@@ -1,4 +1,6 @@
+import { CalendarClock } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
+import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
 import type { Sale } from '../types'
 
@@ -9,15 +11,17 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
 }
 
 interface SaleDetailModalProps {
-  sale: Sale | null
-  isOpen: boolean
-  onClose: () => void
+  sale:         Sale | null
+  isOpen:       boolean
+  onClose:      () => void
+  onReschedule?: () => void
 }
 
-export function SaleDetailModal({ sale, isOpen, onClose }: SaleDetailModalProps) {
+export function SaleDetailModal({ sale, isOpen, onClose, onReschedule }: SaleDetailModalProps) {
   if (!sale) return null
 
   const hasScheduled = !!sale.scheduled_at
+  const isScheduledOrder = sale.order_type === 'delivery' || sale.order_type === 'pickup'
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Sale Details" size="sm">
@@ -75,6 +79,19 @@ export function SaleDetailModal({ sale, isOpen, onClose }: SaleDetailModalProps)
           <div className="border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">Remarks</p>
             <p>{sale.remarks}</p>
+          </div>
+        )}
+
+        {isScheduledOrder && onReschedule && (
+          <div className="border-t border-border pt-3">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => { onClose(); onReschedule() }}
+            >
+              <CalendarClock className="h-4 w-4" />
+              Reschedule {sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'}
+            </Button>
           </div>
         )}
       </div>

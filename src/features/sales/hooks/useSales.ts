@@ -24,6 +24,7 @@ interface UseSalesReturn {
   error: string | null
   addSale: (input: SaleInsert) => Promise<Sale>
   recordPayment: (saleId: string, amount: number, paymentMode: PaymentMode, paidAt: string, remarks: string) => Promise<void>
+  rescheduleOrder: (saleId: string, scheduledAt: string) => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -100,5 +101,19 @@ export function useSales(): UseSalesReturn {
     await fetchData()
   }, [data, stationId, fetchData])
 
-  return { data, isLoading, error, addSale, recordPayment, refetch: fetchData }
+  const rescheduleOrder = useCallback(async (saleId: string, scheduledAt: string) => {
+    const { error: e } = await supabase
+      .from('sales')
+      .update({ scheduled_at: scheduledAt })
+      .eq('id', saleId)
+    if (e) throw new Error(e.message)
+    // Update the reminder so it fires again at the new time
+    await supabase
+      .from('reminders')
+      .update({ scheduled_at: scheduledAt, is_dismissed: false })
+      .eq('sale_id', saleId)
+    await fetchData()
+  }, [fetchData])
+
+  return { data, isLoading, error, addSale, recordPayment, rescheduleOrder, refetch: fetchData }
 }

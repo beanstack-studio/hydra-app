@@ -7,6 +7,7 @@ import { SaleModal } from '@/features/sales/components/SaleModal'
 import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
+import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
@@ -14,11 +15,12 @@ import type { Sale, SaleInsert } from '@/features/sales/types'
 
 export default function SalesPage() {
   const { toast } = useToast()
-  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false)
-  const [selectedSale,    setSelectedSale]    = useState<Sale | null>(null)
-  const [payingSale,      setPayingSale]      = useState<Sale | null>(null)
+  const [isSaleModalOpen,   setIsSaleModalOpen]   = useState(false)
+  const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
+  const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
+  const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
 
-  const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment } = useSales()
+  const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
   const handleAddSale = async (input: SaleInsert) => addSale(input)
@@ -33,6 +35,12 @@ export default function SalesPage() {
     await recordPayment(saleId, amount, paymentMode, paidAt, remarks)
     toast({ title: 'Payment recorded' })
     setPayingSale(null)
+  }
+
+  const handleRescheduleClick = () => {
+    const sale = selectedSale
+    setSelectedSale(null)
+    if (sale) setReschedulingSale(sale)
   }
 
   return (
@@ -67,6 +75,15 @@ export default function SalesPage() {
         sale={selectedSale}
         isOpen={!!selectedSale}
         onClose={() => setSelectedSale(null)}
+        onReschedule={handleRescheduleClick}
+      />
+
+      {/* Reschedule modal */}
+      <RescheduleModal
+        sale={reschedulingSale}
+        isOpen={!!reschedulingSale}
+        onClose={() => setReschedulingSale(null)}
+        onReschedule={rescheduleOrder}
       />
 
       {/* Record payment modal */}
