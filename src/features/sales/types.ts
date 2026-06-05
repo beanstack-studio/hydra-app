@@ -38,6 +38,7 @@ export interface Sale {
   remarks: string | null
   status: SaleStatus
   items: CartItem[] | null
+  fulfilled_at: string | null
   created_at: string
 }
 

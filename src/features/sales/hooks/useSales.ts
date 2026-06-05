@@ -4,16 +4,44 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleInsert, PaymentMode } from '../types'
 
 async function deductLinkedSupplies(stationId: string, productId: string, qtySold: number) {
-  const { data: linked } = await supabase
+  // Check supply_product_links junction table first (multi-link, post-migration)
+  const { data: junctionLinks } = await supabase
+    .from('supply_product_links')
+    .select('supply_id, units_per_sale')
+    .eq('station_id', stationId)
+    .eq('product_id', productId)
+
+  const handledIds = new Set((junctionLinks ?? []).map((l: { supply_id: string }) => l.supply_id))
+
+  // Also check direct linked_product_id (backward compat, skip already handled)
+  const { data: directLinked } = await supabase
     .from('supplies')
     .select('id, qty, units_per_sale')
     .eq('station_id', stationId)
     .eq('linked_product_id', productId)
-  if (!linked || linked.length === 0) return
+
+  const toDeduct: { supply_id: string; units_per_sale: number }[] = [
+    ...(junctionLinks ?? []).map((l: { supply_id: string; units_per_sale: number }) => ({ supply_id: l.supply_id, units_per_sale: l.units_per_sale })),
+    ...(directLinked ?? [])
+      .filter((s: { id: string }) => !handledIds.has(s.id))
+      .map((s: { id: string; units_per_sale: number }) => ({ supply_id: s.id, units_per_sale: s.units_per_sale })),
+  ]
+
+  if (toDeduct.length === 0) return
+
+  const supplyIds = toDeduct.map((l) => l.supply_id)
+  const { data: currentQtys } = await supabase
+    .from('supplies')
+    .select('id, qty')
+    .in('id', supplyIds)
+
+  const qtyMap = new Map((currentQtys ?? []).map((s: { id: string; qty: number }) => [s.id, s.qty]))
+
   await Promise.all(
-    (linked as { id: string; qty: number; units_per_sale: number }[]).map((s) => {
-      const newQty = Math.max(0, s.qty - qtySold * s.units_per_sale)
-      return supabase.from('supplies').update({ qty: newQty }).eq('id', s.id)
+    toDeduct.map((l) => {
+      const currentQty = qtyMap.get(l.supply_id) ?? 0
+      const newQty = Math.max(0, currentQty - qtySold * l.units_per_sale)
+      return supabase.from('supplies').update({ qty: newQty }).eq('id', l.supply_id)
     })
   )
 }
@@ -25,6 +53,7 @@ interface UseSalesReturn {
   addSale: (input: SaleInsert) => Promise<Sale>
   recordPayment: (saleId: string, amount: number, paymentMode: PaymentMode, paidAt: string, remarks: string) => Promise<void>
   rescheduleOrder: (saleId: string, scheduledAt: string) => Promise<void>
+  confirmFulfillment: (saleId: string) => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -69,7 +98,6 @@ export function useSales(): UseSalesReturn {
       .select()
       .single()
     if (e) throw new Error(e.message)
-    // Deduct linked supplies silently — failure doesn't block the sale
     if (stationId && input.product_id) {
       void deductLinkedSupplies(stationId, input.product_id, input.qty)
     }
@@ -107,7 +135,6 @@ export function useSales(): UseSalesReturn {
       .update({ scheduled_at: scheduledAt })
       .eq('id', saleId)
     if (e) throw new Error(e.message)
-    // Update the reminder so it fires again at the new time
     await supabase
       .from('reminders')
       .update({ scheduled_at: scheduledAt, is_dismissed: false })
@@ -115,5 +142,16 @@ export function useSales(): UseSalesReturn {
     await fetchData()
   }, [fetchData])
 
-  return { data, isLoading, error, addSale, recordPayment, rescheduleOrder, refetch: fetchData }
+  const confirmFulfillment = useCallback(async (saleId: string) => {
+    const { error: e } = await supabase
+      .from('sales')
+      .update({ fulfilled_at: new Date().toISOString() })
+      .eq('id', saleId)
+    if (e) throw new Error(e.message)
+    // Dismiss any open reminders for this sale
+    await supabase.from('reminders').update({ is_dismissed: true }).eq('sale_id', saleId)
+    await fetchData()
+  }, [fetchData])
+
+  return { data, isLoading, error, addSale, recordPayment, rescheduleOrder, confirmFulfillment, refetch: fetchData }
 }

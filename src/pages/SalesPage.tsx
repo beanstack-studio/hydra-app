@@ -20,7 +20,7 @@ export default function SalesPage() {
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
 
-  const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder } = useSales()
+  const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
   const handleAddSale = async (input: SaleInsert) => addSale(input)
@@ -41,6 +41,17 @@ export default function SalesPage() {
     const sale = selectedSale
     setSelectedSale(null)
     if (sale) setReschedulingSale(sale)
+  }
+
+  const handleConfirmFulfillment = async () => {
+    if (!selectedSale) return
+    const label = selectedSale.order_type === 'delivery' ? 'delivered' : 'picked up'
+    try {
+      await confirmFulfillment(selectedSale.id)
+      toast({ title: `Marked as ${label}` })
+    } catch (e) {
+      toast({ title: 'Failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
+    }
   }
 
   return (
@@ -76,6 +87,7 @@ export default function SalesPage() {
         isOpen={!!selectedSale}
         onClose={() => setSelectedSale(null)}
         onReschedule={handleRescheduleClick}
+        onConfirmFulfillment={handleConfirmFulfillment}
       />
 
       {/* Reschedule modal */}

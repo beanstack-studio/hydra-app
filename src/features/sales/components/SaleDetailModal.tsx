@@ -1,31 +1,35 @@
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, CheckCircle2, MapPin, Clock } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
 import type { Sale } from '../types'
 
-const ORDER_TYPE_LABEL: Record<string, string> = {
-  'walk-in': 'Walk-in',
-  delivery: 'Delivery',
-  pickup: 'Pickup',
-}
-
 interface SaleDetailModalProps {
-  sale:         Sale | null
-  isOpen:       boolean
-  onClose:      () => void
-  onReschedule?: () => void
+  sale:                  Sale | null
+  isOpen:                boolean
+  onClose:               () => void
+  onReschedule?:         () => void
+  onConfirmFulfillment?: () => void
 }
 
-export function SaleDetailModal({ sale, isOpen, onClose, onReschedule }: SaleDetailModalProps) {
+export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirmFulfillment }: SaleDetailModalProps) {
   if (!sale) return null
 
-  const hasScheduled = !!sale.scheduled_at
   const isScheduledOrder = sale.order_type === 'delivery' || sale.order_type === 'pickup'
+  const isFulfilled      = !!sale.fulfilled_at
+  const orderLabel       = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
+
+  // All items — use items array if present, fallback to single product
+  const itemLines: { name: string; qty: number; subtotal: number }[] =
+    sale.items && sale.items.length > 0
+      ? sale.items.map((i) => ({ name: i.product_name, qty: i.qty, subtotal: i.qty * i.price }))
+      : [{ name: sale.product_name, qty: sale.qty, subtotal: sale.product_total }]
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Sale Details" size="sm">
       <div className="space-y-3 text-sm">
+
+        {/* Section 1: Customer + financials */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <div>
             <p className="text-xs text-muted-foreground">Customer</p>
@@ -34,14 +38,6 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule }: SaleDet
           <div>
             <p className="text-xs text-muted-foreground">Date</p>
             <p className="font-medium">{formatDate(sale.sale_date)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Product</p>
-            <p className="font-medium">{sale.product_name} ×{sale.qty}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Order Type</p>
-            <p className="font-medium">{ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Payment</p>
@@ -59,22 +55,52 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule }: SaleDet
           )}
         </div>
 
-        {hasScheduled && (
-          <div className="border-t border-border pt-3">
-            <p className="text-xs text-muted-foreground">Scheduled</p>
-            <p className="font-medium">
-              {formatDate(sale.scheduled_at!)} at {formatTime(sale.scheduled_at!)}
-            </p>
+        {/* Section 2: Items */}
+        <div className="border-t border-border pt-3 space-y-1">
+          <p className="text-xs text-muted-foreground mb-1">Items</p>
+          {itemLines.map((item, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="font-medium">{item.name} ×{item.qty}</span>
+              <span className="text-muted-foreground text-xs">{formatCurrency(item.subtotal)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Section 3: Delivery/Pickup details */}
+        {isScheduledOrder && (
+          <div className="border-t border-border pt-3 space-y-1.5">
+            <p className="text-xs font-medium text-foreground">{orderLabel} Details</p>
+
+            {(sale.delivery_address || sale.scheduled_at) && (
+              <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                {sale.delivery_address && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 mt-px" />
+                    {sale.delivery_address}
+                  </span>
+                )}
+                {sale.delivery_address && sale.scheduled_at && (
+                  <span className="text-muted-foreground/50">·</span>
+                )}
+                {sale.scheduled_at && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 shrink-0 mt-px" />
+                    {formatDate(sale.scheduled_at)} {formatTime(sale.scheduled_at)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {isFulfilled && (
+              <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 pt-0.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {orderLabel === 'Delivery' ? 'Delivered' : 'Picked up'} on {formatDate(sale.fulfilled_at!)} at {formatTime(sale.fulfilled_at!)}
+              </div>
+            )}
           </div>
         )}
 
-        {sale.delivery_address && (
-          <div className={hasScheduled ? '' : 'border-t border-border pt-3'}>
-            <p className="text-xs text-muted-foreground">Delivery Address</p>
-            <p>{sale.delivery_address}</p>
-          </div>
-        )}
-
+        {/* Section 4: Remarks */}
         {sale.remarks && (
           <div className="border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">Remarks</p>
@@ -82,18 +108,33 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule }: SaleDet
           </div>
         )}
 
-        {isScheduledOrder && onReschedule && (
-          <div className="border-t border-border pt-3">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => { onClose(); onReschedule() }}
-            >
-              <CalendarClock className="h-4 w-4" />
-              Reschedule {sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'}
-            </Button>
+        {/* Section 5: Actions for scheduled orders */}
+        {isScheduledOrder && (onReschedule || onConfirmFulfillment) && (
+          <div className="border-t border-border pt-3 flex gap-2">
+            {onConfirmFulfillment && !isFulfilled && (
+              <Button
+                variant="outline"
+                className="flex-1 gap-2 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                onClick={() => { onClose(); onConfirmFulfillment() }}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {orderLabel === 'Delivery' ? 'Mark Delivered' : 'Mark Picked Up'}
+              </Button>
+            )}
+            {onReschedule && (
+              <Button
+                variant="outline"
+                className="flex-1 gap-2"
+                disabled={isFulfilled}
+                onClick={() => { onClose(); onReschedule() }}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Reschedule
+              </Button>
+            )}
           </div>
         )}
+
       </div>
     </Modal>
   )

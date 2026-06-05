@@ -123,7 +123,8 @@ export function useExpenses(): UseExpensesReturn {
       payment_method: input.payment_method ?? null,
       remarks: input.remarks ?? null,
       receipt_url,
-      inventory_item_id: inventoryItemId,
+      // inventory_item_id FK points to legacy 'inventory' table — use null until migration fixes it
+      inventory_item_id: null,
       supplier: input.supply_store ?? null,
     })
     if (e) throw new Error(e.message)
