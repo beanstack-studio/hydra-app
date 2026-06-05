@@ -9,6 +9,7 @@ import { ExpenseTable } from '@/features/expenses/components/ExpenseTable'
 import { BillTable } from '@/features/bills/components/BillTable'
 import { PayrollSection } from '@/features/payroll/components/PayrollSection'
 import { useExpenses } from '@/features/expenses/hooks/useExpenses'
+import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { formatCurrency, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -30,6 +31,7 @@ export default function ExpensesPage() {
   const [isPaying, setIsPaying] = useState(false)
 
   const { data, isLoading, error, addExpense, updateExpense, deleteExpense, markExpensePaid, getReceiptUrl } = useExpenses()
+  const { data: supplies } = useSupplies()
 
   const openEdit = (expense: Expense) => {
     setEditingExpense(expense)
@@ -145,6 +147,7 @@ export default function ExpensesPage() {
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingExpense(null) }}
         expense={editingExpense}
+        supplies={supplies}
         onAdd={addExpense}
         onUpdate={updateExpense}
       />

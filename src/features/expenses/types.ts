@@ -29,4 +29,10 @@ export type ExpenseInput = {
   remarks: string | null
   receipt_url?: string | null
   inventory_item_id?: string | null
+  // Supplies-specific — only used when category = 'supplies'
+  supply_id?: string | null        // existing supply id
+  supply_name?: string | null      // name of existing supply (for item label)
+  supply_qty?: number | null       // qty purchased
+  supply_store?: string | null     // store/supplier
+  new_supply_name?: string | null  // if creating a brand-new supply item
 }

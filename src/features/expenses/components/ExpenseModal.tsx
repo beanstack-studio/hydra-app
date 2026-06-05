@@ -9,41 +9,51 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { cn, PH_TZ } from '@/lib/utils'
+import { PH_TZ } from '@/lib/utils'
 import type { Expense, ExpenseInput, ExpenseCategory, ExpensePaymentMethod } from '../types'
+import type { Supply } from '@/features/supplies/types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
-  { value: 'gasoline', label: 'Gasoline' },
-  { value: 'supplies', label: 'Supplies' },
-  { value: 'other',    label: 'Other' },
+  { value: 'gasoline',    label: 'Gasoline'    },
+  { value: 'supplies',    label: 'Supplies'    },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'other',       label: 'Other'       },
 ]
 
 const PAYMENT_METHODS: { value: ExpensePaymentMethod; label: string }[] = [
-  { value: 'cash',        label: 'Cash' },
-  { value: 'gcash',       label: 'GCash' },
-  { value: 'maya',        label: 'Maya' },
+  { value: 'cash',        label: 'Cash'        },
+  { value: 'gcash',       label: 'GCash'       },
+  { value: 'maya',        label: 'Maya'        },
   { value: 'credit_card', label: 'Credit Card' },
-  { value: 'other',       label: 'Other' },
+  { value: 'other',       label: 'Other'       },
 ]
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+
+const NEW_ITEM_VALUE = '__new__'
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const expenseSchema = z.object({
-  category: z.string().refine(
+  category:          z.string().refine(
     (v): v is ExpenseCategory =>
       (['gasoline', 'supplies', 'maintenance', 'other', 'labor'] as string[]).includes(v),
     { message: 'Select a category' }
   ),
-  expense_date:   z.string().min(1, 'Date is required'),
-  amount:         z.number({ invalid_type_error: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
-  payment_method: z.enum(['cash', 'gcash', 'maya', 'credit_card', 'other']).nullable(),
-  remarks:        z.string().nullable(),
+  expense_date:      z.string().min(1, 'Date is required'),
+  amount:            z.number({ message: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
+  payment_method:    z.enum(['cash', 'gcash', 'maya', 'credit_card', 'other']).nullable(),
+  remarks:           z.string().nullable(),
+  // Supplies-specific
+  supply_select:     z.string().nullable(),   // supply id or '__new__'
+  new_supply_name:   z.string().nullable(),
+  supply_qty:        z.number().nullable(),
+  supply_store:      z.string().nullable(),
 })
 
 type ExpenseSchema = z.infer<typeof expenseSchema>
@@ -51,16 +61,17 @@ type ExpenseSchema = z.infer<typeof expenseSchema>
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface ExpenseModalProps {
-  isOpen: boolean
-  onClose: () => void
-  expense: Expense | null
-  onAdd: (input: ExpenseInput, file?: File) => Promise<void>
-  onUpdate: (id: string, input: Partial<ExpenseInput>, file?: File) => Promise<void>
+  isOpen:    boolean
+  onClose:   () => void
+  expense:   Expense | null
+  supplies:  Supply[]
+  onAdd:     (input: ExpenseInput, file?: File) => Promise<void>
+  onUpdate:  (id: string, input: Partial<ExpenseInput>, file?: File) => Promise<void>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: ExpenseModalProps) {
+export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpdate }: ExpenseModalProps) {
   const { toast } = useToast()
   const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
 
@@ -79,16 +90,24 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
   } = useForm<ExpenseSchema>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category:       '',
-      expense_date:   todayPH,
-      amount:         0,
-      payment_method: null,
-      remarks:        '',
+      category:        '',
+      expense_date:    todayPH,
+      amount:          0,
+      payment_method:  null,
+      remarks:         '',
+      supply_select:   null,
+      new_supply_name: null,
+      supply_qty:      null,
+      supply_store:    null,
     },
   })
 
-  const expenseDate       = watch('expense_date')
+  const category         = watch('category')
+  const expenseDate      = watch('expense_date')
   const selectedPayMethod = watch('payment_method')
+  const supplySelect     = watch('supply_select')
+  const isSupplies       = category === 'supplies'
+  const isNewSupply      = supplySelect === NEW_ITEM_VALUE
 
   useEffect(() => {
     if (!isOpen) return
@@ -96,19 +115,27 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
     setKeepExistingReceipt(true)
     if (expense) {
       reset({
-        category:       expense.category,
-        expense_date:   expense.expense_date,
-        amount:         expense.amount,
-        payment_method: expense.payment_method ?? null,
-        remarks:        expense.remarks ?? '',
+        category:        expense.category,
+        expense_date:    expense.expense_date,
+        amount:          expense.amount,
+        payment_method:  expense.payment_method ?? null,
+        remarks:         expense.remarks ?? '',
+        supply_select:   expense.inventory_item_id ?? null,
+        new_supply_name: null,
+        supply_qty:      null,
+        supply_store:    null,
       })
     } else {
       reset({
-        category:       '',
-        expense_date:   todayPH,
-        amount:         0,
-        payment_method: null,
-        remarks:        '',
+        category:        '',
+        expense_date:    todayPH,
+        amount:          0,
+        payment_method:  null,
+        remarks:         '',
+        supply_select:   null,
+        new_supply_name: null,
+        supply_qty:      null,
+        supply_store:    null,
       })
     }
   }, [expense, isOpen, reset, todayPH])
@@ -118,13 +145,38 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
     : null
 
   const onSubmit = handleSubmit(async (values) => {
+    // Validate supply fields
+    if (values.category === 'supplies' && !expense) {
+      if (!values.supply_select) {
+        toast({ title: 'Select an item', description: 'Choose an existing item or add a new one.', variant: 'destructive' })
+        return
+      }
+      if (values.supply_select === NEW_ITEM_VALUE && !values.new_supply_name?.trim()) {
+        toast({ title: 'Enter item name', variant: 'destructive' })
+        return
+      }
+      if (!values.supply_qty || values.supply_qty <= 0) {
+        toast({ title: 'Enter qty purchased', variant: 'destructive' })
+        return
+      }
+    }
+
     try {
+      const selectedSupply = values.supply_select && values.supply_select !== NEW_ITEM_VALUE
+        ? supplies.find((s) => s.id === values.supply_select) ?? null
+        : null
+
       const baseInput: ExpenseInput = {
-        category:       values.category,
-        amount:         values.amount,
-        expense_date:   values.expense_date,
-        payment_method: values.payment_method,
-        remarks:        values.remarks || null,
+        category:        values.category,
+        amount:          values.amount,
+        expense_date:    values.expense_date,
+        payment_method:  values.payment_method,
+        remarks:         values.remarks || null,
+        supply_id:       selectedSupply?.id ?? null,
+        supply_name:     selectedSupply?.name ?? null,
+        supply_qty:      values.supply_qty ?? null,
+        supply_store:    values.supply_store || null,
+        new_supply_name: isNewSupply ? (values.new_supply_name ?? null) : null,
       }
 
       if (expense) {
@@ -147,16 +199,14 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
     }
   })
 
-  const selectClass =
-    'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
+  const selectClass = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
   const showExistingReceipt = !selectedFile && keepExistingReceipt && !!existingReceiptName
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Edit Expense' : 'Add Expense'} size="sm">
       <form onSubmit={onSubmit} className="space-y-4">
 
-        {/* ── Category + Date ──────────────────────────────────────────── */}
+        {/* Category + Date */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="exp-category">Category <span className="text-destructive">*</span></Label>
@@ -166,11 +216,8 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
-            {errors.category && (
-              <p className="text-xs text-destructive">{errors.category.message}</p>
-            )}
+            {errors.category && <p className="text-xs text-destructive">{errors.category.message}</p>}
           </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="exp-date">Date <span className="text-destructive">*</span></Label>
             <DatePickerInput
@@ -178,16 +225,73 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
               value={expenseDate}
               onChange={(v) => setValue('expense_date', v, { shouldValidate: true })}
             />
-            {errors.expense_date && (
-              <p className="text-xs text-destructive">{errors.expense_date.message}</p>
-            )}
+            {errors.expense_date && <p className="text-xs text-destructive">{errors.expense_date.message}</p>}
           </div>
         </div>
 
-        {/* ── Amount + Payment Method ───────────────────────────────────── */}
+        {/* Supplies-specific fields */}
+        {isSupplies && !expense && (
+          <>
+            {/* Item selector */}
+            <div className="space-y-1.5">
+              <Label htmlFor="exp-supply">Item <span className="text-destructive">*</span></Label>
+              <select
+                id="exp-supply"
+                value={supplySelect ?? ''}
+                onChange={(e) => setValue('supply_select', e.target.value || null)}
+                className={selectClass}
+              >
+                <option value="">— Select item —</option>
+                {supplies.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+                <option value={NEW_ITEM_VALUE}>+ New item…</option>
+              </select>
+            </div>
+
+            {/* New item name */}
+            {isNewSupply && (
+              <div className="space-y-1.5">
+                <Label htmlFor="exp-new-name">New Item Name <span className="text-destructive">*</span></Label>
+                <Input
+                  id="exp-new-name"
+                  placeholder="e.g. Seal Cap - Slim"
+                  {...register('new_supply_name')}
+                />
+              </div>
+            )}
+
+            {/* Qty + Store */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="exp-qty">Qty Purchased <span className="text-destructive">*</span></Label>
+                <Input
+                  id="exp-qty"
+                  type="number"
+                  min={1}
+                  step="any"
+                  placeholder="0"
+                  {...register('supply_qty', { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="exp-store">Store / Supplier</Label>
+                <Input
+                  id="exp-store"
+                  placeholder="e.g. SM Hypermarket"
+                  {...register('supply_store')}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Amount + Payment Method */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="exp-amount">Amount <span className="text-destructive">*</span></Label>
+            <Label htmlFor="exp-amount">
+              {isSupplies && !expense ? 'Total Price' : 'Amount'} <span className="text-destructive">*</span>
+            </Label>
             <Controller
               name="amount"
               control={control}
@@ -200,25 +304,14 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
                 />
               )}
             />
-            {errors.amount && (
-              <p className="text-xs text-destructive">{errors.amount.message}</p>
-            )}
+            {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
           </div>
-
           <div className="space-y-1.5">
-            <Label htmlFor="exp-payment">
-              Payment Method
-            </Label>
+            <Label htmlFor="exp-payment">Payment Method</Label>
             <select
               id="exp-payment"
               value={selectedPayMethod ?? ''}
-              onChange={(e) =>
-                setValue(
-                  'payment_method',
-                  (e.target.value as ExpensePaymentMethod) || null,
-                  { shouldValidate: true }
-                )
-              }
+              onChange={(e) => setValue('payment_method', (e.target.value as ExpensePaymentMethod) || null, { shouldValidate: true })}
               className={selectClass}
             >
               <option value="">— Select —</option>
@@ -229,22 +322,14 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
           </div>
         </div>
 
-        {/* ── Receipt ──────────────────────────────────────────────────── */}
+        {/* Receipt */}
         <div className="space-y-1.5">
           <Label>Receipt <span className="font-normal text-muted-foreground">(5 MB max)</span></Label>
-
           {selectedFile ? (
             <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-sm">{selectedFile.name}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFile(null)
-                  if (fileInputRef.current) fileInputRef.current.value = ''
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
+              <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-muted-foreground hover:text-foreground transition-colors duration-150">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -252,25 +337,16 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
             <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
               <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-sm text-muted-foreground">{existingReceiptName}</span>
-              <button
-                type="button"
-                onClick={() => setKeepExistingReceipt(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
+              <button type="button" onClick={() => setKeepExistingReceipt(false)} className="text-muted-foreground hover:text-foreground transition-colors duration-150">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 w-full rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-foreground hover:text-foreground transition-colors duration-150"
-            >
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 w-full rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-foreground hover:text-foreground transition-colors duration-150">
               <Paperclip className="h-3.5 w-3.5" />
               <span>Attach receipt (image or PDF)</span>
             </button>
           )}
-
           <input
             ref={fileInputRef}
             type="file"
@@ -280,11 +356,7 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
               const file = e.target.files?.[0]
               if (!file) return
               if (file.size > MAX_FILE_BYTES) {
-                toast({
-                  title: 'File too large',
-                  description: 'Receipt must be 5 MB or less.',
-                  variant: 'destructive',
-                })
+                toast({ title: 'File too large', description: 'Receipt must be 5 MB or less.', variant: 'destructive' })
                 if (fileInputRef.current) fileInputRef.current.value = ''
                 return
               }
@@ -294,24 +366,15 @@ export function ExpenseModal({ isOpen, onClose, expense, onAdd, onUpdate }: Expe
           />
         </div>
 
-        {/* ── Remarks ──────────────────────────────────────────────────── */}
+        {/* Remarks */}
         <div className="space-y-1.5">
-          <Label htmlFor="exp-remarks">
-            Remarks
-          </Label>
-          <Textarea
-            id="exp-remarks"
-            placeholder="Optional notes…"
-            rows={2}
-            {...register('remarks')}
-          />
+          <Label htmlFor="exp-remarks">Remarks</Label>
+          <Textarea id="exp-remarks" placeholder="Optional notes…" rows={2} {...register('remarks')} />
         </div>
 
-        {/* ── Actions ──────────────────────────────────────────────────── */}
+        {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
           <Button type="submit" className="flex-1" disabled={isSubmitting}>
             {isSubmitting ? 'Saving…' : expense ? 'Save Changes' : 'Add Expense'}
           </Button>

@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatInTimeZone } from 'date-fns-tz'
-import { PH_TZ } from '@/lib/utils'
 import type { Supply, SupplyInput, SupplyStatus } from '../types'
 
 function computeStatus(qty: number, threshold: number): SupplyStatus {
@@ -16,10 +14,9 @@ interface UseSuppliesReturn {
   isLoading: boolean
   error: string | null
   addSupply: (input: SupplyInput) => Promise<void>
-  updateSupply: (id: string, input: SupplyInput) => Promise<void>
+  updateSupply: (id: string, input: Partial<SupplyInput>) => Promise<void>
   deleteSupply: (id: string) => Promise<void>
   adjustQty: (id: string, newQty: number) => Promise<void>
-  logAsExpense: (supply: Supply, qty: number) => Promise<void>
   deductForSale: (productId: string, qtySold: number) => Promise<void>
 }
 
@@ -67,7 +64,7 @@ export function useSupplies(): UseSuppliesReturn {
     await fetchData()
   }, [stationId, fetchData])
 
-  const updateSupply = useCallback(async (id: string, input: SupplyInput) => {
+  const updateSupply = useCallback(async (id: string, input: Partial<SupplyInput>) => {
     const { error: e } = await supabase.from('supplies').update(input).eq('id', id)
     if (e) throw new Error(e.message)
     await fetchData()
@@ -88,25 +85,6 @@ export function useSupplies(): UseSuppliesReturn {
     await fetchData()
   }, [fetchData])
 
-  // Log a supply purchase as a Supplies expense
-  const logAsExpense = useCallback(async (supply: Supply, qty: number) => {
-    if (!stationId) return
-    const amount = (supply.price_per_unit ?? 0) * qty
-    const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
-    const { error: e } = await supabase.from('expenses').insert({
-      station_id: stationId,
-      category: 'supplies',
-      item: supply.name,
-      price: amount,
-      amount,
-      frequency: 'one_off',
-      expense_date: supply.last_purchased_at ?? todayPH,
-      payment_method: null,
-      remarks: `${qty} × ${supply.name}${supply.store ? ` from ${supply.store}` : ''}`,
-    })
-    if (e) throw new Error(e.message)
-  }, [stationId])
-
   // Called by useSales after a sale is recorded — deducts linked supplies
   const deductForSale = useCallback(async (productId: string, qtySold: number) => {
     if (!stationId) return
@@ -122,7 +100,7 @@ export function useSupplies(): UseSuppliesReturn {
     await fetchData()
   }, [stationId, data, fetchData])
 
-  return { data, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty, logAsExpense, deductForSale }
+  return { data, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty, deductForSale }
 }
 
 export { computeStatus }

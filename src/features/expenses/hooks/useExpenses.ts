@@ -70,10 +70,52 @@ export function useExpenses(): UseExpensesReturn {
     if (!stationId) return
     let receipt_url: string | null = input.receipt_url ?? null
     if (file) receipt_url = await uploadReceipt(file)
+
+    let inventoryItemId = input.inventory_item_id ?? null
+    let itemLabel = CATEGORY_ITEM_LABELS[input.category] ?? input.category
+    const supplyQty = input.supply_qty ?? 0
+
+    // Handle supply stock update/creation
+    if (input.category === 'supplies' && supplyQty > 0) {
+      const pricePerUnit = input.amount / supplyQty
+
+      if (input.new_supply_name) {
+        // Create new supply item and link it
+        const { data: newSupply } = await supabase.from('supplies').insert({
+          station_id: stationId,
+          name: input.new_supply_name,
+          type: 'supply',
+          qty: supplyQty,
+          price_per_unit: pricePerUnit,
+          store: input.supply_store ?? null,
+          last_purchased_at: input.expense_date,
+          threshold: 0,
+          units_per_sale: 1,
+          linked_product_id: null,
+        }).select('id').single()
+        if (newSupply) inventoryItemId = (newSupply as { id: string }).id
+        itemLabel = input.new_supply_name
+      } else if (input.supply_id) {
+        // Update existing supply — add qty, recalculate price, update store + date
+        const { data: existing } = await supabase
+          .from('supplies').select('qty').eq('id', input.supply_id).single()
+        if (existing) {
+          await supabase.from('supplies').update({
+            qty: (existing as { qty: number }).qty + supplyQty,
+            price_per_unit: pricePerUnit,
+            last_purchased_at: input.expense_date,
+            ...(input.supply_store ? { store: input.supply_store } : {}),
+          }).eq('id', input.supply_id)
+          inventoryItemId = input.supply_id
+        }
+        itemLabel = input.supply_name ?? itemLabel
+      }
+    }
+
     const { error: e } = await supabase.from('expenses').insert({
       station_id: stationId,
       category: input.category,
-      item: CATEGORY_ITEM_LABELS[input.category] ?? input.category,
+      item: itemLabel,
       price: input.amount,
       amount: input.amount,
       frequency: 'one_off',
@@ -81,6 +123,7 @@ export function useExpenses(): UseExpensesReturn {
       payment_method: input.payment_method ?? null,
       remarks: input.remarks ?? null,
       receipt_url,
+      inventory_item_id: inventoryItemId,
     })
     if (e) throw new Error(e.message)
     await fetchData()
