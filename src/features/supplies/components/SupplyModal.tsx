@@ -100,58 +100,56 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     <Modal isOpen={isOpen} onClose={onClose} title={supply ? 'Edit Item' : 'Add Item'} size="sm">
       <form onSubmit={onSubmit} className="space-y-4">
 
-        {/* Name */}
-        <div className="space-y-1.5">
-          <Label htmlFor="sup-name">Item Name <span className="text-destructive">*</span></Label>
-          <Input id="sup-name" placeholder="e.g. Ice Bag 1kg" {...register('name')} />
-          {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-        </div>
-
-        {/* Threshold */}
-        <div className="space-y-1.5">
-          <Label htmlFor="sup-threshold">Low Stock Alert at</Label>
-          <Input
-            id="sup-threshold"
-            type="number"
-            min={0}
-            step="any"
-            className="w-32"
-            {...register('threshold', { valueAsNumber: true })}
-          />
-          <p className="text-xs text-muted-foreground">Show a warning banner when qty drops to this number.</p>
-        </div>
-
-        {/* Linked Product */}
-        <div className="space-y-1.5">
-          <Label htmlFor="sup-linked">Auto-deduct when product sold</Label>
-          <select
-            id="sup-linked"
-            value={linkedProductId ?? ''}
-            onChange={(e) => setValue('linked_product_id', e.target.value || null)}
-            className={selectClass}
-          >
-            <option value="">— None —</option>
-            {sellableProducts.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">Deduct this item from stock every time the linked product is sold.</p>
-        </div>
-
-        {/* Units per sale */}
-        {linkedProductId && (
+        {/* Row 1: Name + Low Stock Alert */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="sup-units">Units used per sale</Label>
+            <Label htmlFor="sup-name">Item Name <span className="text-destructive">*</span></Label>
+            <Input id="sup-name" placeholder="e.g. Ice Bag 1kg" {...register('name')} />
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="sup-threshold">Low Stock Alert</Label>
+            <Input
+              id="sup-threshold"
+              type="number"
+              min={0}
+              step="any"
+              {...register('threshold', { valueAsNumber: true })}
+            />
+            <p className="text-xs text-muted-foreground">Warn when qty drops here.</p>
+          </div>
+        </div>
+
+        {/* Row 2: Auto-deduct product + Units per sale */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="sup-linked">Auto-deduct when sold</Label>
+            <select
+              id="sup-linked"
+              value={linkedProductId ?? ''}
+              onChange={(e) => setValue('linked_product_id', e.target.value || null)}
+              className={selectClass}
+            >
+              <option value="">— None —</option>
+              {sellableProducts.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">Deducts on every sale of this product.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="sup-units">Units per sale</Label>
             <Input
               id="sup-units"
               type="number"
               min={0.01}
               step="any"
-              className="w-28"
+              disabled={!linkedProductId}
               {...register('units_per_sale', { valueAsNumber: true })}
             />
+            <p className="text-xs text-muted-foreground">How many units deducted per sale.</p>
           </div>
-        )}
+        </div>
 
         <div className="flex gap-2 pt-2">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>

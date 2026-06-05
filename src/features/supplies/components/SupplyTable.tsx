@@ -6,7 +6,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SearchInput } from '@/components/shared/SearchInput'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
 import type { Column } from '@/components/shared/DataTable'
@@ -23,7 +23,13 @@ const STATUS_LABEL: Record<SupplyStatus, string> = {
   out_of_stock: 'Out',
 }
 
-type SortKey = 'name' | 'total_value' | 'qty' | 'last_purchased_at'
+const STATUS_ORDER: Record<SupplyStatus, number> = {
+  out_of_stock: 0,
+  low_stock:    1,
+  in_stock:     2,
+}
+
+type SortKey = 'name' | 'qty' | 'last_purchased_at' | 'status'
 
 const SEARCH_THRESHOLD = 10
 
@@ -64,10 +70,10 @@ export function SupplyTable({
   const sorted = [...filtered].sort((a, b) => {
     let cmp = 0
     switch (sortKey) {
-      case 'name':             cmp = a.name.localeCompare(b.name); break
-      case 'total_value':      cmp = (a.qty * (a.price_per_unit ?? 0)) - (b.qty * (b.price_per_unit ?? 0)); break
-      case 'qty':              cmp = a.qty - b.qty; break
+      case 'name':              cmp = a.name.localeCompare(b.name); break
+      case 'qty':               cmp = a.qty - b.qty; break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
+      case 'status':            cmp = STATUS_ORDER[computeStatus(a.qty, a.threshold)] - STATUS_ORDER[computeStatus(b.qty, b.threshold)]; break
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -81,13 +87,9 @@ export function SupplyTable({
       sortable: true,
       render: (item) => {
         const linkedName = item.linked_product_id ? productNames[item.linked_product_id] : null
-        const total = item.price_per_unit != null ? item.qty * item.price_per_unit : null
         return (
           <div className="space-y-0.5">
             <p className="text-sm font-semibold text-foreground">{item.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {total != null ? formatCurrency(total) : '—'}
-            </p>
             {linkedName && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 pt-0.5">
                 <ArrowRight className="h-3 w-3 shrink-0" />
@@ -112,44 +114,49 @@ export function SupplyTable({
       ),
     },
     {
-      key: 'qty',
-      header: 'Qty',
+      key: 'status',
+      header: 'Status',
       sortable: true,
       render: (item) => {
         const status = computeStatus(item.qty, item.threshold)
         return (
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5">
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-7 w-7 shrink-0"
-                onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
-                disabled={item.qty <= 0}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="w-8 text-center text-sm font-bold text-foreground">{item.qty}</span>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-7 w-7 shrink-0"
-                onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-1.5 pl-0.5">
-              <Badge variant={STATUS_VARIANT[status]} className="text-xs">
-                {STATUS_LABEL[status]}
-              </Badge>
-              {item.threshold > 0 && (
-                <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
-              )}
-            </div>
+            <Badge variant={STATUS_VARIANT[status]} className="text-xs">
+              {STATUS_LABEL[status]}
+            </Badge>
+            {item.threshold > 0 && (
+              <p className="text-xs text-muted-foreground">Low: {item.threshold}</p>
+            )}
           </div>
         )
       },
+    },
+    {
+      key: 'qty',
+      header: 'Qty',
+      sortable: true,
+      render: (item) => (
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-7 w-7 shrink-0"
+            onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
+            disabled={item.qty <= 0}
+          >
+            <Minus className="h-3 w-3" />
+          </Button>
+          <span className="w-8 text-center text-sm font-bold text-foreground">{item.qty}</span>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-7 w-7 shrink-0"
+            onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
+      ),
     },
     {
       key: 'actions',

@@ -124,6 +124,7 @@ export function useExpenses(): UseExpensesReturn {
       remarks: input.remarks ?? null,
       receipt_url,
       inventory_item_id: inventoryItemId,
+      supplier: input.supply_store ?? null,
     })
     if (e) throw new Error(e.message)
     await fetchData()

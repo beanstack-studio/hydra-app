@@ -54,3 +54,8 @@ export function stopReminderPolling() {
 export async function dismissReminder(id: string) {
   await supabase.from('reminders').update({ is_dismissed: true }).eq('id', id)
 }
+
+export async function snoozeReminder(id: string, minutes = 5) {
+  const snoozeUntil = new Date(Date.now() + minutes * 60_000).toISOString()
+  await supabase.from('reminders').update({ scheduled_at: snoozeUntil }).eq('id', id)
+}

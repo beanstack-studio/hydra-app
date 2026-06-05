@@ -16,6 +16,7 @@ export interface Expense {
   remarks: string | null
   receipt_url: string | null
   inventory_item_id: string | null
+  supplier: string | null
   recorded_by: string | null
   created_at: string
   updated_at: string

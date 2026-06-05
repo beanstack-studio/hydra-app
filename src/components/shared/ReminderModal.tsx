@@ -1,8 +1,8 @@
-import { Truck, ShoppingBag, X, ExternalLink } from 'lucide-react'
+import { Truck, ShoppingBag, X, ExternalLink, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatTime } from '@/lib/utils'
-import { dismissReminder } from '@/lib/reminders'
+import { dismissReminder, snoozeReminder } from '@/lib/reminders'
 import type { Reminder } from '@/lib/reminders'
 
 interface ReminderModalProps {
@@ -18,8 +18,18 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
   const current = reminders[0]
   const remaining = reminders.length - 1
 
+  // Parse items from message: "Delivery — Name — Item1, Item2"
+  const msgParts = current.message.split(' — ')
+  const itemsStr = msgParts.length >= 3 ? msgParts.slice(2).join(' — ') : current.message
+  const itemLines = itemsStr.split(', ').filter(Boolean).slice(0, 5)
+
   const handleDismiss = async () => {
     await dismissReminder(current.id)
+    onDismiss(current.id)
+  }
+
+  const handleSnooze = async () => {
+    await snoozeReminder(current.id, 5)
     onDismiss(current.id)
   }
 
@@ -60,16 +70,26 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
         {/* Body */}
         <div className="px-4 py-4 space-y-2">
           <p className="text-base font-semibold text-foreground">{current.customer_name}</p>
-          <p className="text-sm text-muted-foreground">{current.message}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm font-semibold text-muted-foreground">
             {formatDate(current.scheduled_at)} · {formatTime(current.scheduled_at)}
           </p>
+          <ul className="space-y-0.5 pt-1">
+            {itemLines.map((line, i) => (
+              <li key={i} className="text-sm text-foreground">
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 px-4 pb-4">
           <Button variant="outline" className="flex-1" onClick={handleDismiss}>
             Dismiss
+          </Button>
+          <Button variant="outline" className="flex-1 gap-1" onClick={handleSnooze}>
+            <Clock className="h-3.5 w-3.5" />
+            Snooze 5m
           </Button>
           <Button className="flex-1 gap-1.5" onClick={handleViewSale}>
             <ExternalLink className="h-3.5 w-3.5" />

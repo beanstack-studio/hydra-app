@@ -74,6 +74,20 @@ export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay 
       ),
     },
     {
+      key: 'item',
+      header: 'Item',
+      render: (e: Expense) => (
+        <span className="text-sm text-foreground">{e.item || '—'}</span>
+      ),
+    },
+    {
+      key: 'supplier',
+      header: 'Supplier',
+      render: (e: Expense) => (
+        <span className="text-sm text-muted-foreground">{e.supplier ?? '—'}</span>
+      ),
+    },
+    {
       key: 'payment',
       header: 'Via',
       render: (e: Expense) => (
@@ -83,15 +97,8 @@ export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay 
       ),
     },
     {
-      key: 'remarks',
-      header: 'Remarks',
-      render: (e: Expense) => (
-        <span className="text-sm text-muted-foreground">{e.remarks ?? '—'}</span>
-      ),
-    },
-    {
       key: 'amount',
-      header: 'Amount',
+      header: 'Total Price',
       sortable: true,
       render: (e: Expense) => (
         <span className="text-sm font-semibold">{formatCurrency(e.amount)}</span>
