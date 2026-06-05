@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, Receipt, Pencil, Trash2, Link } from 'lucide-react'
+import { Package, Minus, Plus, Receipt, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -8,7 +8,7 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { computeStatus } from '../hooks/useSupplies'
-import type { Supply, SupplyStatus, SupplyType } from '../types'
+import type { Supply, SupplyStatus } from '../types'
 import type { Column } from '@/components/shared/DataTable'
 
 const STATUS_VARIANT: Record<SupplyStatus, 'success' | 'outline' | 'destructive'> = {
@@ -23,19 +23,13 @@ const STATUS_LABEL: Record<SupplyStatus, string> = {
   out_of_stock:  'Out',
 }
 
-const TYPE_LABEL: Record<SupplyType, string> = {
-  supply: 'Supply',
-  asset:  'Asset',
-}
-
-type SortKey = 'name' | 'type' | 'qty' | 'price_per_unit' | 'store' | 'last_purchased_at'
+type SortKey = 'name' | 'qty' | 'price_per_unit' | 'total_value' | 'store' | 'last_purchased_at'
 
 const SEARCH_THRESHOLD = 10
 
 interface SupplyTableProps {
   items:           Supply[]
   isLoading:       boolean
-  productNames:    Record<string, string>
   onEditClick:     (item: Supply) => void
   onDeleteClick:   (item: Supply) => void
   onQuickAdjust:   (item: Supply, delta: number) => void
@@ -45,7 +39,6 @@ interface SupplyTableProps {
 export function SupplyTable({
   items,
   isLoading,
-  productNames,
   onEditClick,
   onDeleteClick,
   onQuickAdjust,
@@ -55,8 +48,6 @@ export function SupplyTable({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [search, setSearch]   = useState('')
 
-  const handleSearch = (q: string) => setSearch(q)
-
   const handleSort = (key: string) => {
     const k = key as SortKey
     if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -64,17 +55,20 @@ export function SupplyTable({
   }
 
   const filtered = search.length >= 3
-    ? items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || (i.store ?? '').toLowerCase().includes(search.toLowerCase()))
+    ? items.filter((i) =>
+        i.name.toLowerCase().includes(search.toLowerCase()) ||
+        (i.store ?? '').toLowerCase().includes(search.toLowerCase())
+      )
     : items
 
   const sorted = [...filtered].sort((a, b) => {
     let cmp = 0
     switch (sortKey) {
-      case 'name':             cmp = a.name.localeCompare(b.name); break
-      case 'type':             cmp = a.type.localeCompare(b.type); break
-      case 'qty':              cmp = a.qty - b.qty; break
-      case 'price_per_unit':   cmp = (a.price_per_unit ?? 0) - (b.price_per_unit ?? 0); break
-      case 'store':            cmp = (a.store ?? '').localeCompare(b.store ?? ''); break
+      case 'name':              cmp = a.name.localeCompare(b.name); break
+      case 'qty':               cmp = a.qty - b.qty; break
+      case 'price_per_unit':    cmp = (a.price_per_unit ?? 0) - (b.price_per_unit ?? 0); break
+      case 'total_value':       cmp = (a.qty * (a.price_per_unit ?? 0)) - (b.qty * (b.price_per_unit ?? 0)); break
+      case 'store':             cmp = (a.store ?? '').localeCompare(b.store ?? ''); break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
     }
     return sortDir === 'asc' ? cmp : -cmp
@@ -87,27 +81,46 @@ export function SupplyTable({
       key: 'name',
       header: 'Item',
       sortable: true,
-      render: (item) => {
-        const linkedName = item.linked_product_id ? productNames[item.linked_product_id] : null
-        return (
-          <div>
-            <p className="text-sm font-medium text-foreground">{item.name}</p>
-            {linkedName && (
-              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                <Link className="h-3 w-3" />
-                {linkedName} ({item.units_per_sale}/sale)
-              </p>
-            )}
-          </div>
-        )
-      },
+      render: (item) => (
+        <p className="text-sm font-medium text-foreground">{item.name}</p>
+      ),
     },
     {
-      key: 'type',
-      header: 'Type',
+      key: 'price_per_unit',
+      header: 'Price/pc',
       sortable: true,
       render: (item) => (
-        <Badge variant="outline" className="text-xs">{TYPE_LABEL[item.type]}</Badge>
+        <span className="text-sm text-foreground">
+          {item.price_per_unit != null ? formatCurrency(item.price_per_unit) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'total_value',
+      header: 'Total Value',
+      sortable: true,
+      render: (item) => (
+        <span className="text-sm text-foreground">
+          {item.price_per_unit != null ? formatCurrency(item.qty * item.price_per_unit) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'store',
+      header: 'Store',
+      sortable: true,
+      render: (item) => (
+        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'last_purchased_at',
+      header: 'Last Purchased',
+      sortable: true,
+      render: (item) => (
+        <span className="text-sm text-muted-foreground">
+          {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
+        </span>
       ),
     },
     {
@@ -142,43 +155,6 @@ export function SupplyTable({
           </div>
         )
       },
-    },
-    {
-      key: 'price_per_unit',
-      header: 'Price/pc',
-      sortable: true,
-      render: (item) => (
-        <span className="text-sm text-foreground">
-          {item.price_per_unit != null ? formatCurrency(item.price_per_unit) : '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'price_per_unit',
-      header: 'Total Value',
-      render: (item) => (
-        <span className="text-sm text-foreground">
-          {item.price_per_unit != null ? formatCurrency(item.qty * item.price_per_unit) : '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'store',
-      header: 'Store',
-      sortable: true,
-      render: (item) => (
-        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'last_purchased_at',
-      header: 'Last Purchased',
-      sortable: true,
-      render: (item) => (
-        <span className="text-sm text-muted-foreground">
-          {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
-        </span>
-      ),
     },
     {
       key: 'actions',
@@ -223,13 +199,13 @@ export function SupplyTable({
       {hasLowStock && (
         <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
           <Package className="h-4 w-4 text-destructive shrink-0" />
-          <p className="text-sm text-destructive">Some supplies are running low or out of stock.</p>
+          <p className="text-sm text-destructive">Some items are running low or out of stock.</p>
         </div>
       )}
 
       {items.length > SEARCH_THRESHOLD && (
         <SearchInput
-          onSearch={handleSearch}
+          onSearch={(q) => setSearch(q)}
           placeholder="Search items or store…"
         />
       )}
@@ -250,8 +226,8 @@ export function SupplyTable({
         emptyState={
           <EmptyState
             icon={<Package className="h-8 w-8" />}
-            title="No supplies yet"
-            description="Add your first supply or asset item."
+            title="No items yet"
+            description="Add your first supply item."
           />
         }
       />

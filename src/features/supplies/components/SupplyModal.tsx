@@ -11,35 +11,29 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { formatInTimeZone } from 'date-fns-tz'
 import { PH_TZ } from '@/lib/utils'
-import type { Supply, SupplyInput, SupplyType } from '../types'
+import type { Supply, SupplyInput } from '../types'
 import type { Product } from '@/features/settings/types'
 
 const supplySchema = z.object({
-  name:               z.string().min(1, 'Name is required'),
-  type:               z.enum(['supply', 'asset']),
-  qty:                z.number({ message: 'Enter qty' }).min(0),
-  price_per_unit:     z.number().min(0).nullable(),
-  store:              z.string().nullable(),
-  last_purchased_at:  z.string().nullable(),
-  threshold:          z.number().min(0),
-  linked_product_id:  z.string().nullable(),
-  units_per_sale:     z.number().min(0.01),
+  name:              z.string().min(1, 'Name is required'),
+  qty:               z.number({ message: 'Enter qty' }).min(0),
+  price_per_unit:    z.number().min(0).nullable(),
+  store:             z.string().nullable(),
+  last_purchased_at: z.string().nullable(),
+  threshold:         z.number().min(0),
+  linked_product_id: z.string().nullable(),
+  units_per_sale:    z.number().min(0.01),
 })
 
 type SupplySchema = z.infer<typeof supplySchema>
 
-const TYPE_OPTIONS: { value: SupplyType; label: string }[] = [
-  { value: 'supply', label: 'Supply' },
-  { value: 'asset',  label: 'Asset'  },
-]
-
 interface SupplyModalProps {
-  isOpen:    boolean
-  onClose:   () => void
-  supply:    Supply | null
-  products:  Product[]
-  onAdd:     (input: SupplyInput) => Promise<void>
-  onUpdate:  (id: string, input: SupplyInput) => Promise<void>
+  isOpen:   boolean
+  onClose:  () => void
+  supply:   Supply | null
+  products: Product[]
+  onAdd:    (input: SupplyInput) => Promise<void>
+  onUpdate: (id: string, input: SupplyInput) => Promise<void>
 }
 
 export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate }: SupplyModalProps) {
@@ -58,7 +52,6 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     resolver: zodResolver(supplySchema),
     defaultValues: {
       name:              '',
-      type:              'supply',
       qty:               0,
       price_per_unit:    null,
       store:             null,
@@ -69,15 +62,14 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     },
   })
 
-  const lastPurchased    = watch('last_purchased_at')
-  const linkedProductId  = watch('linked_product_id')
+  const lastPurchased   = watch('last_purchased_at')
+  const linkedProductId = watch('linked_product_id')
 
   useEffect(() => {
     if (!isOpen) return
     if (supply) {
       reset({
         name:              supply.name,
-        type:              supply.type,
         qty:               supply.qty,
         price_per_unit:    supply.price_per_unit,
         store:             supply.store ?? null,
@@ -89,7 +81,6 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     } else {
       reset({
         name:              '',
-        type:              'supply',
         qty:               0,
         price_per_unit:    null,
         store:             null,
@@ -107,7 +98,7 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     try {
       const input: SupplyInput = {
         name:              values.name,
-        type:              values.type,
+        type:              'supply',
         qty:               values.qty,
         price_per_unit:    values.price_per_unit,
         store:             values.store || null,
@@ -135,45 +126,23 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     <Modal isOpen={isOpen} onClose={onClose} title={supply ? 'Edit Item' : 'Add Item'} size="sm">
       <form onSubmit={onSubmit} className="space-y-4">
 
-        {/* Name + Type */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="sup-name">Item Name <span className="text-destructive">*</span></Label>
-            <Input id="sup-name" placeholder="e.g. Ice Bag" {...register('name')} />
-            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sup-type">Type</Label>
-            <select id="sup-type" {...register('type')} className={selectClass}>
-              {TYPE_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </div>
+        {/* Name */}
+        <div className="space-y-1.5">
+          <Label htmlFor="sup-name">Item Name <span className="text-destructive">*</span></Label>
+          <Input id="sup-name" placeholder="e.g. Ice Bag 1kg" {...register('name')} />
+          {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
         </div>
 
         {/* Qty + Threshold */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="sup-qty">Qty on Hand <span className="text-destructive">*</span></Label>
-            <Input
-              id="sup-qty"
-              type="number"
-              min={0}
-              step="any"
-              {...register('qty', { valueAsNumber: true })}
-            />
+            <Input id="sup-qty" type="number" min={0} step="any" {...register('qty', { valueAsNumber: true })} />
             {errors.qty && <p className="text-xs text-destructive">{errors.qty.message}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="sup-threshold">Low Stock Alert</Label>
-            <Input
-              id="sup-threshold"
-              type="number"
-              min={0}
-              step="any"
-              {...register('threshold', { valueAsNumber: true })}
-            />
+            <Label htmlFor="sup-threshold">Low Stock Alert at</Label>
+            <Input id="sup-threshold" type="number" min={0} step="any" {...register('threshold', { valueAsNumber: true })} />
           </div>
         </div>
 
@@ -185,11 +154,7 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
               name="price_per_unit"
               control={control}
               render={({ field }) => (
-                <CurrencyInput
-                  id="sup-price"
-                  value={field.value}
-                  onChange={(v) => field.onChange(v ?? null)}
-                />
+                <CurrencyInput id="sup-price" value={field.value} onChange={(v) => field.onChange(v ?? null)} />
               )}
             />
           </div>
@@ -223,10 +188,10 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground">Select a product to auto-deduct this item when a sale is recorded.</p>
+          <p className="text-xs text-muted-foreground">Select a product to deduct this item from stock when a sale is recorded.</p>
         </div>
 
-        {/* Units per sale — only shown if linked */}
+        {/* Units per sale */}
         {linkedProductId && (
           <div className="space-y-1.5">
             <Label htmlFor="sup-units">Units used per sale</Label>
@@ -238,7 +203,6 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
               className="w-28"
               {...register('units_per_sale', { valueAsNumber: true })}
             />
-            <p className="text-xs text-muted-foreground">How many of this item is consumed each time the linked product is sold.</p>
           </div>
         )}
 
