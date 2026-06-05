@@ -3,6 +3,21 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleInsert, PaymentMode } from '../types'
 
+async function deductLinkedSupplies(stationId: string, productId: string, qtySold: number) {
+  const { data: linked } = await supabase
+    .from('supplies')
+    .select('id, qty, units_per_sale')
+    .eq('station_id', stationId)
+    .eq('linked_product_id', productId)
+  if (!linked || linked.length === 0) return
+  await Promise.all(
+    (linked as { id: string; qty: number; units_per_sale: number }[]).map((s) => {
+      const newQty = Math.max(0, s.qty - qtySold * s.units_per_sale)
+      return supabase.from('supplies').update({ qty: newQty }).eq('id', s.id)
+    })
+  )
+}
+
 interface UseSalesReturn {
   data: Sale[]
   isLoading: boolean
@@ -53,9 +68,13 @@ export function useSales(): UseSalesReturn {
       .select()
       .single()
     if (e) throw new Error(e.message)
+    // Deduct linked supplies silently — failure doesn't block the sale
+    if (stationId && input.product_id) {
+      void deductLinkedSupplies(stationId, input.product_id, input.qty)
+    }
     await fetchData()
     return row as Sale
-  }, [fetchData])
+  }, [fetchData, stationId])
 
   const recordPayment = useCallback(async (
     saleId: string, amount: number, paymentMode: PaymentMode, paidAt: string, remarks: string
