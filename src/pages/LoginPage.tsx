@@ -141,7 +141,7 @@ export default function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm space-y-6 text-center">
-          <h1 className="text-3xl font-bold text-primary tracking-tight">Hydra</h1>
+          <img src="/logo.png" alt="Hydra" className="h-14 w-auto mx-auto" />
           <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <p className="text-sm font-semibold text-foreground">Account not linked to a station</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -159,9 +159,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-primary tracking-tight">Hydra</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Water Station Management</p>
+        <div className="text-center space-y-2">
+          <img src="/logo.png" alt="Hydra" className="h-14 w-auto mx-auto" />
+          <p className="text-sm text-muted-foreground">Water Station Management</p>
         </div>
 
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">

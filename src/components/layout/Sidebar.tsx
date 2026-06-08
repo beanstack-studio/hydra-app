@@ -29,9 +29,7 @@ export function Sidebar() {
   return (
     <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 bg-card border-r border-border z-40">
       <div className="flex h-16 items-center px-6 border-b border-border shrink-0">
-        <span className="text-2xl font-bold text-primary tracking-tight">
-          Hydra
-        </span>
+        <img src="/logo.png" alt="Hydra" className="h-8 w-auto" />
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {navItems.map(({ to, label, icon: Icon }) => (
