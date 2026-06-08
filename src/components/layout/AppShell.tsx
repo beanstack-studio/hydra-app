@@ -26,7 +26,7 @@ function DevBanner() {
 function RoleViewToggle() {
   const role        = useAuthStore((s) => s.role)
   const setViewRole = useAuthStore((s) => s.setViewRole)
-  if (!role) return null
+  if (!role || !import.meta.env.DEV) return null
   const isOwner = role === 'owner'
   return (
     <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs">
