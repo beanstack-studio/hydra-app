@@ -30,7 +30,7 @@ export function Sidebar() {
     <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 bg-slate-900 border-r border-slate-700/30 z-40">
       {/* Logo + wordmark */}
       <div className="flex h-16 items-center gap-2.5 px-5 border-b border-slate-700/30 shrink-0">
-        <img src="/logo.png" alt="Hydra" className="h-8 w-auto" />
+        <img src="/logo.png" alt="Hydra" className="h-9 w-9 rounded-full object-cover shrink-0" />
         <span className="text-base font-bold text-white tracking-tight">Hydra</span>
       </div>
 

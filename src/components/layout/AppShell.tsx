@@ -14,7 +14,7 @@ const SUPER_ADMIN_EMAIL = 'hello@beanstack.studio'
 function MobileHeader() {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2.5 border-b border-border bg-card px-4 lg:hidden shrink-0">
-      <img src="/logo.png" alt="Hydra" className="h-7 w-auto" />
+      <img src="/logo.png" alt="Hydra" className="h-8 w-8 rounded-full object-cover shrink-0" />
       <span className="text-base font-bold text-foreground tracking-tight">Hydra</span>
     </header>
   )
