@@ -10,12 +10,12 @@ import {
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/sales', label: 'Sales', icon: ShoppingCart },
-  { to: '/expenses', label: 'Expenses', icon: Receipt },
+  { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
+  { to: '/expenses',  label: 'Expenses',  icon: Receipt },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/inventory', label: 'Inventory', icon: Package },
-  { to: '/reports', label: 'Reports', icon: BarChart },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/reports',   label: 'Reports',   icon: BarChart },
+  { to: '/settings',  label: 'Settings',  icon: Settings },
 ]
 
 export function BottomNav() {
@@ -28,13 +28,20 @@ export function BottomNav() {
             to={to}
             className={({ isActive }) =>
               cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium transition-all duration-150',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 relative transition-all duration-150',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )
             }
           >
-            <Icon className="h-5 w-5 shrink-0" />
-            {label}
+            {({ isActive }) => (
+              <>
+                {isActive && (
+                  <span className="absolute top-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
+                )}
+                <Icon className={cn('h-5 w-5 shrink-0', isActive && 'scale-110')} />
+                <span className="text-[10px] font-medium leading-tight">{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </div>

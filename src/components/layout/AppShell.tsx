@@ -9,12 +9,23 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { Reminder } from '@/lib/reminders'
 
+const SUPER_ADMIN_EMAIL = 'hello@beanstack.studio'
+
+function MobileHeader() {
+  return (
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2.5 border-b border-border bg-card px-4 lg:hidden shrink-0">
+      <img src="/logo.png" alt="Hydra" className="h-7 w-auto" />
+      <span className="text-base font-bold text-foreground tracking-tight">Hydra</span>
+    </header>
+  )
+}
+
 function DevBanner() {
   const userId = useAuthStore((s) => s.user?.id ?? '')
   const isDevMode = userId.startsWith('dev-')
   if (!isDevMode) return null
   return (
-    <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800">
+    <div className="flex items-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 shrink-0">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span>
         <strong>Demo mode</strong> — changes won't save. Sign in with your Supabase account to use the real app.
@@ -25,11 +36,12 @@ function DevBanner() {
 
 function RoleViewToggle() {
   const role        = useAuthStore((s) => s.role)
+  const email       = useAuthStore((s) => s.user?.email ?? '')
   const setViewRole = useAuthStore((s) => s.setViewRole)
-  if (!role || !import.meta.env.DEV) return null
+  if (!role || email !== SUPER_ADMIN_EMAIL) return null
   const isOwner = role === 'owner'
   return (
-    <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs">
+    <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs shrink-0">
       <span className="text-amber-700 font-medium shrink-0">View as:</span>
       <div className="flex rounded-md border border-amber-300 overflow-hidden text-xs font-medium">
         <button
@@ -83,10 +95,11 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-60">
+      <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
+        <MobileHeader />
         <DevBanner />
         <RoleViewToggle />
-        <main className="flex-1 overflow-y-auto p-4 pb-20 lg:p-6 lg:pb-6">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
