@@ -18,7 +18,7 @@ const ALL_TABS: { id: Tab; label: string; ownerOnly?: boolean }[] = [
   { id: 'products',    label: 'Products' },
   { id: 'maintenance', label: 'Maintenance' },
   { id: 'team',        label: 'Team',  ownerOnly: true },
-  { id: 'plan',        label: 'Plan' },
+  { id: 'plan',        label: 'Plan',  ownerOnly: true },
 ]
 
 export default function SettingsPage() {

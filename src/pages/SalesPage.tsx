@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
+import { SearchInput } from '@/components/shared/SearchInput'
 import { SaleModal } from '@/features/sales/components/SaleModal'
 import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
@@ -11,6 +12,7 @@ import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
+import { formatDate, formatCurrency, downloadCSV } from '@/lib/utils'
 import type { Sale, SaleInsert } from '@/features/sales/types'
 
 export default function SalesPage() {
@@ -19,6 +21,7 @@ export default function SalesPage() {
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
+  const [search,            setSearch]            = useState('')
 
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
@@ -26,6 +29,33 @@ export default function SalesPage() {
   const handleAddSale = async (input: SaleInsert) => addSale(input)
 
   const isLoading = salesLoading || settingsLoading
+
+  const filteredSales = search.length >= 3
+    ? sales.filter((s) =>
+        s.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+        s.product_name.toLowerCase().includes(search.toLowerCase()) ||
+        s.order_type.toLowerCase().includes(search.toLowerCase())
+      )
+    : sales
+
+  const handleExport = () => {
+    downloadCSV(
+      `hydra-sales-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Customer', 'Order Type', 'Product', 'Qty', 'Price/pc', 'Total', 'Payment', 'Status', 'Balance Due'],
+      sales.map((s) => [
+        formatDate(s.sale_date),
+        s.customer_name,
+        s.order_type,
+        s.product_name,
+        s.qty,
+        formatCurrency(s.price_per_piece),
+        formatCurrency(s.total_amount),
+        s.payment_mode,
+        s.status,
+        s.balance_due > 0 ? formatCurrency(s.balance_due) : '',
+      ])
+    )
+  }
 
   const handleRecord = async (
     saleId: string, amount: number,
@@ -56,24 +86,32 @@ export default function SalesPage() {
 
   return (
     <div>
-      <PageHeader title="Sales">
-        <Button onClick={() => setIsSaleModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Record Sale
-        </Button>
-      </PageHeader>
+      <PageHeader title="Sales" />
 
       {salesError && (
         <p className="mb-4 text-sm text-destructive">{salesError}</p>
       )}
+
+      <div className="flex items-center gap-3 mb-4">
+        <SearchInput
+          onSearch={setSearch}
+          placeholder="Search customer, product, order type…"
+          className="flex-1"
+        />
+        <Button size="sm" onClick={() => setIsSaleModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Record Sale
+        </Button>
+      </div>
 
       {/* Sales list */}
       {isLoading ? (
         <LoadingSkeleton rows={5} />
       ) : (
         <SaleTable
-          sales={sales}
+          sales={filteredSales}
           onSelect={setSelectedSale}
+          onExport={handleExport}
           onPay={(sale) => {
             setSelectedSale(null)
             setPayingSale(sale)

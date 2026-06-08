@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Plus, Pencil, Trash2, CreditCard } from 'lucide-react'
+import { FileText, Plus, Pencil, Trash2, CreditCard, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/shared/Modal'
@@ -9,8 +9,9 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { formatCurrency, formatDate, nowPH } from '@/lib/utils'
+import { formatCurrency, formatDate, downloadCSV, nowPH } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
 import type { Bill } from '../types'
 
@@ -33,6 +34,7 @@ const BILL_TYPE_LABELS: Record<string, string> = {
 
 export function BillTable() {
   const { toast } = useToast()
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
   const { data, isLoading, error, month, year, setMonth, setYear, addBill, updateBill, deleteBill, payBill } = useBills()
 
   const [editingBill, setEditingBill] = useState<Bill | null>(null)
@@ -79,6 +81,20 @@ export function BillTable() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  const handleExport = () => {
+    downloadCSV(
+      `hydra-bills-${MONTHS[month - 1]}-${year}.csv`,
+      ['Type', 'Due Date', 'Amount', 'Status', 'Date Paid'],
+      data.map((b) => [
+        BILL_TYPE_LABELS[b.bill_type] ?? b.bill_type,
+        b.due_date ? formatDate(b.due_date) : '',
+        formatCurrency(b.amount),
+        b.date_paid ? 'Paid' : 'Unpaid',
+        b.date_paid ? formatDate(b.date_paid) : '',
+      ])
+    )
   }
 
   const currentYear = nowPH().getFullYear()
@@ -129,7 +145,14 @@ export function BillTable() {
     },
     {
       key: 'actions',
-      header: '',
+      header: (
+        <div className="flex items-center justify-end">
+          <button type="button" title="Export to Excel" onClick={handleExport}
+            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      ),
       render: (bill) => (
         <div className="flex items-center gap-1 justify-end">
           {!bill.date_paid && (
@@ -143,22 +166,26 @@ export function BillTable() {
               Pay
             </Button>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={(e) => { e.stopPropagation(); setEditingBill(bill); setIsFormOpen(true) }}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={(e) => { e.stopPropagation(); setDeletingBill(bill) }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {isOwner && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={(e) => { e.stopPropagation(); setEditingBill(bill); setIsFormOpen(true) }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {isOwner && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); setDeletingBill(bill) }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -188,10 +215,12 @@ export function BillTable() {
         >
           {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <Button size="sm" className="ml-auto" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Bill
-        </Button>
+        {isOwner && (
+          <Button size="sm" className="ml-auto" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Bill
+          </Button>
+        )}
       </div>
 
       <DataTable

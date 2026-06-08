@@ -112,12 +112,16 @@ export function useExpenses(): UseExpensesReturn {
       }
     }
 
+    const storedQty = (input.category === 'supplies' || input.category === 'gasoline') && supplyQty > 0
+      ? supplyQty : null
+
     const { error: e } = await supabase.from('expenses').insert({
       station_id: stationId,
       category: input.category,
       item: itemLabel,
       price: input.amount,
       amount: input.amount,
+      qty: storedQty,
       frequency: 'one_off',
       expense_date: input.expense_date,
       payment_method: input.payment_method ?? null,
@@ -146,17 +150,33 @@ export function useExpenses(): UseExpensesReturn {
       receipt_url = null
     }
 
+    const resolvedCategory = input.category ?? existing?.category
+    let itemLabel: string | undefined = undefined
+    if (resolvedCategory && resolvedCategory !== 'supplies') {
+      itemLabel = CATEGORY_ITEM_LABELS[resolvedCategory] ?? resolvedCategory
+    } else if (input.supply_name) {
+      itemLabel = input.supply_name
+    } else if (input.new_supply_name) {
+      itemLabel = input.new_supply_name
+    }
+
+    const updatedQty = (input.supply_qty != null && input.supply_qty > 0)
+      && (resolvedCategory === 'supplies' || resolvedCategory === 'gasoline')
+      ? input.supply_qty : null
+
     const { error: e } = await supabase
       .from('expenses')
       .update({
         category: input.category,
-        item: input.category ? (CATEGORY_ITEM_LABELS[input.category] ?? input.category) : undefined,
+        ...(itemLabel !== undefined ? { item: itemLabel } : {}),
         price: input.amount,
         amount: input.amount,
+        ...(updatedQty !== null ? { qty: updatedQty } : {}),
         expense_date: input.expense_date,
         payment_method: input.payment_method ?? null,
         remarks: input.remarks ?? null,
         receipt_url,
+        ...(input.supply_store !== undefined ? { supplier: input.supply_store || null } : {}),
       })
       .eq('id', id)
     if (e) throw new Error(e.message)

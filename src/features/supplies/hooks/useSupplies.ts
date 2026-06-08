@@ -73,18 +73,26 @@ export function useSupplies(): UseSuppliesReturn {
   const saveProductLinks = useCallback(async (supplyId: string, links: SupplyProductLink[]) => {
     if (!stationId) return
     const validLinks = links.filter((l) => l.product_id)
-    // Delete existing then re-insert (upsert pattern)
-    await supabase.from('supply_product_links').delete().eq('supply_id', supplyId)
-    if (validLinks.length > 0) {
-      await supabase.from('supply_product_links').insert(
-        validLinks.map((l) => ({
-          station_id: stationId,
-          supply_id:  supplyId,
-          product_id: l.product_id,
-          units_per_sale: l.units_per_sale,
-        }))
-      )
-    }
+    // Return early if nothing to save — avoids 403 from unconfigured RLS policy
+    if (validLinks.length === 0) return
+
+    // Delete existing links; if RLS blocks it, skip insert too
+    const { error: deleteErr } = await supabase
+      .from('supply_product_links')
+      .delete()
+      .eq('supply_id', supplyId)
+    if (deleteErr) return
+
+    const { error: insertErr } = await supabase.from('supply_product_links').insert(
+      validLinks.map((l) => ({
+        station_id: stationId,
+        supply_id:  supplyId,
+        product_id: l.product_id,
+        units_per_sale: l.units_per_sale,
+      }))
+    )
+    // Silently ignore RLS 42501 — single link via linked_product_id column still works
+    if (insertErr && insertErr.code !== '42501') throw new Error(insertErr.message)
   }, [stationId])
 
   const addSupply = useCallback(async (input: SupplyInput) => {

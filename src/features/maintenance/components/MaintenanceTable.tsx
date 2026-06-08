@@ -81,18 +81,16 @@ export function MaintenanceTable() {
         </div>
       )}
 
-      {isOwner && (
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            disabled={!!error}
-            onClick={() => { setEditingLog(null); setIsFormOpen(true) }}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Log
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={!!error}
+          onClick={() => { setEditingLog(null); setIsFormOpen(true) }}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Log Maintenance
+        </Button>
+      </div>
 
       {data.length === 0 ? (
         <EmptyState
@@ -143,15 +141,15 @@ export function MaintenanceTable() {
                   <td className="px-4 py-3">
                     <span className="text-xs text-muted-foreground">{log.technician ?? '—'}</span>
                   </td>
-                  {isOwner && (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="icon" variant="ghost" className="h-8 w-8"
-                          onClick={() => { setEditingLog(log); setIsFormOpen(true) }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="icon" variant="ghost" className="h-8 w-8"
+                        onClick={() => { setEditingLog(log); setIsFormOpen(true) }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {isOwner && (
                         <Button
                           size="icon" variant="ghost"
                           className="h-8 w-8 text-destructive hover:text-destructive"
@@ -159,9 +157,9 @@ export function MaintenanceTable() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </div>
-                    </td>
-                  )}
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

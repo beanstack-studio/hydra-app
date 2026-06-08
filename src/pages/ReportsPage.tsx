@@ -4,9 +4,10 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SalesChart } from '@/features/reports/components/SalesChart'
 import { ExpenseSummary } from '@/features/reports/components/ExpenseSummary'
 import { SalesByProductChart } from '@/features/reports/components/SalesByProductChart'
+import { InsightsSection } from '@/features/reports/components/InsightsSection'
 import { useReports } from '@/features/reports/hooks/useReports'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, nowPH } from '@/lib/utils'
+import { formatCurrency, nowPH, cn } from '@/lib/utils'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -17,7 +18,7 @@ export default function ReportsPage() {
   const station = useAuthStore((s) => s.station)
   const canView = station?.plan !== 'free'
 
-  const { data, isLoading, error, month, year, setMonth, setYear } = useReports()
+  const { data, isLoading, error, mode, month, year, setMode, setMonth, setYear } = useReports()
 
   const currentYear = nowPH().getFullYear()
   const yearOptions = [currentYear - 1, currentYear]
@@ -40,17 +41,39 @@ export default function ReportsPage() {
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {/* Month / Year picker */}
+      {/* Mode toggle + date picker */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <select
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {MONTHS.map((m, i) => (
-            <option key={m} value={i + 1}>{m}</option>
+        {/* Monthly / YTD pill toggle */}
+        <div className="flex rounded-md border border-input overflow-hidden text-sm">
+          {(['monthly', 'ytd'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                'px-3 py-1.5 font-medium transition-colors duration-150',
+                mode === m
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {m === 'monthly' ? 'Monthly' : 'YTD'}
+            </button>
           ))}
-        </select>
+        </div>
+
+        {mode === 'monthly' && (
+          <select
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {MONTHS.map((m, i) => (
+              <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
+        )}
+
         <select
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
@@ -89,6 +112,13 @@ export default function ReportsPage() {
               total={data?.totalSalesAmount ?? 0}
             />
           </div>
+
+          {/* Rankings / Insights */}
+          <InsightsSection
+            topProducts={data?.topProducts ?? []}
+            topCustomers={data?.topCustomers ?? []}
+            topSupplies={data?.topSupplies ?? []}
+          />
         </div>
       )}
     </div>

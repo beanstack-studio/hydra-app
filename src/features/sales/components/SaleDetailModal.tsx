@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, MapPin, Clock } from 'lucide-react'
+import { CalendarClock, CheckCircle2, MapPin, Clock, AlertTriangle } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
@@ -18,6 +18,7 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
   const isScheduledOrder = sale.order_type === 'delivery' || sale.order_type === 'pickup'
   const isFulfilled      = !!sale.fulfilled_at
   const orderLabel       = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
+  const isPaidFully      = sale.balance_due <= 0
 
   // All items — use items array if present, fallback to single product
   const itemLines: { name: string; qty: number; subtotal: number }[] =
@@ -110,28 +111,40 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
 
         {/* Section 5: Actions for scheduled orders */}
         {isScheduledOrder && (onReschedule || onConfirmFulfillment) && (
-          <div className="border-t border-border pt-3 flex gap-2">
-            {onConfirmFulfillment && !isFulfilled && (
-              <Button
-                variant="outline"
-                className="flex-1 gap-2 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
-                onClick={() => { onClose(); onConfirmFulfillment() }}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {orderLabel === 'Delivery' ? 'Mark Delivered' : 'Mark Picked Up'}
-              </Button>
+          <div className="border-t border-border pt-3 space-y-2">
+            {/* Payment warning — blocks fulfillment confirmation */}
+            {onConfirmFulfillment && !isFulfilled && !isPaidFully && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30 px-3 py-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-px" />
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  Outstanding balance of <span className="font-semibold">{formatCurrency(sale.balance_due)}</span> — collect full payment before confirming {orderLabel.toLowerCase()}.
+                </p>
+              </div>
             )}
-            {onReschedule && (
-              <Button
-                variant="outline"
-                className="flex-1 gap-2"
-                disabled={isFulfilled}
-                onClick={() => { onClose(); onReschedule() }}
-              >
-                <CalendarClock className="h-4 w-4" />
-                Reschedule
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {onConfirmFulfillment && !isFulfilled && (
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                  disabled={!isPaidFully}
+                  onClick={() => { onClose(); onConfirmFulfillment() }}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {orderLabel === 'Delivery' ? 'Mark Delivered' : 'Mark Picked Up'}
+                </Button>
+              )}
+              {onReschedule && (
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  disabled={isFulfilled}
+                  onClick={() => { onClose(); onReschedule() }}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Reschedule
+                </Button>
+              )}
+            </div>
           </div>
         )}
 

@@ -14,6 +14,25 @@ export interface ProductSalesSummary {
   total_amount: number
 }
 
+export interface ProductRanking {
+  product_name: string
+  qty: number
+  order_count: number
+  total_amount: number
+}
+
+export interface CustomerRanking {
+  customer_name: string
+  order_count: number
+  total_amount: number
+}
+
+export interface SupplyRanking {
+  item: string
+  purchase_count: number
+  total_amount: number
+}
+
 export interface DailyPoint {
   date: string
   sales: number
@@ -27,4 +46,7 @@ export interface ReportsData {
   totalSalesAmount: number
   totalExpensesAmount: number
   netProfit: number
+  topProducts: ProductRanking[]
+  topCustomers: CustomerRanking[]
+  topSupplies: SupplyRanking[]
 }

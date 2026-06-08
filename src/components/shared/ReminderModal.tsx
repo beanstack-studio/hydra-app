@@ -1,5 +1,4 @@
-import { Truck, ShoppingBag, X, ExternalLink, Clock } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Truck, ShoppingBag, X, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatTime } from '@/lib/utils'
 import { dismissReminder, snoozeReminder } from '@/lib/reminders'
@@ -11,8 +10,6 @@ interface ReminderModalProps {
 }
 
 export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
-  const navigate = useNavigate()
-
   if (reminders.length === 0) return null
 
   const current = reminders[0]
@@ -31,12 +28,6 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
   const handleSnooze = async () => {
     await snoozeReminder(current.id, 5)
     onDismiss(current.id)
-  }
-
-  const handleViewSale = async () => {
-    await dismissReminder(current.id)
-    onDismiss(current.id)
-    navigate('/sales')
   }
 
   const Icon = current.order_type === 'delivery' ? Truck : ShoppingBag
@@ -90,10 +81,6 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
           <Button variant="outline" className="flex-1 gap-1" onClick={handleSnooze}>
             <Clock className="h-3.5 w-3.5" />
             Snooze 5m
-          </Button>
-          <Button className="flex-1 gap-1.5" onClick={handleViewSale}>
-            <ExternalLink className="h-3.5 w-3.5" />
-            View Sale
           </Button>
         </div>
 

@@ -63,6 +63,33 @@ export const formatPhone = (raw: string): string => {
 export const cleanPhone = (formatted: string): string =>
   formatted.replace(/\D/g, '')
 
+export function downloadCSV(
+  filename: string,
+  headers: string[],
+  rows: (string | number | null | undefined)[][]
+): void {
+  const escape = (v: string | number | null | undefined): string => {
+    if (v == null) return ''
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+  const lines = [
+    headers.map(escape).join(','),
+    ...rows.map((row) => row.map(escape).join(',')),
+  ].join('\n')
+  const blob = new Blob(['\uFEFF' + lines], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 // Title-case a string: capitalises first letter of each word.
 // Preserves intentional ALL-CAPS words (e.g. "ABL" stays "ABL", not "Abl").
 export const toTitleCase = (str: string): string =>

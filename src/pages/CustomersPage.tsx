@@ -3,7 +3,6 @@ import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
-import { StatCard } from '@/components/shared/StatCard'
 import { Modal } from '@/components/shared/Modal'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -11,6 +10,7 @@ import { CustomerList } from '@/features/customers/components/CustomerList'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useToast } from '@/hooks/use-toast'
+import { formatDate, formatCurrency, downloadCSV } from '@/lib/utils'
 import type { Customer } from '@/features/customers/types'
 
 export default function CustomersPage() {
@@ -28,12 +28,23 @@ export default function CustomersPage() {
     ? data.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : data
 
-  const regularCount = data.filter((c) => c.type === 'regular').length
-  const retailerCount = data.filter((c) => c.type === 'retailer').length
-
   const openEdit = (customer: Customer) => {
     setEditingCustomer(customer)
     setIsModalOpen(true)
+  }
+
+  const handleExport = () => {
+    downloadCSV(
+      `hydra-customers-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Name', 'Type', 'Phone', 'Last Order', 'Balance'],
+      data.map((c) => [
+        c.name,
+        c.type,
+        c.phone ?? '',
+        c.last_ordered_at ? formatDate(c.last_ordered_at + 'T00:00:00') : '',
+        c.total_balance && c.total_balance > 0 ? formatCurrency(c.total_balance) : '',
+      ])
+    )
   }
 
   const handleDelete = async () => {
@@ -52,27 +63,21 @@ export default function CustomersPage() {
 
   return (
     <div>
-      <PageHeader title="Customers">
-        <Button onClick={() => { setEditingCustomer(null); setIsModalOpen(true) }}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Customer
-        </Button>
-      </PageHeader>
+      <PageHeader title="Customers" />
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <StatCard label="Total" value={data.length} />
-        <StatCard label="Regular" value={regularCount} />
-        <StatCard label="Retailer" value={retailerCount} />
-      </div>
-
-      <div className="mb-4">
+      <div className="flex items-center gap-3 mb-4">
         <SearchInput
           onSearch={setSearchQuery}
           placeholder="Search customers…"
           minChars={1}
+          className="flex-1"
         />
+        <Button size="sm" onClick={() => { setEditingCustomer(null); setIsModalOpen(true) }}>
+          <Plus className="h-4 w-4 mr-1.5" />
+          Add Customer
+        </Button>
       </div>
 
       {isLoading ? (
@@ -83,6 +88,7 @@ export default function CustomersPage() {
           onEdit={openEdit}
           onDelete={setDeletingCustomer}
           onView={(c) => navigate(`/customers/${c.id}`)}
+          onExport={handleExport}
         />
       )}
 

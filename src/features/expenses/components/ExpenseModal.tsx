@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { formatInTimeZone } from 'date-fns-tz'
-import { Paperclip, X } from 'lucide-react'
+import { Paperclip, X, Info } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { PH_TZ } from '@/lib/utils'
+import { PH_TZ, formatCurrency } from '@/lib/utils'
 import type { Expense, ExpenseInput, ExpenseCategory, ExpensePaymentMethod } from '../types'
 import type { Supply } from '@/features/supplies/types'
 
@@ -102,28 +102,36 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
     },
   })
 
-  const category         = watch('category')
-  const expenseDate      = watch('expense_date')
+  const category          = watch('category')
+  const expenseDate       = watch('expense_date')
   const selectedPayMethod = watch('payment_method')
-  const supplySelect     = watch('supply_select')
-  const isSupplies       = category === 'supplies'
-  const isNewSupply      = supplySelect === NEW_ITEM_VALUE
+  const supplySelect      = watch('supply_select')
+  const supplyQtyVal      = watch('supply_qty')
+  const amountVal         = watch('amount')
+  const isSupplies        = category === 'supplies'
+  const isGasoline        = category === 'gasoline'
+  const isNewSupply       = supplySelect === NEW_ITEM_VALUE
+
+  const derivedPricePerUnit = supplyQtyVal && supplyQtyVal > 0 && amountVal > 0
+    ? amountVal / supplyQtyVal
+    : null
 
   useEffect(() => {
     if (!isOpen) return
     setSelectedFile(null)
     setKeepExistingReceipt(true)
     if (expense) {
+      const matchedSupply = supplies.find((s) => s.name === expense.item)
       reset({
         category:        expense.category,
         expense_date:    expense.expense_date,
         amount:          expense.amount,
         payment_method:  expense.payment_method ?? null,
         remarks:         expense.remarks ?? '',
-        supply_select:   expense.inventory_item_id ?? null,
+        supply_select:   matchedSupply?.id ?? null,
         new_supply_name: null,
-        supply_qty:      null,
-        supply_store:    null,
+        supply_qty:      expense.qty ?? null,
+        supply_store:    expense.supplier ?? null,
       })
     } else {
       reset({
@@ -138,15 +146,15 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
         supply_store:    null,
       })
     }
-  }, [expense, isOpen, reset, todayPH])
+  }, [expense, isOpen, reset, todayPH, supplies])
 
   const existingReceiptName = expense?.receipt_url
     ? (expense.receipt_url.split('/').pop()?.replace(/^\d+-/, '') ?? 'receipt')
     : null
 
   const onSubmit = handleSubmit(async (values) => {
-    // Validate supply fields
-    if (values.category === 'supplies' && !expense) {
+    // Validate category-specific fields
+    if (values.category === 'supplies') {
       if (!values.supply_select) {
         toast({ title: 'Select an item', description: 'Choose an existing item or add a new one.', variant: 'destructive' })
         return
@@ -157,6 +165,12 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
       }
       if (!values.supply_qty || values.supply_qty <= 0) {
         toast({ title: 'Enter qty purchased', variant: 'destructive' })
+        return
+      }
+    }
+    if (values.category === 'gasoline') {
+      if (!values.supply_qty || values.supply_qty <= 0) {
+        toast({ title: 'Enter liters purchased', variant: 'destructive' })
         return
       }
     }
@@ -230,7 +244,7 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
         </div>
 
         {/* Supplies-specific fields */}
-        {isSupplies && !expense && (
+        {isSupplies && (
           <>
             {/* Item selector */}
             <div className="space-y-1.5">
@@ -265,13 +279,20 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="exp-qty">Qty Purchased <span className="text-destructive">*</span></Label>
-                <Input
-                  id="exp-qty"
-                  type="number"
-                  min={1}
-                  step="any"
-                  placeholder="0"
-                  {...register('supply_qty', { valueAsNumber: true })}
+                <Controller
+                  name="supply_qty"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      id="exp-qty"
+                      type="number"
+                      min={1}
+                      step="any"
+                      placeholder="0"
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                    />
+                  )}
                 />
               </div>
               <div className="space-y-1.5">
@@ -286,11 +307,43 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
           </>
         )}
 
+        {/* Gasoline-specific fields */}
+        {isGasoline && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="exp-liters">Liters <span className="text-destructive">*</span></Label>
+              <Controller
+                name="supply_qty"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="exp-liters"
+                    type="number"
+                    min={0.1}
+                    step="any"
+                    placeholder="0"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                  />
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="exp-gasstation">Gas Station</Label>
+              <Input
+                id="exp-gasstation"
+                placeholder="e.g. Shell, Petron, Caltex"
+                {...register('supply_store')}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Amount + Payment Method */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="exp-amount">
-              {isSupplies && !expense ? 'Total Price' : 'Amount'} <span className="text-destructive">*</span>
+              {isSupplies ? 'Total Price' : isGasoline ? 'Total Cost' : 'Amount'} <span className="text-destructive">*</span>
             </Label>
             <Controller
               name="amount"
@@ -305,6 +358,13 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
               )}
             />
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+            {(isGasoline || isSupplies) && derivedPricePerUnit !== null && (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Info className="h-3 w-3 shrink-0" />
+                {isGasoline ? 'Per liter' : 'Per unit'}:{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(derivedPricePerUnit)}</span>
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="exp-payment">Payment Method</Label>

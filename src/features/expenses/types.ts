@@ -9,6 +9,8 @@ export interface Expense {
   item: string
   price: number
   amount: number
+  qty: number | null
+  price_per_unit: number | null
   expense_date: string
   frequency: string
   employee_name: string | null

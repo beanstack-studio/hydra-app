@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Download } from 'lucide-react'
 import { DataTable } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Badge } from '@/components/ui/badge'
@@ -35,9 +35,10 @@ interface SaleTableProps {
   sales: Sale[]
   onSelect: (sale: Sale) => void
   onPay?: (sale: Sale) => void
+  onExport: () => void
 }
 
-export function SaleTable({ sales, onSelect, onPay }: SaleTableProps) {
+export function SaleTable({ sales, onSelect, onPay, onExport }: SaleTableProps) {
   const [sortKey, setSortKey] = useState<SaleSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -126,6 +127,18 @@ export function SaleTable({ sales, onSelect, onPay }: SaleTableProps) {
           )}
         </div>
       ),
+    },
+    {
+      key: 'actions',
+      header: (
+        <div className="flex items-center justify-end">
+          <button type="button" title="Export to Excel" onClick={onExport}
+            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+      render: () => null,
     },
   ]
 

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, Pencil, Trash2, ArrowRight } from 'lucide-react'
+import { Package, Minus, Plus, Pencil, Trash2, ArrowRight, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { SearchInput } from '@/components/shared/SearchInput'
 import { formatDate } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
 import type { Column } from '@/components/shared/DataTable'
@@ -31,8 +31,6 @@ const STATUS_ORDER: Record<SupplyStatus, number> = {
 
 type SortKey = 'name' | 'qty' | 'last_purchased_at' | 'status'
 
-const SEARCH_THRESHOLD = 10
-
 interface SupplyTableProps {
   items:         Supply[]
   isLoading:     boolean
@@ -40,6 +38,7 @@ interface SupplyTableProps {
   onEditClick:   (item: Supply) => void
   onDeleteClick: (item: Supply) => void
   onQuickAdjust: (item: Supply, delta: number) => void
+  onExport:      () => void
 }
 
 export function SupplyTable({
@@ -49,10 +48,11 @@ export function SupplyTable({
   onEditClick,
   onDeleteClick,
   onQuickAdjust,
+  onExport,
 }: SupplyTableProps) {
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [search, setSearch]   = useState('')
 
   const handleSort = (key: string) => {
     const k = key as SortKey
@@ -60,14 +60,7 @@ export function SupplyTable({
     else { setSortKey(k); setSortDir('asc') }
   }
 
-  const filtered = search.length >= 3
-    ? items.filter((i) =>
-        i.name.toLowerCase().includes(search.toLowerCase()) ||
-        (i.store ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : items
-
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...items].sort((a, b) => {
     let cmp = 0
     switch (sortKey) {
       case 'name':              cmp = a.name.localeCompare(b.name); break
@@ -160,7 +153,14 @@ export function SupplyTable({
     },
     {
       key: 'actions',
-      header: '',
+      header: (
+        <div className="flex items-center justify-end">
+          <button type="button" title="Export to Excel" onClick={onExport}
+            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      ),
       render: (item) => (
         <div className="flex items-center gap-1 justify-end">
           <Button
@@ -171,14 +171,16 @@ export function SupplyTable({
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          {isOwner && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -193,10 +195,6 @@ export function SupplyTable({
           <Package className="h-4 w-4 text-destructive shrink-0" />
           <p className="text-sm text-destructive">Some items are running low or out of stock.</p>
         </div>
-      )}
-
-      {items.length > SEARCH_THRESHOLD && (
-        <SearchInput onSearch={(q) => setSearch(q)} placeholder="Search items or store…" />
       )}
 
       <DataTable

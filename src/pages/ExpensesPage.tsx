@@ -10,7 +10,8 @@ import { BillTable } from '@/features/bills/components/BillTable'
 import { PayrollSection } from '@/features/payroll/components/PayrollSection'
 import { useExpenses } from '@/features/expenses/hooks/useExpenses'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
-import { formatCurrency, cn } from '@/lib/utils'
+import { SearchInput } from '@/components/shared/SearchInput'
+import { formatCurrency, formatDate, downloadCSV, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
@@ -21,7 +22,8 @@ export default function ExpensesPage() {
   const { toast } = useToast()
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner'
-  const [activeTab, setActiveTab] = useState<Tab>('expenses')
+  const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
+  const [expenseSearch,  setExpenseSearch]  = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
@@ -86,8 +88,32 @@ export default function ExpensesPage() {
   ]
   const TABS = ALL_EXPENSE_TABS.filter((t) => !t.ownerOnly || isOwner)
 
+  const handleExportExpenses = () => {
+    downloadCSV(
+      `hydra-expenses-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Category', 'Item', 'Qty', 'Price/Unit', 'Supplier', 'Total Price', 'Payment Method'],
+      data.filter((e) => e.category !== 'labor').map((e) => [
+        formatDate(e.expense_date),
+        e.category,
+        e.item,
+        e.qty ?? '',
+        e.qty && e.qty > 0 ? formatCurrency(e.amount / e.qty) : '',
+        e.supplier ?? '',
+        formatCurrency(e.amount),
+        e.payment_method ?? '',
+      ])
+    )
+  }
+
   // Staff see only one-off expense categories (no labor/payroll rows)
-  const visibleExpenses = data.filter((e) => e.category !== 'labor')
+  const baseExpenses = data.filter((e) => e.category !== 'labor')
+  const visibleExpenses = expenseSearch.length >= 3
+    ? baseExpenses.filter((e) =>
+        e.item.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+        (e.supplier ?? '').toLowerCase().includes(expenseSearch.toLowerCase()) ||
+        e.category.toLowerCase().includes(expenseSearch.toLowerCase())
+      )
+    : baseExpenses
 
   return (
     <div>
@@ -118,7 +144,12 @@ export default function ExpensesPage() {
       <div className="mt-6">
         {activeTab === 'expenses' ? (
           <>
-            <div className="flex justify-end mb-4">
+            <div className="flex items-center gap-3 mb-4">
+              <SearchInput
+                onSearch={setExpenseSearch}
+                placeholder="Search item, supplier, category…"
+                className="flex-1"
+              />
               <Button size="sm" onClick={() => { setEditingExpense(null); setIsModalOpen(true) }}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Expense
@@ -133,6 +164,7 @@ export default function ExpensesPage() {
                 onDelete={openDelete}
                 onViewReceipt={(e) => { void handleViewReceipt(e) }}
                 onPay={(e) => { setPayingExpense(e); setPayMethod('') }}
+                onExport={handleExportExpenses}
               />
             )}
           </>

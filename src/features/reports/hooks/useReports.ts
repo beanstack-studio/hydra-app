@@ -3,14 +3,18 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatInTimeZone } from 'date-fns-tz'
 import { nowPH, PH_TZ } from '@/lib/utils'
-import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint } from '../types'
+import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking } from '../types'
+
+export type ReportMode = 'monthly' | 'ytd'
 
 interface UseReportsReturn {
   data: ReportsData | null
   isLoading: boolean
   error: string | null
+  mode: ReportMode
   month: number
   year: number
+  setMode: (m: ReportMode) => void
   setMonth: (m: number) => void
   setYear: (y: number) => void
 }
@@ -19,8 +23,9 @@ export function useReports(): UseReportsReturn {
   const stationId = useAuthStore((s) => s.stationId)
 
   const now = nowPH()
+  const [mode,  setMode]  = useState<ReportMode>('monthly')
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
+  const [year,  setYear]  = useState(now.getFullYear())
 
   const [data, setData] = useState<ReportsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -31,30 +36,51 @@ export function useReports(): UseReportsReturn {
     setError(null)
     setIsLoading(true)
     try {
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-      const endMonth = month === 12 ? 1 : month + 1
-      const endYear  = month === 12 ? year + 1 : year
-      const endDate  = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
+      const todayPH    = nowPH()
+      const currentYear = todayPH.getFullYear()
+
+      let startDate: string
+      let endDate: string
+      let billsMaxMonth: number | null = null
+
+      if (mode === 'ytd') {
+        startDate = `${year}-01-01`
+        endDate = year === currentYear
+          ? formatInTimeZone(todayPH, PH_TZ, 'yyyy-MM-dd')
+          : `${year}-12-31`
+        billsMaxMonth = year === currentYear ? todayPH.getMonth() + 1 : 12
+      } else {
+        startDate = `${year}-${String(month).padStart(2, '0')}-01`
+        const endMonth = month === 12 ? 1 : month + 1
+        const endYear  = month === 12 ? year + 1 : year
+        endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
+      }
+
+      let billsQuery = supabase
+        .from('monthly_bills')
+        .select('*')
+        .eq('station_id', stationId)
+        .eq('year', year)
+      if (mode === 'monthly') {
+        billsQuery = billsQuery.eq('month', month)
+      } else if (billsMaxMonth !== null) {
+        billsQuery = billsQuery.lte('month', billsMaxMonth)
+      }
 
       const [salesRes, expensesRes, billsRes] = await Promise.all([
         supabase
           .from('sales')
-          .select('sale_date, total_amount, status, product_name')
+          .select('sale_date, total_amount, status, product_name, qty, customer_name')
           .eq('station_id', stationId)
           .gte('sale_date', startDate)
-          .lt('sale_date', endDate),
+          .lte('sale_date', endDate),
         supabase
           .from('expenses')
           .select('*')
           .eq('station_id', stationId)
           .gte('expense_date', startDate)
-          .lt('expense_date', endDate),
-        supabase
-          .from('monthly_bills')
-          .select('*')
-          .eq('station_id', stationId)
-          .eq('month', month)
-          .eq('year', year),
+          .lte('expense_date', endDate),
+        billsQuery,
       ])
 
       const sales    = salesRes.data    ?? []
@@ -78,7 +104,6 @@ export function useReports(): UseReportsReturn {
         dailyExpMap.set(dateKey, (dailyExpMap.get(dateKey) ?? 0) + (e.amount as number))
       }
 
-      // Merge into daily points (union of dates)
       const allDates = new Set([...dailySalesMap.keys(), ...dailyExpMap.keys()])
       const dailyPoints: DailyPoint[] = Array.from(allDates)
         .sort()
@@ -101,7 +126,7 @@ export function useReports(): UseReportsReturn {
       const expenseSummary: ExpenseSummaryItem[] = Array.from(expenseMap.entries())
         .map(([category, total]) => ({ category, total }))
 
-      // ── Product sales summary ────────────────────────────────────────────
+      // ── Product sales summary (donut chart) ─────────────────────────────
       const productMap = new Map<string, number>()
       for (const s of sales) {
         const name = (s.product_name as string) || 'Unknown'
@@ -110,6 +135,53 @@ export function useReports(): UseReportsReturn {
       const productSales: ProductSalesSummary[] = Array.from(productMap.entries())
         .map(([product_name, total_amount]) => ({ product_name, total_amount }))
         .sort((a, b) => b.total_amount - a.total_amount)
+
+      // ── Top products ranking (by qty) ────────────────────────────────────
+      const productRankMap = new Map<string, { qty: number; order_count: number; total_amount: number }>()
+      for (const s of sales) {
+        const name = (s.product_name as string) || 'Unknown'
+        const prev = productRankMap.get(name) ?? { qty: 0, order_count: 0, total_amount: 0 }
+        productRankMap.set(name, {
+          qty: prev.qty + ((s.qty as number) ?? 0),
+          order_count: prev.order_count + 1,
+          total_amount: prev.total_amount + (s.total_amount as number),
+        })
+      }
+      const topProducts: ProductRanking[] = Array.from(productRankMap.entries())
+        .map(([product_name, v]) => ({ product_name, ...v }))
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 5)
+
+      // ── Top customers ranking (by total spend) ───────────────────────────
+      const customerRankMap = new Map<string, { order_count: number; total_amount: number }>()
+      for (const s of sales) {
+        const name = (s.customer_name as string) || 'Walk-in'
+        const prev = customerRankMap.get(name) ?? { order_count: 0, total_amount: 0 }
+        customerRankMap.set(name, {
+          order_count: prev.order_count + 1,
+          total_amount: prev.total_amount + (s.total_amount as number),
+        })
+      }
+      const topCustomers: CustomerRanking[] = Array.from(customerRankMap.entries())
+        .map(([customer_name, v]) => ({ customer_name, ...v }))
+        .sort((a, b) => b.total_amount - a.total_amount)
+        .slice(0, 5)
+
+      // ── Top supplies ranking (by spend = most replenished) ───────────────
+      const supplyRankMap = new Map<string, { purchase_count: number; total_amount: number }>()
+      for (const e of expenses) {
+        if ((e.category as string) !== 'supplies') continue
+        const item = (e.item as string) || 'Unknown'
+        const prev = supplyRankMap.get(item) ?? { purchase_count: 0, total_amount: 0 }
+        supplyRankMap.set(item, {
+          purchase_count: prev.purchase_count + 1,
+          total_amount: prev.total_amount + (e.amount as number),
+        })
+      }
+      const topSupplies: SupplyRanking[] = Array.from(supplyRankMap.entries())
+        .map(([item, v]) => ({ item, ...v }))
+        .sort((a, b) => b.total_amount - a.total_amount)
+        .slice(0, 5)
 
       // ── Totals ───────────────────────────────────────────────────────────
       const totalExpensesAmount =
@@ -124,15 +196,18 @@ export function useReports(): UseReportsReturn {
         totalSalesAmount,
         totalExpensesAmount,
         netProfit: totalSalesAmount - totalExpensesAmount,
+        topProducts,
+        topCustomers,
+        topSupplies,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load reports')
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, month, year])
+  }, [stationId, mode, month, year])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  return { data, isLoading, error, month, year, setMonth, setYear }
+  return { data, isLoading, error, mode, month, year, setMode, setMonth, setYear }
 }

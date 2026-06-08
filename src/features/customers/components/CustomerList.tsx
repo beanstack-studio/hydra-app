@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Users, Trash2 } from 'lucide-react'
+import { Users, Trash2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import type { Customer, CustomerType } from '../types'
 
 type CustomerSortKey = 'name' | 'type' | 'last_ordered' | 'balance'
@@ -27,9 +28,11 @@ interface CustomerListProps {
   onEdit: (customer: Customer) => void
   onDelete: (customer: Customer) => void
   onView: (customer: Customer) => void
+  onExport: () => void
 }
 
-export function CustomerList({ onDelete, onView, customers }: CustomerListProps) {
+export function CustomerList({ onDelete, onView, customers, onExport }: CustomerListProps) {
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<CustomerSortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -101,15 +104,22 @@ export function CustomerList({ onDelete, onView, customers }: CustomerListProps)
     },
     {
       key: 'actions',
-      header: '',
-      render: (c: Customer) => (
+      header: (
+        <div className="flex items-center justify-end">
+          <button type="button" title="Export to Excel" onClick={onExport}
+            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+      render: (c: Customer) => isOwner ? (
         <div className="flex items-center justify-end">
           <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
             onClick={(e) => { e.stopPropagation(); onDelete(c) }}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      ),
+      ) : null,
     },
   ]
 
