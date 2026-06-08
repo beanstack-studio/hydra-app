@@ -10,11 +10,11 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-primary/10 text-primary border-primary/20',
-  secondary: 'bg-secondary text-secondary-foreground border-secondary',
-  destructive: 'bg-destructive/10 text-destructive border-destructive/20',
+  default: 'bg-primary/10 text-primary border-primary/25',
+  secondary: 'bg-secondary text-secondary-foreground border-border',
+  destructive: 'bg-destructive/10 text-destructive border-destructive/25',
   outline: 'bg-transparent text-foreground border-border',
-  success: 'bg-green-50 text-green-700 border-green-200',
+  success: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
 }
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {

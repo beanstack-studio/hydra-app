@@ -27,8 +27,8 @@ export function Sidebar() {
   const userName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
 
   return (
-    <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 bg-card border-r border-border z-40">
-      <div className="flex h-16 items-center px-6 border-b border-border shrink-0">
+    <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 bg-card border-r border-border z-40 shadow-sm">
+      <div className="flex h-16 items-center px-5 border-b border-border bg-card shrink-0">
         <img src="/logo.png" alt="Hydra" className="h-8 w-auto" />
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
@@ -40,7 +40,7 @@ export function Sidebar() {
               cn(
                 'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 isActive
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-primary/10 text-primary font-semibold'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               )
             }

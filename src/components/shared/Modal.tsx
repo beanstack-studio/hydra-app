@@ -47,13 +47,13 @@ export function Modal({
     >
       {/* Full-viewport backdrop — rendered via portal so no overflow clipping */}
       <div
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
         className={cn(
-          'relative z-10 w-full bg-card rounded-t-2xl lg:rounded-2xl shadow-xl',
+          'relative z-10 w-full bg-card rounded-t-2xl lg:rounded-2xl shadow-xl border border-border',
           'max-h-[90dvh] flex flex-col overflow-hidden',
           sizeClasses[size]
         )}
