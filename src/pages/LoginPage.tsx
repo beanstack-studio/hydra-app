@@ -34,19 +34,19 @@ const recoverSchema = z.object({
   path: ['confirmPassword'],
 })
 
-type LoginSchema = z.infer<typeof loginSchema>
-type SignUpSchema = z.infer<typeof signUpSchema>
-type ForgotSchema = z.infer<typeof forgotSchema>
+type LoginSchema   = z.infer<typeof loginSchema>
+type SignUpSchema  = z.infer<typeof signUpSchema>
+type ForgotSchema  = z.infer<typeof forgotSchema>
 type RecoverSchema = z.infer<typeof recoverSchema>
 
 export default function LoginPage() {
   const isPasswordRecovery = useAuthStore((s) => s.isPasswordRecovery)
-  const noStation = useAuthStore((s) => s.noStation)
-  const clearAuth = useAuthStore((s) => s.clearAuth)
-  const [view, setView] = useState<AuthView>('login')
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [signUpSuccess, setSignUpSuccess] = useState(false)
-  const [forgotSuccess, setForgotSuccess] = useState(false)
+  const noStation          = useAuthStore((s) => s.noStation)
+  const clearAuth          = useAuthStore((s) => s.clearAuth)
+  const [view, setView]    = useState<AuthView>('login')
+  const [authError,      setAuthError]      = useState<string | null>(null)
+  const [signUpSuccess,  setSignUpSuccess]  = useState(false)
+  const [forgotSuccess,  setForgotSuccess]  = useState(false)
 
   useEffect(() => {
     if (isPasswordRecovery) setView('recover')
@@ -112,7 +112,6 @@ export default function LoginPage() {
     setAuthError(null)
     const { error } = await supabase.auth.updateUser({ password: data.password })
     if (error) setAuthError(error.message)
-    // On success, onAuthStateChange fires USER_UPDATED → loadSession → user enters app
   })
 
   const handleSignOut = async () => {
@@ -129,7 +128,7 @@ export default function LoginPage() {
 
   const tabClass = (t: 'login' | 'signup') =>
     cn(
-      'flex-1 py-2 text-sm font-medium border-b-2 -mb-px transition-all duration-150',
+      'flex-1 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-all duration-150',
       view === t
         ? 'border-primary text-primary'
         : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -137,12 +136,27 @@ export default function LoginPage() {
 
   const showTabs = view === 'login' || view === 'signup'
 
+  /* Branding header — shared by all views */
+  const BrandHeader = () => (
+    <div className="flex flex-col items-center gap-3 mb-6">
+      <img
+        src="/logo.png"
+        alt="Hydra"
+        className="h-16 w-16 rounded-full object-cover shadow-md ring-2 ring-primary/20"
+      />
+      <div className="text-center">
+        <p className="text-xl font-bold text-foreground tracking-tight">Hydra</p>
+        <p className="text-xs text-muted-foreground">Water Station Management</p>
+      </div>
+    </div>
+  )
+
   if (noStation) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <img src="/logo.png" alt="Hydra" className="h-14 w-auto mx-auto" />
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
+        <div className="w-full max-w-sm space-y-6">
+          <BrandHeader />
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4 text-center">
             <p className="text-sm font-semibold text-foreground">Account not linked to a station</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Your account was created but has no station assigned yet. Ask your administrator to run the station setup SQL for your account, then try signing in again.
@@ -157,12 +171,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <img src="/logo.png" alt="Hydra" className="h-14 w-auto mx-auto" />
-          <p className="text-sm text-muted-foreground">Water Station Management</p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-sm">
+        <BrandHeader />
 
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           {showTabs && (
@@ -177,7 +188,7 @@ export default function LoginPage() {
           )}
 
           <div className="p-6">
-            {/* ── Sign In ──────────────────────────────────────────────────── */}
+            {/* ── Sign In ──────────────────────────────────────────────── */}
             {view === 'login' && (
               <form onSubmit={onLogin} noValidate className="space-y-4">
                 <div className="space-y-1.5">
@@ -206,10 +217,13 @@ export default function LoginPage() {
               </form>
             )}
 
-            {/* ── Sign Up ──────────────────────────────────────────────────── */}
+            {/* ── Sign Up ──────────────────────────────────────────────── */}
             {view === 'signup' && (
               signUpSuccess ? (
                 <div className="text-center space-y-3 py-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary text-xl">✓</span>
+                  </div>
                   <p className="text-sm font-semibold text-foreground">Account created!</p>
                   <p className="text-xs text-muted-foreground">
                     Check your email for a confirmation link, then sign in.
@@ -246,7 +260,7 @@ export default function LoginPage() {
               )
             )}
 
-            {/* ── Forgot Password ──────────────────────────────────────────── */}
+            {/* ── Forgot Password ──────────────────────────────────────── */}
             {view === 'forgot' && (
               forgotSuccess ? (
                 <div className="space-y-4">
@@ -286,7 +300,7 @@ export default function LoginPage() {
               )
             )}
 
-            {/* ── Set New Password (after clicking reset link) ─────────────── */}
+            {/* ── Set New Password ─────────────────────────────────────── */}
             {view === 'recover' && (
               <form onSubmit={onRecover} noValidate className="space-y-4">
                 <div>
@@ -311,6 +325,10 @@ export default function LoginPage() {
             )}
           </div>
         </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Hydra · Water Station Management
+        </p>
       </div>
     </div>
   )
