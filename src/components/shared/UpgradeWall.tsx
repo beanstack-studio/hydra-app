@@ -6,13 +6,14 @@ import { PageHeader } from '@/components/layout/PageHeader'
 interface UpgradeWallProps {
   title: string
   feature: string
+  showTitle?: boolean
 }
 
-export function UpgradeWall({ title, feature }: UpgradeWallProps) {
+export function UpgradeWall({ title, feature, showTitle = true }: UpgradeWallProps) {
   const navigate = useNavigate()
   return (
     <div>
-      <PageHeader title={title} />
+      {showTitle && <PageHeader title={title} />}
       <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-muted/40 px-6 py-12 text-center">
         <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
           <Lock className="h-6 w-6 text-primary" />

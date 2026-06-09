@@ -8,6 +8,8 @@ import { StaffProfileModal } from './StaffProfileModal'
 import { useTeamSettings } from '../hooks/useTeamSettings'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/hooks/use-toast'
+import { usePlan } from '@/hooks/usePlan'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { formatCurrency, cn } from '@/lib/utils'
 import type { StaffMember, MemberInput } from '../hooks/useTeamSettings'
 
@@ -15,6 +17,7 @@ type SortKey = 'name' | 'pay_rate'
 type SortDir = 'asc' | 'desc'
 
 export function TeamSettings() {
+  const plan = usePlan()
   const { toast } = useToast()
   const currentRole = useAuthStore((s) => s.role)
   const isOwner = currentRole === 'owner'
@@ -27,6 +30,8 @@ export function TeamSettings() {
   const [isRemoving,    setIsRemoving]    = useState(false)
   const [sortKey,       setSortKey]       = useState<SortKey>('name')
   const [sortDir,       setSortDir]       = useState<SortDir>('asc')
+
+  if (plan === 'free') return <UpgradeWall title="Team Members" feature="Team Members" showTitle={false} />
 
   const openAdd  = () => { setEditingStaff(null); setProfileOpen(true) }
   const openEdit = (s: StaffMember) => { setEditingStaff(s); setProfileOpen(true) }

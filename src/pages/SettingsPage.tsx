@@ -16,6 +16,7 @@ import { PlanSettings } from '@/features/settings/components/PlanSettings'
 import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
 
 type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
@@ -93,9 +94,7 @@ export default function SettingsPage() {
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
   const planLabel       = PLAN_LABELS[station?.plan ?? 'free'] ?? 'Free'
 
-  const visibleStore   = isFree
-    ? STORE_SECTIONS.filter((s) => s.id !== 'maintenance')
-    : STORE_SECTIONS
+  const visibleStore   = STORE_SECTIONS
   const visibleAccount = ACCOUNT_SECTIONS.filter((s) => !s.ownerOnly || isOwner)
 
   function renderDetail() {
@@ -134,8 +133,10 @@ export default function SettingsPage() {
           />
         )
       case 'maintenance':
+        if (isFree) return <UpgradeWall title="Maintenance Log" feature="Maintenance Log" showTitle={false} />
         return <MaintenanceTable />
       case 'team':
+        if (isFree) return <UpgradeWall title="Team Members" feature="Team Members" showTitle={false} />
         return <TeamSettings />
       case 'plan':
         return <PlanSettings />
@@ -170,20 +171,28 @@ export default function SettingsPage() {
   // ── Section card (used in mobile hub) ─────────────────────────────────────
   function SectionCard({ section }: { section: SectionDef }) {
     const Icon = section.icon
+    const SECTION_FREE_LOCKED = new Set(['maintenance', 'team'])
+    const isLocked = isFree && SECTION_FREE_LOCKED.has(section.id)
     return (
       <button
         type="button"
         onClick={() => setActive(section.id)}
         className="flex items-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-accent/50 active:bg-accent transition-colors duration-150 text-left"
       >
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="h-[18px] w-[18px] text-primary" />
+        <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', isLocked ? 'bg-muted/60' : 'bg-primary/10')}>
+          <Icon className={cn('h-[18px] w-[18px]', isLocked ? 'text-muted-foreground' : 'text-primary')} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">{section.label}</p>
+          <p className={cn('text-sm font-medium', isLocked ? 'text-muted-foreground' : 'text-foreground')}>{section.label}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        {isLocked ? (
+          <span className="flex items-center gap-0.5 text-[9px] font-bold rounded px-1.5 py-0.5 bg-amber-100 text-amber-700 shrink-0">
+            PRO
+          </span>
+        ) : (
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
       </button>
     )
   }

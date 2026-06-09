@@ -54,7 +54,7 @@ function RoleViewToggle() {
         <button type="button" onClick={() => { setViewRole('staff'); setViewPlan(null) }} className={btnClass('staff')}>
           Staff
         </button>
-        <button type="button" onClick={() => setViewPlan('free')} className={btnClass('free')}>
+        <button type="button" onClick={() => { setViewRole('owner'); setViewPlan('free') }} className={btnClass('free')}>
           Free
         </button>
       </div>

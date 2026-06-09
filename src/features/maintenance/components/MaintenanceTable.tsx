@@ -9,12 +9,15 @@ import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useMaintenance } from '../hooks/useMaintenance'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import type { MaintenanceLog } from '../types'
 
 type MaintenanceSortKey = 'equipment' | 'date' | 'cost'
 type SortDir = 'asc' | 'desc'
 
 export function MaintenanceTable() {
+  const plan = usePlan()
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const { data, isLoading, error, addLog, updateLog, deleteLog } = useMaintenance()
@@ -25,6 +28,8 @@ export function MaintenanceTable() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [sortKey, setSortKey] = useState<MaintenanceSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  if (plan === 'free') return <UpgradeWall title="Maintenance Log" feature="Maintenance Log" showTitle={false} />
 
   const handleSort = (key: MaintenanceSortKey) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
