@@ -82,6 +82,8 @@ export function AppShell() {
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
+    // Only show update banner when replacing an existing SW (not on first install)
+    if (!navigator.serviceWorker.controller) return
     const handleControllerChange = () => setHasUpdate(true)
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
     return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)

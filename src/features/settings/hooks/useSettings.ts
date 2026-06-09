@@ -207,6 +207,11 @@ export function useSettings(): UseSettingsReturn {
     const publicUrl = await uploadStationPhotoToStorage(stationId, file)
     const { error: e } = await supabase.from('stations').update({ photo_url: publicUrl }).eq('id', stationId)
     if (e) throw new Error(e.message)
+    // Verify the update actually persisted — RLS can silently block updates (0 rows, no error)
+    const { data: check } = await supabase.from('stations').select('photo_url').eq('id', stationId).maybeSingle()
+    if (check?.photo_url !== publicUrl) {
+      throw new Error('Photo uploaded but not saved — add an UPDATE policy for the stations table in Supabase.')
+    }
     setStation({ ...authStation, photo_url: publicUrl })
   }, [stationId, authStation, setStation])
 
