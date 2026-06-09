@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
-import { AlertTriangle } from 'lucide-react'
+import { Outlet, Link, useLocation } from 'react-router-dom'
+import { AlertTriangle, Settings } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
@@ -10,15 +10,6 @@ import { cn } from '@/lib/utils'
 import type { Reminder } from '@/lib/reminders'
 
 const SUPER_ADMIN_EMAIL = 'hello@beanstack.studio'
-
-function MobileHeader() {
-  return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2.5 border-b border-border bg-card px-4 lg:hidden shrink-0">
-      <img src="/logo.png" alt="Hydra" className="h-8 w-8 rounded-full object-cover shrink-0" />
-      <span className="text-base font-bold text-foreground tracking-tight">Hydra</span>
-    </header>
-  )
-}
 
 function DevBanner() {
   const userId = useAuthStore((s) => s.user?.id ?? '')
@@ -76,6 +67,10 @@ function RoleViewToggle() {
 
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
+  const role     = useAuthStore((s) => s.role)
+  const location = useLocation()
+  const isOwner  = role === 'owner' || role === 'super_admin'
+  const onSettingsPage = location.pathname.startsWith('/settings')
 
   useEffect(() => {
     startReminderPolling((reminders) => {
@@ -96,13 +91,24 @@ export function AppShell() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
-        <MobileHeader />
         <DevBanner />
         <RoleViewToggle />
         <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
+
+      {/* Settings shortcut — mobile only, owner only, hidden when already on settings */}
+      {isOwner && !onSettingsPage && (
+        <Link
+          to="/settings"
+          className="fixed top-3 right-4 z-40 lg:hidden flex items-center justify-center h-8 w-8 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground shadow-sm transition-colors duration-150"
+          title="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
+      )}
+
       <BottomNav />
       <ReminderModal reminders={pendingReminders} onDismiss={handleDismiss} />
     </div>

@@ -1,24 +1,28 @@
 import { NavLink } from 'react-router-dom'
-import {
-  ShoppingCart,
-  Receipt,
-  Users,
-  Package,
-  BarChart,
-  Settings,
-} from 'lucide-react'
+import { ShoppingCart, Receipt, Users, Package, BarChart, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
-const navItems = [
+const OWNER_NAV = [
   { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
   { to: '/expenses',  label: 'Expenses',  icon: Receipt },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/reports',   label: 'Reports',   icon: BarChart },
+]
+
+const STAFF_NAV = [
+  { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
+  { to: '/expenses',  label: 'Expenses',  icon: Receipt },
+  { to: '/customers', label: 'Customers', icon: Users },
+  { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/settings',  label: 'Settings',  icon: Settings },
 ]
 
 export function BottomNav() {
+  const role = useAuthStore((s) => s.role)
+  const navItems = role === 'owner' || role === 'super_admin' ? OWNER_NAV : STAFF_NAV
+
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden">
       <div className="flex h-16">

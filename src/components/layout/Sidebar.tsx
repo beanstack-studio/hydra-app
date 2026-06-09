@@ -12,13 +12,20 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
   { to: '/expenses',  label: 'Expenses',  icon: Receipt },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/reports',   label: 'Reports',   icon: BarChart },
   { to: '/settings',  label: 'Settings',  icon: Settings },
+]
+
+const STAFF_NAV_ITEMS = [
+  { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
+  { to: '/expenses',  label: 'Expenses',  icon: Receipt },
+  { to: '/customers', label: 'Customers', icon: Users },
+  { to: '/inventory', label: 'Inventory', icon: Package },
 ]
 
 /* Deep teal derived from primary hue — clearly themed, not pitch-black */
@@ -28,7 +35,9 @@ const BORDER      = 'border-white/10'
 export function Sidebar() {
   const station  = useAuthStore((s) => s.station)
   const user     = useAuthStore((s) => s.user)
+  const role     = useAuthStore((s) => s.role)
   const userName = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
+  const navItems = (role === 'owner' || role === 'super_admin') ? ALL_NAV_ITEMS : STAFF_NAV_ITEMS
 
   return (
     <aside className={cn('hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 z-40', SIDEBAR_BG, 'border-r', BORDER)}>
