@@ -20,6 +20,7 @@ interface AuthState {
   isPasswordRecovery: boolean
   noStation: boolean
   setAuth: (params: { user: User; stationId: string; role: Role; station: Station }) => void
+  setStation: (station: Station) => void
   clearAuth: () => void
   setInitialized: () => void
   setPasswordRecovery: (v: boolean) => void
@@ -37,6 +38,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
   noStation: false,
   setAuth: ({ user, stationId, role, station }) =>
     set({ user, stationId, role, station, noStation: false, isPasswordRecovery: false }),
+  setStation: (station) =>
+    set({ station }),
   clearAuth: () =>
     set({ user: null, stationId: null, role: null, station: null, noStation: false }),
   setInitialized: () =>

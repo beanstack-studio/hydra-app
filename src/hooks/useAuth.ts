@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react'
-import type { Session } from '@supabase/supabase-js'
+import { useEffect, useCallback, useRef } from 'react'
+import type { Session, RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import type { Station } from '@/stores/authStore'
@@ -10,9 +10,11 @@ type Role = 'owner' | 'staff' | 'super_admin'
 
 export function useAuth() {
   const setAuth = useAuthStore((s) => s.setAuth)
+  const setStation = useAuthStore((s) => s.setStation)
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const setInitialized = useAuthStore((s) => s.setInitialized)
   const setNoStation = useAuthStore((s) => s.setNoStation)
+  const stationChannelRef = useRef<RealtimeChannel | null>(null)
 
   const loadSession = useCallback(async (session: Session | null) => {
     if (!session) {
@@ -79,7 +81,20 @@ export function useAuth() {
       station: stationRow as Station,
     })
     setInitialized()
-  }, [setAuth, clearAuth, setInitialized])
+
+    // Realtime: keep station metadata (name, photo) in sync across devices
+    if (stationChannelRef.current) {
+      void supabase.removeChannel(stationChannelRef.current)
+    }
+    stationChannelRef.current = supabase
+      .channel(`station-meta:${stationId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'stations', filter: `id=eq.${stationId}` },
+        (payload) => { setStation(payload.new as Station) }
+      )
+      .subscribe()
+  }, [setAuth, setStation, clearAuth, setInitialized])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -97,6 +112,11 @@ export function useAuth() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      if (stationChannelRef.current) {
+        void supabase.removeChannel(stationChannelRef.current)
+      }
+    }
   }, [loadSession])
 }

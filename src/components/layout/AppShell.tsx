@@ -97,26 +97,21 @@ export function AppShell() {
         <DevBanner />
         <RoleViewToggle />
 
-        {/* Mobile station header — owner only, hidden on settings page */}
+        {/* Mobile station avatar — owner only, hidden on settings page */}
         {isOwner && !onSettingsPage && (
-          <div className="lg:hidden flex items-center justify-end px-4 h-12 border-b border-border shrink-0">
+          <div className="lg:hidden flex items-center justify-end px-4 h-10 border-b border-border/40 shrink-0">
             <Link
               to="/settings"
-              className="flex items-center gap-2 rounded-full pl-2.5 pr-1 py-1 border border-border hover:bg-accent transition-colors duration-150"
+              className="h-7 w-7 rounded-full overflow-hidden border border-border shadow-sm shrink-0"
               title="Settings"
             >
-              <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
-                {stationName || 'My Station'}
-              </span>
-              <div className="h-7 w-7 rounded-full overflow-hidden shrink-0 border border-border">
-                {stationPhotoUrl ? (
-                  <img src={stationPhotoUrl} alt={stationName} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full bg-primary/15 flex items-center justify-center">
-                    <Building2 className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                )}
-              </div>
+              {stationPhotoUrl ? (
+                <img key={stationPhotoUrl} src={stationPhotoUrl} alt={stationName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full bg-primary/15 flex items-center justify-center">
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                </div>
+              )}
             </Link>
           </div>
         )}
