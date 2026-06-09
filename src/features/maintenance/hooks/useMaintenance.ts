@@ -107,12 +107,13 @@ export function useMaintenance(): UseMaintenanceReturn {
         await supabase.from('expenses').insert({
           station_id: stationId,
           category: 'maintenance',
-          item: `Maintenance: ${input.equipment}`,
+          item: input.equipment,
           price: input.cost,
           amount: input.cost,
           frequency: 'one_off',
           expense_date: input.service_date,
           payment_method: null,
+          supplier: input.technician ?? null,
           remarks: input.issue,
         })
       } catch {
@@ -135,6 +136,13 @@ export function useMaintenance(): UseMaintenanceReturn {
       }
     }
 
+    // Fetch old log before updating so we can find the linked expense
+    const { data: oldLog } = await supabase
+      .from('maintenance_logs')
+      .select('item_filter, service_date, maintenance_date, cost')
+      .eq('id', id)
+      .single()
+
     const updateData: Record<string, unknown> = {
       item_filter: input.equipment,
       total_price: input.cost ?? 0,
@@ -148,8 +156,51 @@ export function useMaintenance(): UseMaintenanceReturn {
 
     const { error: e } = await supabase.from('maintenance_logs').update(updateData).eq('id', id)
     if (e) throw new Error(e.message)
+
+    // Sync linked expense row
+    if (oldLog && stationId) {
+      const oldEquipment = oldLog.item_filter as string
+      const oldDate = (oldLog.service_date ?? oldLog.maintenance_date) as string
+
+      // Match on old item name — handle both legacy 'Maintenance: X' and current 'X' formats
+      const { data: matchedExpense } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('station_id', stationId)
+        .eq('category', 'maintenance')
+        .eq('expense_date', oldDate)
+        .in('item', [oldEquipment, `Maintenance: ${oldEquipment}`])
+        .limit(1)
+        .maybeSingle()
+
+      if (matchedExpense) {
+        await supabase.from('expenses').update({
+          item:         input.equipment   ?? oldEquipment,
+          amount:       input.cost        ?? (oldLog.cost as number | null) ?? 0,
+          price:        input.cost        ?? (oldLog.cost as number | null) ?? 0,
+          expense_date: input.service_date ?? oldDate,
+          supplier:     input.technician  ?? null,
+          remarks:      input.issue       ?? null,
+        }).eq('id', (matchedExpense as { id: string }).id)
+      } else if (input.cost && input.cost > 0) {
+        // No linked expense found — create one now
+        await supabase.from('expenses').insert({
+          station_id:     stationId,
+          category:       'maintenance',
+          item:           input.equipment ?? oldEquipment,
+          price:          input.cost,
+          amount:         input.cost,
+          frequency:      'one_off',
+          expense_date:   input.service_date ?? oldDate,
+          payment_method: null,
+          supplier:       input.technician ?? null,
+          remarks:        input.issue      ?? null,
+        })
+      }
+    }
+
     await fetchData()
-  }, [fetchData, uploadPhoto])
+  }, [fetchData, uploadPhoto, stationId])
 
   const deleteLog = useCallback(async (id: string) => {
     const { error: e } = await supabase.from('maintenance_logs').delete().eq('id', id)
