@@ -180,7 +180,7 @@ export function useReports(): UseReportsReturn {
       }
       const topSupplies: SupplyRanking[] = Array.from(supplyRankMap.entries())
         .map(([item, v]) => ({ item, ...v }))
-        .sort((a, b) => b.total_amount - a.total_amount)
+        .sort((a, b) => b.purchase_count - a.purchase_count || b.total_amount - a.total_amount)
         .slice(0, 5)
 
       // ── Totals ───────────────────────────────────────────────────────────

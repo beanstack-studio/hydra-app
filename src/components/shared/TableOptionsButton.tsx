@@ -31,6 +31,8 @@ interface TableOptionsButtonProps {
   filterValue?: Record<string, string>
   onFilterChange?: (groupKey: string, value: string) => void
   onFilterReset?: () => void
+  /** Keys excluded from the active-filter badge count (e.g. always-present month/year) */
+  uncountedFilterKeys?: string[]
   /** Column visibility — drives both table display and export defaults */
   hiddenKeys?: Set<string>
   onToggleColumn?: (key: string) => void
@@ -46,6 +48,7 @@ export function TableOptionsButton({
   filterValue = {},
   onFilterChange,
   onFilterReset,
+  uncountedFilterKeys,
   hiddenKeys,
   onToggleColumn,
   exportColumns,
@@ -57,7 +60,9 @@ export function TableOptionsButton({
   const [exportChecked, setExportChecked] = useState<Record<string, boolean>>({})
   const [format,        setFormat]        = useState<FileFormat>('csv')
 
-  const activeFilterCount = Object.values(filterValue).filter(Boolean).length
+  const activeFilterCount = Object.entries(filterValue)
+    .filter(([k, v]) => v && !uncountedFilterKeys?.includes(k))
+    .length
   const hasFilters        = filterGroups  && filterGroups.length  > 0
   const hasExport         = exportColumns && exportColumns.length > 0 && exportRows
 

@@ -27,26 +27,13 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   other:       'Other',
 }
 
-const BILL_FILTER_GROUPS: FilterGroup[] = [
-  {
-    key: 'status',
-    label: 'Status',
-    options: [
-      { value: 'unpaid', label: 'Unpaid' },
-      { value: 'paid',   label: 'Paid'   },
-    ],
-  },
-  {
-    key: 'payment_method',
-    label: 'Payment Method',
-    options: [
-      { value: 'cash',        label: 'Cash'        },
-      { value: 'gcash',       label: 'GCash'       },
-      { value: 'maya',        label: 'Maya'        },
-      { value: 'credit_card', label: 'Credit Card' },
-      { value: 'other',       label: 'Other'       },
-    ],
-  },
+const BILL_TYPE_OPTIONS = [
+  { value: 'electricity', label: 'Electricity' },
+  { value: 'water',       label: 'Water'       },
+  { value: 'internet',    label: 'Internet'    },
+  { value: 'rent',        label: 'Rent'        },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'other',       label: 'Other'       },
 ]
 
 
@@ -79,8 +66,48 @@ const BILL_TYPE_LABELS: Record<string, string> = {
 export function BillTable() {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
-  const { hiddenKeys, toggleColumn } = useTablePrefs('bills', ['description'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('bills', ['description'])
   const { data, isLoading, error, month, year, setMonth, setYear, addBill, updateBill, deleteBill, payBill } = useBills()
+
+  const currentYear = nowPH().getFullYear()
+  const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
+
+  const billFilterGroups: FilterGroup[] = [
+    {
+      key: 'month',
+      label: 'Month',
+      options: MONTHS.map((m, i) => ({ value: String(i + 1), label: m })),
+    },
+    {
+      key: 'year',
+      label: 'Year',
+      options: yearOptions.map((y) => ({ value: String(y), label: String(y) })),
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      options: BILL_TYPE_OPTIONS,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      options: [
+        { value: 'unpaid', label: 'Unpaid' },
+        { value: 'paid',   label: 'Paid'   },
+      ],
+    },
+    {
+      key: 'payment_method',
+      label: 'Payment Method',
+      options: [
+        { value: 'cash',        label: 'Cash'        },
+        { value: 'gcash',       label: 'GCash'       },
+        { value: 'maya',        label: 'Maya'        },
+        { value: 'credit_card', label: 'Credit Card' },
+        { value: 'other',       label: 'Other'       },
+      ],
+    },
+  ]
 
   const [editingBill,  setEditingBill]  = useState<Bill | null>(null)
   const [isFormOpen,   setIsFormOpen]   = useState(false)
@@ -90,6 +117,22 @@ export function BillTable() {
   const [billFilters,  setBillFilters]  = useState<Record<string, string>>({})
   const [sortKey,      setSortKey]      = useState<BillSortKey>('due_date')
   const [sortDir,      setSortDir]      = useState<SortDir>('asc')
+
+  const handleBillFilterChange = (key: string, val: string) => {
+    if (key === 'month') {
+      setMonth(val ? Number(val) : nowPH().getMonth() + 1)
+    } else if (key === 'year') {
+      setYear(val ? Number(val) : currentYear)
+    } else {
+      setBillFilters((prev) => ({ ...prev, [key]: val }))
+    }
+  }
+
+  const handleBillFilterReset = () => {
+    setBillFilters({})
+    setMonth(nowPH().getMonth() + 1)
+    setYear(currentYear)
+  }
 
   const handleSort = (key: string) => {
     const k = key as BillSortKey
@@ -102,6 +145,7 @@ export function BillTable() {
   }
 
   const filteredData = data.filter((b) => {
+    if (billFilters.type && b.bill_type !== billFilters.type) return false
     if (billFilters.status) {
       const isPaid = !!b.date_paid
       if (billFilters.status === 'paid'   && !isPaid) return false
@@ -148,9 +192,6 @@ export function BillTable() {
     date_paid: b.date_paid ? formatDate(b.date_paid) : '',
     description: b.description ?? '',
   }))
-
-  const currentYear = nowPH().getFullYear()
-  const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
 
   const columns: Column<Bill>[] = [
     {
@@ -261,30 +302,18 @@ export function BillTable() {
     <div className="space-y-4 w-full">
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Month / year picker + options + Add */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {MONTHS.map((m, i) => (
-            <option key={m} value={i + 1}>{m}</option>
-          ))}
-        </select>
-        <select
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+      {/* Options + Add */}
+      <div className="flex items-center gap-3">
+        <p className="text-sm text-muted-foreground">
+          {MONTHS[month - 1]} {year}
+        </p>
         <div className="ml-auto flex items-center gap-3">
           <TableOptionsButton
-            filterGroups={BILL_FILTER_GROUPS}
-            filterValue={billFilters}
-            onFilterChange={(key, val) => setBillFilters((prev) => ({ ...prev, [key]: val }))}
-            onFilterReset={() => setBillFilters({})}
+            filterGroups={billFilterGroups}
+            filterValue={{ ...billFilters, month: String(month), year: String(year) }}
+            onFilterChange={handleBillFilterChange}
+            onFilterReset={handleBillFilterReset}
+            uncountedFilterKeys={['month', 'year']}
             hiddenKeys={hiddenKeys}
             onToggleColumn={toggleColumn}
             exportColumns={BILLS_EXPORT_COLUMNS}
@@ -309,6 +338,8 @@ export function BillTable() {
         sortDir={sortDir}
         onSort={handleSort}
         hiddenKeys={hiddenKeys}
+        columnWidths={columnWidths}
+        onColumnResize={onColumnResize}
         emptyState={
           <EmptyState
             icon={<FileText className="h-8 w-8" />}
