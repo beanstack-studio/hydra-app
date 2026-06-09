@@ -91,12 +91,6 @@ export function TeamSettings() {
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Team Roster
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">All employees — used for payroll</p>
-        </div>
         {isOwner && (
           <Button size="sm" onClick={openAdd}>
             <UserPlus className="h-4 w-4 mr-1" />
