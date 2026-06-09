@@ -94,7 +94,7 @@ export function useAuth() {
         (payload) => { setStation(payload.new as Station) }
       )
       .subscribe()
-  }, [setAuth, setStation, clearAuth, setInitialized])
+  }, [setAuth, setStation, clearAuth, setInitialized, setNoStation])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -112,11 +112,28 @@ export function useAuth() {
       }
     )
 
+    // Re-fetch station when app is foregrounded (mobile PWA loses WS while backgrounded)
+    const handleVisibilityChange = () => {
+      if (document.hidden) return
+      const { stationId } = useAuthStore.getState()
+      if (!stationId) return
+      void supabase
+        .from('stations')
+        .select('id, name, plan, owner_name, photo_url')
+        .eq('id', stationId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setStation(data as Station)
+        })
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (stationChannelRef.current) {
         void supabase.removeChannel(stationChannelRef.current)
       }
     }
-  }, [loadSession])
+  }, [loadSession, setStation, setInitialized])
 }

@@ -67,6 +67,7 @@ function RoleViewToggle() {
 
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
+  const [hasUpdate, setHasUpdate] = useState(false)
 
   useEffect(() => {
     startReminderPolling((reminders) => {
@@ -79,6 +80,13 @@ export function AppShell() {
     return () => stopReminderPolling()
   }, [])
 
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const handleControllerChange = () => setHasUpdate(true)
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange)
+  }, [])
+
   const handleDismiss = (id: string) => {
     setPendingReminders((prev) => prev.filter((r) => r.id !== id))
   }
@@ -89,6 +97,18 @@ export function AppShell() {
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
         <DevBanner />
         <RoleViewToggle />
+        {hasUpdate && (
+          <div className="flex items-center justify-between bg-primary/10 border-b border-primary/20 px-4 py-2 text-sm shrink-0">
+            <span className="font-medium text-primary">New version available</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="text-sm font-semibold text-primary underline underline-offset-2"
+            >
+              Reload
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <Outlet />
