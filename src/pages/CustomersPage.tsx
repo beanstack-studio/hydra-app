@@ -13,8 +13,10 @@ import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatExportAmount } from '@/lib/utils'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
-import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
+import type { FilterGroup } from '@/components/shared/FilterButton'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
 
 const CUSTOMER_FILTER_GROUPS: FilterGroup[] = [
   {
@@ -42,9 +44,9 @@ import type { Customer } from '@/features/customers/types'
 export default function CustomersPage() {
   const plan = usePlan()
   const { toast } = useToast()
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('customers', ['messenger'])
   const navigate = useNavigate()
   const [isModalOpen,  setIsModalOpen]  = useState(false)
-  const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -71,7 +73,7 @@ export default function CustomersPage() {
     setIsModalOpen(true)
   }
 
-  const customerExportRows = data.map((c) => ({
+  const customerExportRows = filteredCustomers.map((c) => ({
     name:       c.name,
     type:       c.type,
     phone:      c.phone ?? '',
@@ -108,11 +110,17 @@ export default function CustomersPage() {
           minChars={1}
           className="flex-1"
         />
-        <FilterButton
-          groups={CUSTOMER_FILTER_GROUPS}
-          value={filters}
-          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onReset={() => setFilters({})}
+        <TableOptionsButton
+          filterGroups={CUSTOMER_FILTER_GROUPS}
+          filterValue={filters}
+          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onFilterReset={() => setFilters({})}
+          hiddenKeys={hiddenKeys}
+          onToggleColumn={toggleColumn}
+          exportColumns={CUSTOMER_EXPORT_COLUMNS}
+          exportRows={customerExportRows}
+          exportFilename="hydra-customers"
+          exportTitle="Customers"
         />
         <Button size="sm" onClick={() => { setEditingCustomer(null); setIsModalOpen(true) }}>
           <Plus className="h-4 w-4 mr-1.5" />
@@ -128,18 +136,12 @@ export default function CustomersPage() {
           onEdit={openEdit}
           onDelete={setDeletingCustomer}
           onView={(c) => navigate(`/customers/${c.id}`)}
-          onExport={() => setIsExportOpen(true)}
+          hiddenKeys={hiddenKeys}
+          columnWidths={columnWidths}
+          onColumnResize={onColumnResize}
         />
       )}
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title="Customers"
-        filename="hydra-customers"
-        columns={CUSTOMER_EXPORT_COLUMNS}
-        rows={customerExportRows}
-      />
 
       <CustomerModal
         isOpen={isModalOpen}

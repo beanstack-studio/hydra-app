@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ShoppingCart, Download } from 'lucide-react'
+import { ShoppingCart, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/shared/DataTable'
+import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,14 +32,36 @@ const paymentLabel: Record<PaymentMode, string> = {
   utang: 'Utang',
 }
 
+export const SALE_COLUMN_CONFIG: ColumnConfig[] = [
+  { key: 'date',       label: 'Date' },
+  { key: 'customer',   label: 'Customer' },
+  { key: 'order_type', label: 'Type' },
+  { key: 'product',    label: 'Product' },
+  { key: 'payment',    label: 'Payment' },
+  { key: 'amount',     label: 'Amount' },
+  { key: 'status',     label: 'Status' },
+  { key: 'remarks',    label: 'Remarks' },
+]
+
 interface SaleTableProps {
   sales: Sale[]
   onSelect: (sale: Sale) => void
   onPay?: (sale: Sale) => void
-  onExport: () => void
+  onDelete?: (sale: Sale) => void
+  hiddenKeys?: Set<string>
+  columnWidths?: Record<string, number>
+  onColumnResize?: (key: string, width: number) => void
 }
 
-export function SaleTable({ sales, onSelect, onPay, onExport }: SaleTableProps) {
+export function SaleTable({
+  sales,
+  onSelect,
+  onPay,
+  onDelete,
+  hiddenKeys,
+  columnWidths,
+  onColumnResize,
+}: SaleTableProps) {
   const [sortKey, setSortKey] = useState<SaleSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -89,6 +112,25 @@ export function SaleTable({ sales, onSelect, onPay, onExport }: SaleTableProps) 
       ),
     },
     {
+      key: 'product',
+      header: 'Product',
+      render: (s: Sale) => {
+        const productLines: string[] = s.items && s.items.length > 0
+          ? s.items.map((item) => `${item.product_name} ×${item.qty}`)
+          : [`${s.product_name} ×${s.qty}`]
+        if (s.container_enabled && s.container_qty > 0) {
+          productLines.push(`Container ×${s.container_qty}`)
+        }
+        return (
+          <div className="flex flex-col gap-0.5">
+            {productLines.map((line, i) => (
+              <span key={i} className="text-xs text-muted-foreground whitespace-nowrap">{line}</span>
+            ))}
+          </div>
+        )
+      },
+    },
+    {
       key: 'payment',
       header: 'Payment',
       sortable: true,
@@ -129,16 +171,27 @@ export function SaleTable({ sales, onSelect, onPay, onExport }: SaleTableProps) 
       ),
     },
     {
+      key: 'remarks',
+      header: 'Remarks',
+      render: (s: Sale) => (
+        <span className="text-xs text-muted-foreground">{s.remarks ?? '—'}</span>
+      ),
+    },
+    {
       key: 'actions',
-      header: (
-        <div className="flex items-center justify-end">
-          <button type="button" title="Export to Excel" onClick={onExport}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <Download className="h-4 w-4" />
+      header: '',
+      render: (s: Sale) => onDelete ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            title="Delete sale"
+            onClick={(e) => { e.stopPropagation(); onDelete(s) }}
+            className="text-muted-foreground hover:text-destructive transition-colors duration-150 p-1"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
-      ),
-      render: () => null,
+      ) : null,
     },
   ]
 
@@ -151,6 +204,9 @@ export function SaleTable({ sales, onSelect, onPay, onExport }: SaleTableProps) 
       sortKey={sortKey}
       sortDir={sortDir}
       onSort={handleSort}
+      hiddenKeys={hiddenKeys}
+      columnWidths={columnWidths}
+      onColumnResize={onColumnResize}
       emptyState={
         <EmptyState
           icon={<ShoppingCart className="h-8 w-8" />}

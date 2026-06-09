@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Users, Trash2, Download } from 'lucide-react'
+import { Users, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
+import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatDate, formatCurrency, formatPhone, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -23,15 +24,33 @@ const TYPE_VARIANT: Record<CustomerType, 'default' | 'secondary' | 'outline'> = 
   retailer: 'secondary',
 }
 
+export const CUSTOMER_COLUMN_CONFIG: ColumnConfig[] = [
+  { key: 'name',         label: 'Name' },
+  { key: 'type',         label: 'Type' },
+  { key: 'phone',        label: 'Phone' },
+  { key: 'address',      label: 'Address' },
+  { key: 'last_ordered', label: 'Last Order' },
+  { key: 'balance',      label: 'Balance' },
+]
+
 interface CustomerListProps {
   customers: Customer[]
   onEdit: (customer: Customer) => void
   onDelete: (customer: Customer) => void
   onView: (customer: Customer) => void
-  onExport: () => void
+  hiddenKeys?: Set<string>
+  columnWidths?: Record<string, number>
+  onColumnResize?: (key: string, width: number) => void
 }
 
-export function CustomerList({ onDelete, onView, customers, onExport }: CustomerListProps) {
+export function CustomerList({
+  onDelete,
+  onView,
+  customers,
+  hiddenKeys,
+  columnWidths,
+  onColumnResize,
+}: CustomerListProps) {
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<CustomerSortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -122,14 +141,7 @@ export function CustomerList({ onDelete, onView, customers, onExport }: Customer
     },
     {
       key: 'actions',
-      header: (
-        <div className="flex items-center justify-end">
-          <button type="button" title="Export to Excel" onClick={onExport}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <Download className="h-4 w-4" />
-          </button>
-        </div>
-      ),
+      header: '',
       render: (c: Customer) => isOwner ? (
         <div className="flex items-center justify-end">
           <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
@@ -150,6 +162,9 @@ export function CustomerList({ onDelete, onView, customers, onExport }: Customer
       sortKey={sortKey}
       sortDir={sortDir}
       onSort={handleSort}
+      hiddenKeys={hiddenKeys}
+      columnWidths={columnWidths}
+      onColumnResize={onColumnResize}
       emptyState={
         <EmptyState
           icon={<Users className="h-8 w-8" />}

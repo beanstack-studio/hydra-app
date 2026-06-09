@@ -51,6 +51,7 @@ interface UseSalesReturn {
   isLoading: boolean
   error: string | null
   addSale: (input: SaleInsert) => Promise<Sale>
+  deleteSale: (saleId: string) => Promise<void>
   recordPayment: (saleId: string, amount: number, paymentMode: PaymentMode, paidAt: string, remarks: string) => Promise<void>
   rescheduleOrder: (saleId: string, scheduledAt: string) => Promise<void>
   confirmFulfillment: (saleId: string) => Promise<void>
@@ -98,8 +99,13 @@ export function useSales(): UseSalesReturn {
       .select()
       .single()
     if (e) throw new Error(e.message)
-    if (stationId && input.product_id) {
-      void deductLinkedSupplies(stationId, input.product_id, input.qty)
+    if (stationId) {
+      const itemsToDeduct = input.items && input.items.length > 0
+        ? input.items
+        : [{ product_id: input.product_id, qty: input.qty }]
+      itemsToDeduct.forEach(({ product_id, qty }) => {
+        if (product_id) void deductLinkedSupplies(stationId, product_id, qty)
+      })
     }
     await fetchData()
     return row as Sale
@@ -142,6 +148,19 @@ export function useSales(): UseSalesReturn {
     await fetchData()
   }, [fetchData])
 
+  const deleteSale = useCallback(async (saleId: string) => {
+    // Delete related records first to avoid FK constraint errors
+    await supabase.from('reminders').delete().eq('sale_id', saleId)
+    await supabase.from('sale_payments').delete().eq('sale_id', saleId)
+    const { error: e } = await supabase
+      .from('sales')
+      .delete()
+      .eq('id', saleId)
+      .eq('station_id', stationId)
+    if (e) throw new Error(e.message)
+    await fetchData()
+  }, [fetchData, stationId])
+
   const confirmFulfillment = useCallback(async (saleId: string) => {
     const { error: e } = await supabase
       .from('sales')
@@ -153,5 +172,5 @@ export function useSales(): UseSalesReturn {
     await fetchData()
   }, [fetchData])
 
-  return { data, isLoading, error, addSale, recordPayment, rescheduleOrder, confirmFulfillment, refetch: fetchData }
+  return { data, isLoading, error, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment, refetch: fetchData }
 }

@@ -12,11 +12,13 @@ import { useExpenses } from '@/features/expenses/hooks/useExpenses'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { formatCurrency, formatExportAmount, formatDate, cn } from '@/lib/utils'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
-import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+import type { FilterGroup } from '@/components/shared/FilterButton'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
 
 const EXPENSE_STATIC_FILTER_GROUPS: FilterGroup[] = [
@@ -68,6 +70,7 @@ const EXPENSE_EXPORT_COLUMNS: ExportColumnDef[] = [
 export default function ExpensesPage() {
   const { toast } = useToast()
   const role    = useAuthStore((s) => s.role)
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('expenses', ['remarks'])
   const plan    = usePlan()
   const isOwner = role === 'owner'
   const isFree  = plan === 'free'
@@ -75,7 +78,6 @@ export default function ExpensesPage() {
   const [expenseSearch,  setExpenseSearch]  = useState('')
   const [expenseFilters, setExpenseFilters] = useState<Record<string, string>>({})
   const [isModalOpen,   setIsModalOpen]   = useState(false)
-  const [isExportOpen,  setIsExportOpen]  = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -139,18 +141,6 @@ export default function ExpensesPage() {
   ]
   const TABS = ALL_EXPENSE_TABS.filter((t) => !t.ownerOnly || isOwner)
 
-  const expenseExportRows = data.filter((e) => e.category !== 'labor').map((e) => ({
-    date:           formatDate(e.expense_date),
-    category:       e.category,
-    item:           e.item,
-    qty:            e.qty ?? '',
-    price_per_unit: e.qty && e.qty > 0 ? formatExportAmount(e.amount / e.qty) : '',
-    supplier:       e.supplier ?? '',
-    total_price:    formatExportAmount(e.amount),
-    payment_method: e.payment_method ?? '',
-    remarks:        e.remarks ?? '',
-  }))
-
   // Staff see only one-off expense categories (no labor/payroll rows)
   const baseExpenses = data.filter((e) => e.category !== 'labor')
 
@@ -187,6 +177,18 @@ export default function ExpensesPage() {
         : true
     )
 
+  const expenseExportRows = visibleExpenses.map((e) => ({
+    date:           formatDate(e.expense_date),
+    category:       e.category,
+    item:           e.item,
+    qty:            e.qty ?? '',
+    price_per_unit: e.qty && e.qty > 0 ? formatExportAmount(e.amount / e.qty) : '',
+    supplier:       e.supplier ?? '',
+    total_price:    formatExportAmount(e.amount),
+    payment_method: e.payment_method ?? '',
+    remarks:        e.remarks ?? '',
+  }))
+
   return (
     <div>
       <PageHeader title="Expenses" />
@@ -222,11 +224,17 @@ export default function ExpensesPage() {
                 placeholder="Search item, supplier, category…"
                 className="flex-1"
               />
-              <FilterButton
-                groups={expenseFilterGroups}
-                value={expenseFilters}
-                onChange={(key, val) => setExpenseFilters((prev) => ({ ...prev, [key]: val }))}
-                onReset={() => setExpenseFilters({})}
+              <TableOptionsButton
+                filterGroups={expenseFilterGroups}
+                filterValue={expenseFilters}
+                onFilterChange={(key, val) => setExpenseFilters((prev) => ({ ...prev, [key]: val }))}
+                onFilterReset={() => setExpenseFilters({})}
+                hiddenKeys={hiddenKeys}
+                onToggleColumn={toggleColumn}
+                exportColumns={isFree ? undefined : EXPENSE_EXPORT_COLUMNS}
+                exportRows={isFree ? undefined : expenseExportRows}
+                exportFilename="hydra-expenses"
+                exportTitle="Expenses"
               />
               <Button size="sm" onClick={() => { setEditingExpense(null); setIsModalOpen(true) }}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -242,7 +250,9 @@ export default function ExpensesPage() {
                 onDelete={openDelete}
                 onViewReceipt={(e) => { void handleViewReceipt(e) }}
                 onPay={(e) => { setPayingExpense(e); setPayMethod('') }}
-                onExport={isFree ? undefined : () => setIsExportOpen(true)}
+                hiddenKeys={hiddenKeys}
+                columnWidths={columnWidths}
+                onColumnResize={onColumnResize}
               />
             )}
           </>
@@ -253,16 +263,6 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      {!isFree && (
-        <ExportModal
-          isOpen={isExportOpen}
-          onClose={() => setIsExportOpen(false)}
-          title="Expenses"
-          filename="hydra-expenses"
-          columns={EXPENSE_EXPORT_COLUMNS}
-          rows={expenseExportRows}
-        />
-      )}
 
       <ExpenseModal
         isOpen={isModalOpen}

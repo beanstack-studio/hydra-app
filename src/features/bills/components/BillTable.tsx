@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { FileText, Plus, Pencil, Trash2, CreditCard, Download } from 'lucide-react'
+import { FileText, Plus, Pencil, Trash2, CreditCard } from 'lucide-react'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/shared/Modal'
@@ -7,11 +8,16 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import type { FilterGroup } from '@/components/shared/FilterButton'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
 import { formatCurrency, formatExportAmount, formatDate, nowPH } from '@/lib/utils'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
-import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
+import { useToast } from '@/hooks/use-toast'
+import { useAuthStore } from '@/stores/authStore'
+import { useBills } from '../hooks/useBills'
+import type { Bill } from '../types'
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash:        'Cash',
@@ -43,18 +49,15 @@ const BILL_FILTER_GROUPS: FilterGroup[] = [
   },
 ]
 
+
 const BILLS_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'type',      label: 'Type' },                                      // visible
-  { key: 'due_date',  label: 'Due Date',  defaultChecked: false },
-  { key: 'amount',    label: 'Amount' },                                    // visible
-  { key: 'status',    label: 'Status' },                                    // visible
-  { key: 'date_paid', label: 'Date Paid' },                                // visible
-  { key: 'remarks',   label: 'Remarks',   defaultChecked: false },
+  { key: 'type',        label: 'Type'        },
+  { key: 'due_date',    label: 'Due Date',    defaultChecked: false },
+  { key: 'amount',      label: 'Amount'      },
+  { key: 'status',      label: 'Status'      },
+  { key: 'date_paid',   label: 'Date Paid'   },
+  { key: 'description', label: 'Description', defaultChecked: false },
 ]
-import { useToast } from '@/hooks/use-toast'
-import { useAuthStore } from '@/stores/authStore'
-import { useBills } from '../hooks/useBills'
-import type { Bill } from '../types'
 
 type BillSortKey = 'type' | 'due_date' | 'status' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -66,27 +69,27 @@ const MONTHS = [
 
 const BILL_TYPE_LABELS: Record<string, string> = {
   electricity: 'Electricity',
-  water: 'Water',
-  internet: 'Internet',
-  rent: 'Rent',
-  other: 'Other',
+  water:       'Water',
+  internet:    'Internet',
+  rent:        'Rent',
+  other:       'Other',
   maintenance: 'Maintenance',
 }
 
 export function BillTable() {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
+  const { hiddenKeys, toggleColumn } = useTablePrefs('bills', ['description'])
   const { data, isLoading, error, month, year, setMonth, setYear, addBill, updateBill, deleteBill, payBill } = useBills()
 
-  const [editingBill, setEditingBill] = useState<Bill | null>(null)
-  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingBill,  setEditingBill]  = useState<Bill | null>(null)
+  const [isFormOpen,   setIsFormOpen]   = useState(false)
   const [deletingBill, setDeletingBill] = useState<Bill | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleting,   setIsDeleting]   = useState(false)
   const [payingBill,   setPayingBill]   = useState<Bill | null>(null)
-  const [isExportOpen, setIsExportOpen] = useState(false)
   const [billFilters,  setBillFilters]  = useState<Record<string, string>>({})
-  const [sortKey, setSortKey] = useState<BillSortKey>('due_date')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [sortKey,      setSortKey]      = useState<BillSortKey>('due_date')
+  const [sortDir,      setSortDir]      = useState<SortDir>('asc')
 
   const handleSort = (key: string) => {
     const k = key as BillSortKey
@@ -110,7 +113,7 @@ export function BillTable() {
 
   const sorted = [...filteredData].sort((a, b) => {
     let cmp = 0
-    if (sortKey === 'type') cmp = a.bill_type.localeCompare(b.bill_type)
+    if (sortKey === 'type')   cmp = a.bill_type.localeCompare(b.bill_type)
     if (sortKey === 'status') cmp = Number(!!a.date_paid) - Number(!!b.date_paid)
     if (sortKey === 'amount') cmp = a.amount - b.amount
     if (sortKey === 'due_date') {
@@ -136,13 +139,14 @@ export function BillTable() {
     }
   }
 
-  const billExportRows = data.map((b) => ({
+  // Export rows from filtered + sorted data only
+  const billExportRows = sorted.map((b) => ({
     type:      BILL_TYPE_LABELS[b.bill_type] ?? b.bill_type,
     due_date:  b.due_date ? formatDate(b.due_date) : '',
     amount:    formatExportAmount(b.amount),
     status:    b.date_paid ? 'Paid' : 'Unpaid',
     date_paid: b.date_paid ? formatDate(b.date_paid) : '',
-    remarks:   b.remarks ?? '',
+    description: b.description ?? '',
   }))
 
   const currentYear = nowPH().getFullYear()
@@ -204,15 +208,15 @@ export function BillTable() {
       ),
     },
     {
-      key: 'actions',
-      header: (
-        <div className="flex items-center justify-end">
-          <button type="button" title="Export" onClick={() => setIsExportOpen(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <Download className="h-4 w-4" />
-          </button>
-        </div>
+      key: 'description',
+      header: 'Description',
+      render: (bill) => (
+        <span className="text-xs text-muted-foreground">{bill.description ?? '—'}</span>
       ),
+    },
+    {
+      key: 'actions',
+      header: '',
       render: (bill) => (
         <div className="flex items-center gap-1 justify-end">
           {!bill.date_paid && (
@@ -257,7 +261,7 @@ export function BillTable() {
     <div className="space-y-4 w-full">
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Month / year picker + Add */}
+      {/* Month / year picker + options + Add */}
       <div className="flex items-center gap-3 flex-wrap">
         <select
           value={month}
@@ -275,18 +279,26 @@ export function BillTable() {
         >
           {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <FilterButton
-          groups={BILL_FILTER_GROUPS}
-          value={billFilters}
-          onChange={(key, val) => setBillFilters((prev) => ({ ...prev, [key]: val }))}
-          onReset={() => setBillFilters({})}
-        />
-        {isOwner && (
-          <Button size="sm" className="ml-auto" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Bill
-          </Button>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          <TableOptionsButton
+            filterGroups={BILL_FILTER_GROUPS}
+            filterValue={billFilters}
+            onFilterChange={(key, val) => setBillFilters((prev) => ({ ...prev, [key]: val }))}
+            onFilterReset={() => setBillFilters({})}
+            hiddenKeys={hiddenKeys}
+            onToggleColumn={toggleColumn}
+            exportColumns={BILLS_EXPORT_COLUMNS}
+            exportRows={billExportRows}
+            exportFilename={`hydra-bills-${MONTHS[month - 1]}-${year}`}
+            exportTitle="Bills"
+          />
+          {isOwner && (
+            <Button size="sm" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Bill
+            </Button>
+          )}
+        </div>
       </div>
 
       <DataTable
@@ -296,6 +308,7 @@ export function BillTable() {
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
+        hiddenKeys={hiddenKeys}
         emptyState={
           <EmptyState
             icon={<FileText className="h-8 w-8" />}
@@ -303,15 +316,6 @@ export function BillTable() {
             description="Add electricity, water, internet or rent bills."
           />
         }
-      />
-
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title="Bills"
-        filename={`hydra-bills-${MONTHS[month - 1]}-${year}`}
-        columns={BILLS_EXPORT_COLUMNS}
-        rows={billExportRows}
       />
 
       <BillModal

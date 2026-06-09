@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Receipt, Pencil, Trash2, Paperclip, Download } from 'lucide-react'
+import { Receipt, Pencil, Trash2, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
+import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -27,16 +28,39 @@ const PAYMENT_LABELS: Record<ExpensePaymentMethod, string> = {
   other:       'Other',
 }
 
+export const EXPENSE_COLUMN_CONFIG: ColumnConfig[] = [
+  { key: 'date',          label: 'Date' },
+  { key: 'category',      label: 'Category' },
+  { key: 'item',          label: 'Item' },
+  { key: 'qty',           label: 'Qty' },
+  { key: 'supplier',      label: 'Supplier' },
+  { key: 'price_per_unit', label: 'Price/Unit' },
+  { key: 'payment',       label: 'Via' },
+  { key: 'amount',        label: 'Total Price' },
+  { key: 'remarks',       label: 'Remarks' },
+]
+
 interface ExpenseTableProps {
   expenses: Expense[]
   onEdit: (expense: Expense) => void
   onDelete: (expense: Expense) => void
   onViewReceipt: (expense: Expense) => void
   onPay: (expense: Expense) => void
-  onExport?: () => void
+  hiddenKeys?: Set<string>
+  columnWidths?: Record<string, number>
+  onColumnResize?: (key: string, width: number) => void
 }
 
-export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay, onExport }: ExpenseTableProps) {
+export function ExpenseTable({
+  expenses,
+  onEdit,
+  onDelete,
+  onViewReceipt,
+  onPay,
+  hiddenKeys,
+  columnWidths,
+  onColumnResize,
+}: ExpenseTableProps) {
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<ExpenseSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -139,17 +163,15 @@ export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay,
       ),
     },
     {
-      key: 'actions',
-      header: (
-        <div className="flex items-center justify-end">
-          {onExport && (
-            <button type="button" title="Export to Excel" onClick={onExport}
-              className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-              <Download className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+      key: 'remarks',
+      header: 'Remarks',
+      render: (e: Expense) => (
+        <span className="text-xs text-muted-foreground">{e.remarks ?? '—'}</span>
       ),
+    },
+    {
+      key: 'actions',
+      header: '',
       render: (e: Expense) => (
         <div className="flex items-center gap-1 justify-end">
           {!e.payment_method && (
@@ -206,6 +228,9 @@ export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay,
       sortKey={sortKey}
       sortDir={sortDir}
       onSort={handleSort}
+      hiddenKeys={hiddenKeys}
+      columnWidths={columnWidths}
+      onColumnResize={onColumnResize}
       emptyState={
         <EmptyState
           icon={<Receipt className="h-8 w-8" />}

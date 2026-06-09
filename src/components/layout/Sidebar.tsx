@@ -53,8 +53,9 @@ const ACCOUNT_MENU = [
 
 const FREE_LOCKED_ROUTES = new Set(['/customers', '/inventory', '/reports'])
 
-const SIDEBAR_BG = 'bg-[hsl(191,72%,14%)]'
-const BORDER     = 'border-white/10'
+const SIDEBAR_BG      = 'bg-[hsl(191,72%,14%)]'
+const SIDEBAR_SUB_BG  = 'bg-[hsl(191,60%,10%)]'
+const BORDER          = 'border-white/10'
 
 export function Sidebar() {
   const navigate        = useNavigate()
@@ -97,7 +98,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className={cn('hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 z-40', SIDEBAR_BG, 'border-r', BORDER)}>
+    <aside className={cn('hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 z-40', onSettingsPage ? SIDEBAR_SUB_BG : SIDEBAR_BG, 'border-r', BORDER)}>
 
       {/* Station header */}
       <div className={cn('flex h-16 items-center gap-2.5 px-4 border-b shrink-0', BORDER)}>
@@ -128,8 +129,16 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-0.5">
         {onSettingsPage ? (
-          <>
-            <p className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+          <div
+            key="settings-nav"
+            className="animate-in fade-in-0 zoom-in-95 duration-200 origin-top-right"
+          >
+            {/* Visual connection: shows this nav came from Settings */}
+            <div className={cn('flex items-center gap-2 px-4 py-2 mb-1 border-b', BORDER)}>
+              <Settings className="h-3 w-3 text-white/40 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Settings</span>
+            </div>
+            <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
               Store
             </p>
             {STORE_MENU.map(({ id, label, icon: Icon, freeLocked }) => {
@@ -185,7 +194,7 @@ export function Sidebar() {
                 </button>
               )
             })}
-          </>
+          </div>
         ) : (
           navItems.map(({ to, label, icon: Icon }) => {
             const isLocked = isFree && FREE_LOCKED_ROUTES.has(to)

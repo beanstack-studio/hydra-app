@@ -29,18 +29,25 @@ interface ExportModalProps {
   filename: string
   columns: ExportColumnDef[]
   rows: Record<string, string | number | null | undefined>[]
+  /** Table column keys that are currently hidden — matching export columns will be pre-unchecked */
+  hiddenTableKeys?: Set<string>
 }
 
-export function ExportModal({ isOpen, onClose, title, filename, columns, rows }: ExportModalProps) {
+export function ExportModal({ isOpen, onClose, title, filename, columns, rows, hiddenTableKeys }: ExportModalProps) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [format, setFormat]   = useState<FileFormat>('csv')
 
   useEffect(() => {
     if (isOpen) {
-      setChecked(Object.fromEntries(columns.map((c) => [c.key, c.defaultChecked ?? true])))
+      setChecked(Object.fromEntries(
+        columns.map((c) => {
+          const hiddenByTable = hiddenTableKeys?.has(c.key) ?? false
+          return [c.key, hiddenByTable ? false : (c.defaultChecked ?? true)]
+        })
+      ))
       setFormat('csv')
     }
-  }, [isOpen, columns])
+  }, [isOpen, columns, hiddenTableKeys])
 
   const selectedCols = columns.filter((c) => checked[c.key])
   const allChecked   = selectedCols.length === columns.length

@@ -12,8 +12,10 @@ import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatExportAmount } from '@/lib/utils'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
-import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
+import type { FilterGroup } from '@/components/shared/FilterButton'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
 
 const INVENTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'item',            label: 'Item' },                                     // visible
@@ -31,6 +33,7 @@ import type { Supply, SupplyInput } from '@/features/supplies/types'
 export default function InventoryPage() {
   const plan    = usePlan()
   const role    = useAuthStore((s) => s.role)
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('inventory', ['threshold', 'price_per_unit'])
   const isOwner = role === 'owner' || role === 'super_admin'
   const { toast } = useToast()
 
@@ -39,7 +42,6 @@ export default function InventoryPage() {
   const [supplyModalOpen, setSupplyModalOpen] = useState(false)
   const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
   const [search,          setSearch]          = useState('')
-  const [isExportOpen,    setIsExportOpen]    = useState(false)
   const [filters,         setFilters]         = useState<Record<string, string>>({})
 
   const products = settings?.products ?? []
@@ -92,7 +94,7 @@ export default function InventoryPage() {
     )
 
   const STATUS_LABEL = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }
-  const inventoryExportRows = supplies.map((s) => ({
+  const inventoryExportRows = filteredSupplies.map((s) => ({
     item:           s.name,
     supplier:       s.store ?? '',
     linked_product: s.linked_product_id ? (productNames[s.linked_product_id] ?? '') : '',
@@ -131,11 +133,17 @@ export default function InventoryPage() {
           placeholder="Search items or store…"
           className="flex-1"
         />
-        <FilterButton
-          groups={inventoryFilterGroups}
-          value={filters}
-          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onReset={() => setFilters({})}
+        <TableOptionsButton
+          filterGroups={inventoryFilterGroups}
+          filterValue={filters}
+          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onFilterReset={() => setFilters({})}
+          hiddenKeys={hiddenKeys}
+          onToggleColumn={toggleColumn}
+          exportColumns={INVENTORY_EXPORT_COLUMNS}
+          exportRows={inventoryExportRows}
+          exportFilename="hydra-inventory"
+          exportTitle="Inventory"
         />
         {isOwner && (
           <Button size="sm" onClick={() => { setEditingSupply(null); setSupplyModalOpen(true) }}>
@@ -154,17 +162,11 @@ export default function InventoryPage() {
         onEditClick={(item) => { setEditingSupply(item); setSupplyModalOpen(true) }}
         onDeleteClick={handleDeleteSupply}
         onQuickAdjust={handleQuickAdjust}
-        onExport={() => setIsExportOpen(true)}
+        hiddenKeys={hiddenKeys}
+        columnWidths={columnWidths}
+        onColumnResize={onColumnResize}
       />
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title="Inventory"
-        filename="hydra-inventory"
-        columns={INVENTORY_EXPORT_COLUMNS}
-        rows={inventoryExportRows}
-      />
 
       <SupplyModal
         isOpen={supplyModalOpen}

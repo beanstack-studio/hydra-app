@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SearchInput } from '@/components/shared/SearchInput'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { SaleModal } from '@/features/sales/components/SaleModal'
 import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
@@ -13,8 +13,19 @@ import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatExportAmount } from '@/lib/utils'
-import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+import { formatDate, formatCurrency, formatExportAmount } from '@/lib/utils'
+import type { FilterGroup } from '@/components/shared/FilterButton'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import { useAuthStore } from '@/stores/authStore'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import type { Sale, SaleInsert } from '@/features/sales/types'
 
 const SALE_FILTER_GROUPS: FilterGroup[] = [
@@ -52,15 +63,18 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export default function SalesPage() {
   const { toast } = useToast()
+  const role = useAuthStore((s) => s.role)
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('sales', ['product', 'remarks'])
   const [isSaleModalOpen,   setIsSaleModalOpen]   = useState(false)
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
+  const [deletingSale,      setDeletingSale]      = useState<Sale | null>(null)
+  const [isDeleting,        setIsDeleting]        = useState(false)
   const [search,            setSearch]            = useState('')
-  const [isExportOpen,      setIsExportOpen]      = useState(false)
   const [filters,           setFilters]           = useState<Record<string, string>>({})
 
-  const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
+  const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
   const handleAddSale = async (input: SaleInsert) => addSale(input)
@@ -81,11 +95,17 @@ export default function SalesPage() {
         : true
     )
 
-  const exportRows = sales.map((s) => ({
+  const exportRows = filteredSales.map((s) => ({
     date:        formatDate(s.sale_date),
     customer:    s.customer_name,
     order_type:  s.order_type,
-    product:     s.product_name,
+    product: (() => {
+      const lines = s.items && s.items.length > 0
+        ? s.items.map((i) => `${i.product_name} ×${i.qty}`)
+        : [`${s.product_name} ×${s.qty}`]
+      if (s.container_enabled && s.container_qty > 0) lines.push(`Container ×${s.container_qty}`)
+      return lines.join('; ')
+    })(),
     total:       formatExportAmount(s.total_amount),
     payment:     s.payment_mode,
     status:      s.status,
@@ -101,6 +121,20 @@ export default function SalesPage() {
     await recordPayment(saleId, amount, paymentMode, paidAt, remarks)
     toast({ title: 'Payment recorded' })
     setPayingSale(null)
+  }
+
+  const handleDeleteSale = async () => {
+    if (!deletingSale) return
+    setIsDeleting(true)
+    try {
+      await deleteSale(deletingSale.id)
+      toast({ title: 'Sale deleted' })
+      setDeletingSale(null)
+    } catch (e) {
+      toast({ title: 'Failed to delete', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const handleRescheduleClick = () => {
@@ -134,11 +168,17 @@ export default function SalesPage() {
           placeholder="Search customer, product, order type…"
           className="flex-1"
         />
-        <FilterButton
-          groups={SALE_FILTER_GROUPS}
-          value={filters}
-          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onReset={() => setFilters({})}
+        <TableOptionsButton
+          filterGroups={SALE_FILTER_GROUPS}
+          filterValue={filters}
+          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onFilterReset={() => setFilters({})}
+          hiddenKeys={hiddenKeys}
+          onToggleColumn={toggleColumn}
+          exportColumns={SALES_EXPORT_COLUMNS}
+          exportRows={exportRows}
+          exportFilename="hydra-sales"
+          exportTitle="Sales"
         />
         <Button size="sm" onClick={() => setIsSaleModalOpen(true)}>
           <Plus className="h-4 w-4 mr-1" />
@@ -153,11 +193,14 @@ export default function SalesPage() {
         <SaleTable
           sales={filteredSales}
           onSelect={setSelectedSale}
-          onExport={() => setIsExportOpen(true)}
           onPay={(sale) => {
             setSelectedSale(null)
             setPayingSale(sale)
           }}
+          onDelete={role !== 'staff' ? setDeletingSale : undefined}
+          hiddenKeys={hiddenKeys}
+          columnWidths={columnWidths}
+          onColumnResize={onColumnResize}
         />
       )}
 
@@ -178,6 +221,27 @@ export default function SalesPage() {
         onReschedule={rescheduleOrder}
       />
 
+      {/* Delete confirm dialog */}
+      <Dialog open={!!deletingSale} onOpenChange={(open) => { if (!open) setDeletingSale(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Sale</DialogTitle>
+            <DialogDescription>
+              Delete {deletingSale?.customer_name}&apos;s sale of {formatCurrency(deletingSale?.total_amount ?? 0)}?
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingSale(null)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSale} disabled={isDeleting}>
+              {isDeleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Record payment modal */}
       <RecordPaymentModal
         sale={payingSale}
@@ -186,14 +250,6 @@ export default function SalesPage() {
         onRecord={handleRecord}
       />
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title="Sales"
-        filename="hydra-sales"
-        columns={SALES_EXPORT_COLUMNS}
-        rows={exportRows}
-      />
 
       {/* Record sale modal */}
       <SaleModal

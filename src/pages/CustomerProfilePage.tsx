@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User, Download } from 'lucide-react'
+import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -9,7 +9,8 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
-import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
+import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, cn } from '@/lib/utils'
@@ -60,7 +61,6 @@ export default function CustomerProfilePage() {
   const { customer, sales, isLoading, error, recordPayment, updateCustomer } = useCustomerProfile(id)
   const [payingSale, setPayingSale] = useState<SaleWithPayments | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isExportOpen, setIsExportOpen] = useState(false)
   const [sortKey, setSortKey] = useState<OrderSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -151,22 +151,6 @@ export default function CustomerProfilePage() {
           )}
         </div>
       ),
-    },
-    {
-      key: 'export',
-      header: (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            title="Export order history"
-            onClick={() => setIsExportOpen(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150"
-          >
-            <Download className="h-4 w-4" />
-          </button>
-        </div>
-      ),
-      render: () => null,
     },
   ]
 
@@ -267,9 +251,17 @@ export default function CustomerProfilePage() {
 
           {/* ── Right column: order history ── */}
           <div>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              Order History
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                Order History
+              </h2>
+              <TableOptionsButton
+                exportColumns={ORDER_HISTORY_EXPORT_COLUMNS}
+                exportRows={orderHistoryExportRows}
+                exportFilename={`hydra-orders-${customer?.name ?? 'customer'}`}
+                exportTitle={customer ? `Orders — ${customer.name}` : 'Order History'}
+              />
+            </div>
 
             <DataTable
               columns={orderHistoryColumns}
@@ -290,14 +282,6 @@ export default function CustomerProfilePage() {
         </div>
       )}
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title={customer ? `Orders — ${customer.name}` : 'Order History'}
-        filename={`hydra-orders-${customer?.name ?? 'customer'}`}
-        columns={ORDER_HISTORY_EXPORT_COLUMNS}
-        rows={orderHistoryExportRows}
-      />
 
       <RecordPaymentModal
         sale={payingSale}

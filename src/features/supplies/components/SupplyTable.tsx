@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, Pencil, Trash2, Download } from 'lucide-react'
+import { Package, Minus, Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
+import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
-import type { Column } from '@/components/shared/DataTable'
 
 const STATUS_VARIANT: Record<SupplyStatus, 'success' | 'outline' | 'destructive'> = {
   in_stock:     'success',
@@ -31,6 +31,15 @@ const STATUS_ORDER: Record<SupplyStatus, number> = {
 
 type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at' | 'status'
 
+export const SUPPLY_COLUMN_CONFIG: ColumnConfig[] = [
+  { key: 'name',             label: 'Item' },
+  { key: 'store',            label: 'Supplier' },
+  { key: 'linked_product',   label: 'Used For' },
+  { key: 'last_purchased_at', label: 'Last Purchase' },
+  { key: 'status',           label: 'Status' },
+  { key: 'qty',              label: 'Qty' },
+]
+
 interface SupplyTableProps {
   items:         Supply[]
   isLoading:     boolean
@@ -38,7 +47,9 @@ interface SupplyTableProps {
   onEditClick:   (item: Supply) => void
   onDeleteClick: (item: Supply) => void
   onQuickAdjust: (item: Supply, delta: number) => void
-  onExport:      () => void
+  hiddenKeys?:   Set<string>
+  columnWidths?: Record<string, number>
+  onColumnResize?: (key: string, width: number) => void
 }
 
 export function SupplyTable({
@@ -48,7 +59,9 @@ export function SupplyTable({
   onEditClick,
   onDeleteClick,
   onQuickAdjust,
-  onExport,
+  hiddenKeys,
+  columnWidths,
+  onColumnResize,
 }: SupplyTableProps) {
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
@@ -76,12 +89,12 @@ export function SupplyTable({
 
   const hasLowStock = items.some((i) => computeStatus(i.qty, i.threshold) !== 'in_stock')
 
-  const columns: Column<Supply>[] = [
+  const columns = [
     {
       key: 'name',
       header: 'Item',
       sortable: true,
-      render: (item) => (
+      render: (item: Supply) => (
         <p className="text-sm font-semibold text-foreground">{item.name}</p>
       ),
     },
@@ -89,7 +102,7 @@ export function SupplyTable({
       key: 'store',
       header: 'Supplier',
       sortable: true,
-      render: (item) => (
+      render: (item: Supply) => (
         <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
       ),
     },
@@ -97,7 +110,7 @@ export function SupplyTable({
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
-      render: (item) => {
+      render: (item: Supply) => {
         const linkedName = item.linked_product_id ? productNames[item.linked_product_id] : null
         return (
           <span className="text-sm text-muted-foreground">
@@ -110,7 +123,7 @@ export function SupplyTable({
       key: 'last_purchased_at',
       header: 'Last Purchase',
       sortable: true,
-      render: (item) => (
+      render: (item: Supply) => (
         <span className="text-sm text-foreground">
           {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
         </span>
@@ -120,7 +133,7 @@ export function SupplyTable({
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (item) => {
+      render: (item: Supply) => {
         const status = computeStatus(item.qty, item.threshold)
         return (
           <div className="space-y-1">
@@ -138,7 +151,7 @@ export function SupplyTable({
       key: 'qty',
       header: 'Qty',
       sortable: true,
-      render: (item) => (
+      render: (item: Supply) => (
         <div className="flex items-center gap-1.5">
           {isOwner && (
             <Button
@@ -167,15 +180,8 @@ export function SupplyTable({
     },
     {
       key: 'actions',
-      header: (
-        <div className="flex items-center justify-end">
-          <button type="button" title="Export to Excel" onClick={onExport}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <Download className="h-4 w-4" />
-          </button>
-        </div>
-      ),
-      render: (item) => (
+      header: '',
+      render: (item: Supply) => (
         <div className="flex items-center gap-1 justify-end">
           {isOwner && (
             <>
@@ -220,6 +226,9 @@ export function SupplyTable({
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
+        hiddenKeys={hiddenKeys}
+        columnWidths={columnWidths}
+        onColumnResize={onColumnResize}
         rowClassName={(item) => {
           const status = computeStatus(item.qty, item.threshold)
           if (status === 'out_of_stock') return 'bg-destructive/5'
