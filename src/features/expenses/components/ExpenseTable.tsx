@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Receipt, Pencil, Trash2, Paperclip } from 'lucide-react'
+import { Receipt, Trash2, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -199,16 +199,6 @@ export function ExpenseTable({
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
-              onClick={(ev) => { ev.stopPropagation(); onEdit(e) }}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-          {isOwner && (
-            <Button
-              size="icon"
-              variant="ghost"
               className="h-8 w-8 text-destructive hover:text-destructive"
               onClick={(ev) => { ev.stopPropagation(); onDelete(e) }}
             >
@@ -226,6 +216,7 @@ export function ExpenseTable({
       columns={columns}
       data={sorted}
       rowKey={(e) => e.id}
+      onRowClick={isOwner ? onEdit : undefined}
       sortKey={sortKey}
       sortDir={sortDir}
       onSort={handleSort}

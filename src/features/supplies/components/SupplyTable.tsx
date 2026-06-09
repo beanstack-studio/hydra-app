@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Package, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -184,24 +184,14 @@ export function SupplyTable({
       render: (item: Supply) => (
         <div className="flex items-center gap-1 justify-end">
           {isOwner && (
-            <>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={(e) => { e.stopPropagation(); onEditClick(item) }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-destructive hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           )}
         </div>
       ),
@@ -224,6 +214,7 @@ export function SupplyTable({
         columns={columns}
         data={sorted}
         rowKey={(item) => item.id}
+        onRowClick={isOwner ? onEditClick : undefined}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}

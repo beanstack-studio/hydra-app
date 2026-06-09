@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Plus, Pencil, Trash2, CreditCard } from 'lucide-react'
+import { FileText, Plus, Trash2, CreditCard } from 'lucide-react'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -275,16 +275,6 @@ export function BillTable() {
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
-              onClick={(e) => { e.stopPropagation(); setEditingBill(bill); setIsFormOpen(true) }}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-          {isOwner && (
-            <Button
-              size="icon"
-              variant="ghost"
               className="h-8 w-8 text-destructive hover:text-destructive"
               onClick={(e) => { e.stopPropagation(); setDeletingBill(bill) }}
             >
@@ -335,6 +325,7 @@ export function BillTable() {
         columns={columns}
         data={sorted}
         rowKey={(bill) => bill.id}
+        onRowClick={isOwner ? (bill) => { setEditingBill(bill); setIsFormOpen(true) } : undefined}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
