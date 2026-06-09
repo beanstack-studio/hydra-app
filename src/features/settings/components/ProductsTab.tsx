@@ -392,9 +392,9 @@ export function ProductsTab({
   const [isDeletingZone, setIsDeletingZone] = useState(false)
 
   type SortState = { key: 'name' | 'price'; dir: 'asc' | 'desc' }
-  const [waterSort, setWaterSort] = useState<SortState>({ key: 'name', dir: 'asc' })
-  const [iceSort,   setIceSort]   = useState<SortState>({ key: 'name', dir: 'asc' })
-  const [addonSort, setAddonSort] = useState<SortState>({ key: 'name', dir: 'asc' })
+  const [waterSort, setWaterSort] = useState<SortState>({ key: 'price', dir: 'asc' })
+  const [iceSort,   setIceSort]   = useState<SortState>({ key: 'price', dir: 'asc' })
+  const [addonSort, setAddonSort] = useState<SortState>({ key: 'price', dir: 'asc' })
 
   const toggleSort = (
     setState: Dispatch<SetStateAction<SortState>>,
