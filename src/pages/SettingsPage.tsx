@@ -51,7 +51,7 @@ const SECTION_LABELS: Record<Section, string> = {
 
 const PLAN_LABELS: Record<string, string> = {
   free:  'Free',
-  basic: 'Basic',
+  basic: 'Pro',   // legacy tier — treated as Pro
   pro:   'Pro',
 }
 

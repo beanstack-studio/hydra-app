@@ -69,7 +69,7 @@ export function Sidebar() {
   const isFree          = plan === 'free'
   const stationPhotoUrl = station?.photo_url ?? null
   const stationName     = station?.name ?? 'My Station'
-  const planLabel       = station?.plan ? station.plan.charAt(0).toUpperCase() + station.plan.slice(1) : 'Free'
+  const planLabel       = station?.plan === 'free' ? 'Free' : 'Pro'
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage

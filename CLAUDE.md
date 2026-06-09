@@ -394,16 +394,20 @@ Check role from authStore. Gate owner-only UI with role check.
 
 ## Subscription plans
 
+Two tiers only — no middle plan.
+
 | Plan | Users | Features | Price |
 |---|---|---|---|
 | Free | 1 owner | Sales + Expenses only | ₱0 |
-| Basic | 3 | All modules + reminders | ₱299/mo |
-| Pro | Unlimited | All + priority support | ₱599/mo |
+| Pro  | Unlimited | All modules + features + priority support | ₱599/mo |
+
+Note: 'basic' still exists in the DB type for backwards compat with legacy rows.
+Treat `plan !== 'free'` as "has Pro access" — both 'basic' and 'pro' map to Pro.
 
 Feature gate example:
 ```typescript
-const { station } = useAuthStore()
-const canAccessReports = station?.plan !== 'free'
+const plan = usePlan()  // from @/hooks/usePlan
+const canAccessReports = plan !== 'free'
 ```
 
 ---
