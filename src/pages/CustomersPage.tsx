@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
+import { usePlan } from '@/hooks/usePlan'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/shared/Modal'
 import { SearchInput } from '@/components/shared/SearchInput'
@@ -38,6 +40,7 @@ const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
 import type { Customer } from '@/features/customers/types'
 
 export default function CustomersPage() {
+  const plan = usePlan()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [isModalOpen,  setIsModalOpen]  = useState(false)
@@ -49,6 +52,8 @@ export default function CustomersPage() {
   const [filters,     setFilters]     = useState<Record<string, string>>({})
 
   const { data, isLoading, error, addCustomer, updateCustomer, deleteCustomer } = useCustomers()
+
+  if (plan === 'free') return <UpgradeWall title="Customers" feature="Customers" />
 
   const filteredCustomers = data
     .filter((c) => {

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
+import { usePlan } from '@/hooks/usePlan'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { SupplyTable } from '@/features/supplies/components/SupplyTable'
@@ -26,17 +28,20 @@ import { computeStatus } from '@/features/supplies/hooks/useSupplies'
 import type { Supply, SupplyInput } from '@/features/supplies/types'
 
 export default function InventoryPage() {
+  const plan    = usePlan()
   const { toast } = useToast()
 
   const { data: supplies, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty } = useSupplies()
   const { data: settings } = useSettings()
-  const products = settings?.products ?? []
-
   const [supplyModalOpen, setSupplyModalOpen] = useState(false)
   const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
   const [search,          setSearch]          = useState('')
   const [isExportOpen,    setIsExportOpen]    = useState(false)
   const [filters,         setFilters]         = useState<Record<string, string>>({})
+
+  const products = settings?.products ?? []
+
+  if (plan === 'free') return <UpgradeWall title="Inventory" feature="Inventory" />
 
   const productNames: Record<string, string> = Object.fromEntries(
     products.map((p) => [p.id, p.name])

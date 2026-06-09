@@ -7,6 +7,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
 import { BusinessSettings } from '@/features/settings/components/BusinessSettings'
 import { ProductsTab } from '@/features/settings/components/ProductsTab'
 import { TeamSettings } from '@/features/settings/components/TeamSettings'
@@ -58,7 +59,9 @@ export default function SettingsPage() {
   const [searchParams] = useSearchParams()
   const role    = useAuthStore((s) => s.role)
   const station = useAuthStore((s) => s.station)
+  const plan    = usePlan()
   const isOwner = role === 'owner' || role === 'super_admin'
+  const isFree  = plan === 'free'
 
   const [active, setActive] = useState<Section | null>(null)
 
@@ -90,7 +93,9 @@ export default function SettingsPage() {
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
   const planLabel       = PLAN_LABELS[station?.plan ?? 'free'] ?? 'Free'
 
-  const visibleStore   = STORE_SECTIONS
+  const visibleStore   = isFree
+    ? STORE_SECTIONS.filter((s) => s.id !== 'maintenance')
+    : STORE_SECTIONS
   const visibleAccount = ACCOUNT_SECTIONS.filter((s) => !s.ownerOnly || isOwner)
 
   function renderDetail() {

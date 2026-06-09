@@ -5,8 +5,9 @@ import { SalesChart } from '@/features/reports/components/SalesChart'
 import { ExpenseSummary } from '@/features/reports/components/ExpenseSummary'
 import { SalesByProductChart } from '@/features/reports/components/SalesByProductChart'
 import { InsightsSection } from '@/features/reports/components/InsightsSection'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { useReports } from '@/features/reports/hooks/useReports'
-import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
 import { formatCurrency, nowPH, cn } from '@/lib/utils'
 
 const MONTHS = [
@@ -15,25 +16,14 @@ const MONTHS = [
 ]
 
 export default function ReportsPage() {
-  const station = useAuthStore((s) => s.station)
-  const canView = station?.plan !== 'free'
+  const plan = usePlan()
 
   const { data, isLoading, error, mode, month, year, setMode, setMonth, setYear } = useReports()
 
   const currentYear = nowPH().getFullYear()
   const yearOptions = [currentYear - 1, currentYear]
 
-  if (!canView) {
-    return (
-      <div>
-        <PageHeader title="Reports" />
-        <div className="rounded-xl border border-border bg-muted/40 px-6 py-8 text-center">
-          <p className="text-sm font-semibold text-foreground">Reports require Basic plan or higher</p>
-          <p className="mt-1 text-xs text-muted-foreground">Upgrade to unlock monthly reports, charts, and profit tracking.</p>
-        </div>
-      </div>
-    )
-  }
+  if (plan === 'free') return <UpgradeWall title="Reports" feature="Reports" />
 
   return (
     <div>

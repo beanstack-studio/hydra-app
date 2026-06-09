@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
 import { supabase } from '@/lib/supabase'
 
 const ALL_NAV_ITEMS = [
@@ -58,12 +59,19 @@ export function Sidebar() {
   const station         = useAuthStore((s) => s.station)
   const user            = useAuthStore((s) => s.user)
   const role            = useAuthStore((s) => s.role)
+  const plan            = usePlan()
   const userName        = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
   const navItems        = (role === 'owner' || role === 'super_admin') ? ALL_NAV_ITEMS : STAFF_NAV_ITEMS
   const isOwner         = role === 'owner' || role === 'super_admin'
+  const isFree          = plan === 'free'
   const stationPhotoUrl = station?.photo_url ?? null
   const stationName     = station?.name ?? 'My Station'
   const planLabel       = station?.plan ? station.plan.charAt(0).toUpperCase() + station.plan.slice(1) : 'Free'
+
+  const FREE_LOCKED = new Set(['/customers', '/inventory', '/reports'])
+  const visibleStoreMenu = isFree
+    ? STORE_MENU.filter((m) => m.id !== 'maintenance')
+    : STORE_MENU
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage
@@ -116,7 +124,7 @@ export function Sidebar() {
             <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
               Store
             </p>
-            {STORE_MENU.map(({ id, label, icon: Icon }) => (
+            {visibleStoreMenu.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -155,17 +163,25 @@ export function Sidebar() {
             ))}
           </>
         ) : (
-          navItems.map(({ to, label, icon: Icon }) => (
-            <button
-              key={to}
-              type="button"
-              onClick={() => navigate(to)}
-              className={navItemClass(location.pathname.startsWith(to))}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {label}
-            </button>
-          ))
+          navItems.map(({ to, label, icon: Icon }) => {
+            const isLocked = isFree && FREE_LOCKED.has(to)
+            return (
+              <button
+                key={to}
+                type="button"
+                onClick={() => navigate(to)}
+                className={navItemClass(location.pathname.startsWith(to))}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {label}
+                {isLocked && (
+                  <span className="ml-auto text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
+                    PRO
+                  </span>
+                )}
+              </button>
+            )
+          })
         )}
       </nav>
 

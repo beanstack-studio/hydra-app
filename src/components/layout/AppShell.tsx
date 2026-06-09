@@ -6,6 +6,7 @@ import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
 import { startReminderPolling, stopReminderPolling } from '@/lib/reminders'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
 import { cn } from '@/lib/utils'
 import type { Reminder } from '@/lib/reminders'
 
@@ -28,36 +29,33 @@ function DevBanner() {
 function RoleViewToggle() {
   const role        = useAuthStore((s) => s.role)
   const email       = useAuthStore((s) => s.user?.email ?? '')
+  const viewPlan    = useAuthStore((s) => s.viewPlan)
   const setViewRole = useAuthStore((s) => s.setViewRole)
+  const setViewPlan = useAuthStore((s) => s.setViewPlan)
   if (!role || email !== SUPER_ADMIN_EMAIL) return null
-  const isOwner = role === 'owner'
+
+  type ActiveView = 'owner' | 'staff' | 'free'
+  const activeView: ActiveView =
+    viewPlan === 'free' ? 'free' :
+    role === 'owner' || role === 'super_admin' ? 'owner' : 'staff'
+
+  const btnClass = (v: ActiveView) => cn(
+    'px-2.5 py-1 transition-colors duration-150',
+    activeView === v ? 'bg-amber-500 text-white' : 'text-amber-700 hover:bg-amber-100'
+  )
+
   return (
     <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs shrink-0">
       <span className="text-amber-700 font-medium shrink-0">View as:</span>
       <div className="flex rounded-md border border-amber-300 overflow-hidden text-xs font-medium">
-        <button
-          type="button"
-          onClick={() => setViewRole('owner')}
-          className={cn(
-            'px-2.5 py-1 transition-colors duration-150',
-            isOwner
-              ? 'bg-amber-500 text-white'
-              : 'text-amber-700 hover:bg-amber-100'
-          )}
-        >
+        <button type="button" onClick={() => { setViewRole('owner'); setViewPlan(null) }} className={btnClass('owner')}>
           Owner
         </button>
-        <button
-          type="button"
-          onClick={() => setViewRole('staff')}
-          className={cn(
-            'px-2.5 py-1 transition-colors duration-150',
-            !isOwner
-              ? 'bg-amber-500 text-white'
-              : 'text-amber-700 hover:bg-amber-100'
-          )}
-        >
+        <button type="button" onClick={() => { setViewRole('staff'); setViewPlan(null) }} className={btnClass('staff')}>
           Staff
+        </button>
+        <button type="button" onClick={() => setViewPlan('free')} className={btnClass('free')}>
+          Free
         </button>
       </div>
       <span className="text-amber-600 italic">testing only — resets on refresh</span>
@@ -68,8 +66,15 @@ function RoleViewToggle() {
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
   const [hasUpdate, setHasUpdate] = useState(false)
+  const plan   = usePlan()
+  const isFree = plan === 'free'
 
   useEffect(() => {
+    if (isFree) {
+      stopReminderPolling()
+      setPendingReminders([])
+      return
+    }
     startReminderPolling((reminders) => {
       setPendingReminders((prev) => {
         const existingIds = new Set(prev.map((r) => r.id))
@@ -78,7 +83,7 @@ export function AppShell() {
       })
     })
     return () => stopReminderPolling()
-  }, [])
+  }, [isFree])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return

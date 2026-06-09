@@ -33,7 +33,7 @@ interface ExpenseTableProps {
   onDelete: (expense: Expense) => void
   onViewReceipt: (expense: Expense) => void
   onPay: (expense: Expense) => void
-  onExport: () => void
+  onExport?: () => void
 }
 
 export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay, onExport }: ExpenseTableProps) {
@@ -142,10 +142,12 @@ export function ExpenseTable({ expenses, onEdit, onDelete, onViewReceipt, onPay,
       key: 'actions',
       header: (
         <div className="flex items-center justify-end">
-          <button type="button" title="Export to Excel" onClick={onExport}
-            className="text-muted-foreground hover:text-foreground transition-colors duration-150">
-            <Download className="h-4 w-4" />
-          </button>
+          {onExport && (
+            <button type="button" title="Export to Excel" onClick={onExport}
+              className="text-muted-foreground hover:text-foreground transition-colors duration-150">
+              <Download className="h-4 w-4" />
+            </button>
+          )}
         </div>
       ),
       render: (e: Expense) => (

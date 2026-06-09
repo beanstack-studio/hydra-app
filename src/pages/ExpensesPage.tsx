@@ -15,6 +15,7 @@ import { formatCurrency, formatExportAmount, formatDate, cn } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
 import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
 
@@ -67,7 +68,9 @@ const EXPENSE_EXPORT_COLUMNS: ExportColumnDef[] = [
 export default function ExpensesPage() {
   const { toast } = useToast()
   const role    = useAuthStore((s) => s.role)
+  const plan    = usePlan()
   const isOwner = role === 'owner'
+  const isFree  = plan === 'free'
   const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
   const [expenseSearch,  setExpenseSearch]  = useState('')
   const [expenseFilters, setExpenseFilters] = useState<Record<string, string>>({})
@@ -239,7 +242,7 @@ export default function ExpensesPage() {
                 onDelete={openDelete}
                 onViewReceipt={(e) => { void handleViewReceipt(e) }}
                 onPay={(e) => { setPayingExpense(e); setPayMethod('') }}
-                onExport={() => setIsExportOpen(true)}
+                onExport={isFree ? undefined : () => setIsExportOpen(true)}
               />
             )}
           </>
@@ -250,14 +253,16 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        title="Expenses"
-        filename="hydra-expenses"
-        columns={EXPENSE_EXPORT_COLUMNS}
-        rows={expenseExportRows}
-      />
+      {!isFree && (
+        <ExportModal
+          isOpen={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          title="Expenses"
+          filename="hydra-expenses"
+          columns={EXPENSE_EXPORT_COLUMNS}
+          rows={expenseExportRows}
+        />
+      )}
 
       <ExpenseModal
         isOpen={isModalOpen}

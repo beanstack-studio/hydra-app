@@ -19,6 +19,7 @@ interface AuthState {
   isInitialized: boolean
   isPasswordRecovery: boolean
   noStation: boolean
+  viewPlan: 'free' | null
   setAuth: (params: { user: User; stationId: string; role: Role; station: Station }) => void
   setStation: (station: Station) => void
   clearAuth: () => void
@@ -26,6 +27,7 @@ interface AuthState {
   setPasswordRecovery: (v: boolean) => void
   setNoStation: () => void
   setViewRole: (r: Role) => void
+  setViewPlan: (p: 'free' | null) => void
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   isInitialized: false,
   isPasswordRecovery: false,
   noStation: false,
+  viewPlan: null,
   setAuth: ({ user, stationId, role, station }) =>
     set({ user, stationId, role, station, noStation: false, isPasswordRecovery: false }),
   setStation: (station) =>
@@ -50,4 +53,6 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ isInitialized: true, noStation: true }),
   setViewRole: (r: Role) =>
     set({ role: r }),
+  setViewPlan: (p) =>
+    set({ viewPlan: p }),
 }))
