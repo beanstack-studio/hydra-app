@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Building2, Package, Wrench, Users, CreditCard,
+  ArrowLeft, Building2, Package, Wrench, Users, CreditCard, User,
   ChevronRight, LogOut, X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -12,10 +12,11 @@ import { ProductsTab } from '@/features/settings/components/ProductsTab'
 import { TeamSettings } from '@/features/settings/components/TeamSettings'
 import { MaintenanceTable } from '@/features/maintenance/components/MaintenanceTable'
 import { PlanSettings } from '@/features/settings/components/PlanSettings'
+import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan'
+type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
 interface SectionDef {
   id: Section
@@ -32,8 +33,9 @@ const STORE_SECTIONS: SectionDef[] = [
 ]
 
 const ACCOUNT_SECTIONS: SectionDef[] = [
-  { id: 'team', label: 'Team Members',  description: 'Staff roster and pay rates',   icon: Users,       ownerOnly: true },
-  { id: 'plan', label: 'Plan & Billing', description: 'Your subscription and limits', icon: CreditCard,  ownerOnly: true },
+  { id: 'account', label: 'My Account',   description: 'Email, password, display name', icon: User },
+  { id: 'team',    label: 'Team Members',  description: 'Staff roster and pay rates',    icon: Users,      ownerOnly: true },
+  { id: 'plan',    label: 'Plan & Billing', description: 'Your subscription and limits',  icon: CreditCard, ownerOnly: true },
 ]
 
 const SECTION_LABELS: Record<Section, string> = {
@@ -42,6 +44,7 @@ const SECTION_LABELS: Record<Section, string> = {
   maintenance: 'Maintenance Log',
   team:        'Team Members',
   plan:        'Plan & Billing',
+  account:     'My Account',
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -88,7 +91,7 @@ export default function SettingsPage() {
   const planLabel       = PLAN_LABELS[station?.plan ?? 'free'] ?? 'Free'
 
   const visibleStore   = STORE_SECTIONS
-  const visibleAccount = isOwner ? ACCOUNT_SECTIONS : []
+  const visibleAccount = ACCOUNT_SECTIONS.filter((s) => !s.ownerOnly || isOwner)
 
   function renderDetail() {
     if (!active) return null
@@ -131,6 +134,8 @@ export default function SettingsPage() {
         return <TeamSettings />
       case 'plan':
         return <PlanSettings />
+      case 'account':
+        return <AccountSettings />
     }
   }
 

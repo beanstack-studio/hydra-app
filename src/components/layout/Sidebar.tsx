@@ -10,6 +10,7 @@ import {
   Building2,
   Wrench,
   CreditCard,
+  User,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,12 @@ const STORE_MENU = [
   { id: 'maintenance', label: 'Maintenance Log',     icon: Wrench },
 ]
 
+// Visible to all roles
+const USER_MENU = [
+  { id: 'account', label: 'My Account', icon: User },
+]
+
+// Owner-only
 const ACCOUNT_MENU = [
   { id: 'team', label: 'Team Members',   icon: Users },
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard },
@@ -121,24 +128,31 @@ export function Sidebar() {
               </button>
             ))}
 
-            {isOwner && (
-              <>
-                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                  Account
-                </p>
-                {ACCOUNT_MENU.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => navigate(`/settings?section=${id}`)}
-                    className={navItemClass(activeSection === id)}
-                  >
-                    <Icon className="h-[18px] w-[18px] shrink-0" />
-                    {label}
-                  </button>
-                ))}
-              </>
-            )}
+            <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+              Account
+            </p>
+            {USER_MENU.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigate(`/settings?section=${id}`)}
+                className={navItemClass(activeSection === id)}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {label}
+              </button>
+            ))}
+            {isOwner && ACCOUNT_MENU.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigate(`/settings?section=${id}`)}
+                className={navItemClass(activeSection === id)}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {label}
+              </button>
+            ))}
           </>
         ) : (
           navItems.map(({ to, label, icon: Icon }) => (
