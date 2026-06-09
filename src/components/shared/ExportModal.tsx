@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/shared/Modal'
-import { downloadCSV } from '@/lib/utils'
+import { downloadCSV, PH_TZ } from '@/lib/utils'
+import { formatInTimeZone } from 'date-fns-tz'
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -55,7 +56,7 @@ export function ExportModal({ isOpen, onClose, title, filename, columns, rows }:
   const handleExport = () => {
     if (noneChecked) return
 
-    const base    = `${filename}-${new Date().toISOString().slice(0, 10)}`
+    const base    = `${filename}-${formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd-HHmm')}`
     const headers = selectedCols.map((c) => c.label)
     const body    = rows.map((row) => selectedCols.map((c) => row[c.key] ?? ''))
 

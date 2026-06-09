@@ -12,15 +12,28 @@ import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatExportAmount } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+
+const CUSTOMER_FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: 'type',
+    label: 'Customer Type',
+    options: [
+      { value: 'walk_in',  label: 'Walk-in'  },
+      { value: 'regular',  label: 'Regular'  },
+      { value: 'retailer', label: 'Retailer' },
+    ],
+  },
+]
 
 const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'name',       label: 'Name' },                                    // visible
-  { key: 'type',       label: 'Type' },                                    // visible
-  { key: 'phone',      label: 'Phone',     defaultChecked: false },
+  { key: 'name',       label: 'Name' },                              // visible
+  { key: 'type',       label: 'Type' },                              // visible
+  { key: 'phone',      label: 'Phone' },                            // visible
   { key: 'messenger',  label: 'Messenger', defaultChecked: false },
-  { key: 'address',    label: 'Address',   defaultChecked: false },
-  { key: 'last_order', label: 'Last Order' },                              // visible
-  { key: 'balance',    label: 'Balance Due' },                             // visible
+  { key: 'address',    label: 'Address' },                          // visible
+  { key: 'last_order', label: 'Last Order' },                       // visible
+  { key: 'balance',    label: 'Balance Due' },                      // visible
 ]
 import type { Customer } from '@/features/customers/types'
 
@@ -33,12 +46,20 @@ export default function CustomersPage() {
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [filters,     setFilters]     = useState<Record<string, string>>({})
 
   const { data, isLoading, error, addCustomer, updateCustomer, deleteCustomer } = useCustomers()
 
-  const filteredCustomers = searchQuery.length >= 1
-    ? data.filter((c) => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : data
+  const filteredCustomers = data
+    .filter((c) => {
+      if (filters.type && filters.type !== c.type) return false
+      return true
+    })
+    .filter((c) =>
+      searchQuery.length >= 1
+        ? c.name.toLowerCase().includes(searchQuery.toLowerCase())
+        : true
+    )
 
   const openEdit = (customer: Customer) => {
     setEditingCustomer(customer)
@@ -81,6 +102,12 @@ export default function CustomersPage() {
           placeholder="Search customers…"
           minChars={1}
           className="flex-1"
+        />
+        <FilterButton
+          groups={CUSTOMER_FILTER_GROUPS}
+          value={filters}
+          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onReset={() => setFilters({})}
         />
         <Button size="sm" onClick={() => { setEditingCustomer(null); setIsModalOpen(true) }}>
           <Plus className="h-4 w-4 mr-1.5" />

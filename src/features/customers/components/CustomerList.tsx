@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { formatDate, formatCurrency, formatPhone, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Customer, CustomerType } from '../types'
 
@@ -78,11 +78,29 @@ export function CustomerList({ onDelete, onView, customers, onExport }: Customer
       ),
     },
     {
+      key: 'phone',
+      header: 'Phone',
+      render: (c: Customer) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {c.phone ? formatPhone(c.phone) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'address',
+      header: 'Address',
+      render: (c: Customer) => (
+        <span className="text-xs text-muted-foreground max-w-[180px] block truncate">
+          {c.address ?? '—'}
+        </span>
+      ),
+    },
+    {
       key: 'last_ordered',
       header: 'Last Order',
       sortable: true,
       render: (c: Customer) => (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
           {c.last_ordered_at ? formatDate(c.last_ordered_at + 'T00:00:00') : '—'}
         </span>
       ),

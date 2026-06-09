@@ -10,15 +10,17 @@ import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatExportAmount } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
 
 const INVENTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'item',           label: 'Item' },                                      // visible
-  { key: 'last_purchase',  label: 'Last Purchase' },                             // visible
-  { key: 'status',         label: 'Status' },                                    // visible
-  { key: 'qty',            label: 'Qty' },                                       // visible
-  { key: 'threshold',      label: 'Low Stock Threshold', defaultChecked: false },
-  { key: 'price_per_unit', label: 'Price/Unit',          defaultChecked: false },
-  { key: 'store',          label: 'Store',               defaultChecked: false },
+  { key: 'item',            label: 'Item' },                                     // visible
+  { key: 'supplier',        label: 'Supplier' },                                 // visible
+  { key: 'linked_product',  label: 'Used For Product' },                        // visible
+  { key: 'last_purchase',   label: 'Last Purchase' },                            // visible
+  { key: 'status',          label: 'Status' },                                   // visible
+  { key: 'qty',             label: 'Qty' },                                      // visible
+  { key: 'threshold',       label: 'Low Stock Threshold', defaultChecked: false },
+  { key: 'price_per_unit',  label: 'Price/Unit',          defaultChecked: false },
 ]
 import { computeStatus } from '@/features/supplies/hooks/useSupplies'
 import type { Supply, SupplyInput } from '@/features/supplies/types'
@@ -34,27 +36,63 @@ export default function InventoryPage() {
   const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
   const [search,          setSearch]          = useState('')
   const [isExportOpen,    setIsExportOpen]    = useState(false)
+  const [filters,         setFilters]         = useState<Record<string, string>>({})
 
   const productNames: Record<string, string> = Object.fromEntries(
     products.map((p) => [p.id, p.name])
   )
 
-  const filteredSupplies = search.length >= 3
-    ? supplies.filter((s) =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        (s.store ?? '').toLowerCase().includes(search.toLowerCase())
-      )
-    : supplies
+  const uniqueStores = [...new Set(supplies.map((s) => s.store).filter(Boolean))] as string[]
+
+  const inventoryFilterGroups: FilterGroup[] = [
+    {
+      key: 'status',
+      label: 'Stock Status',
+      options: [
+        { value: 'in_stock',     label: 'In Stock'     },
+        { value: 'low_stock',    label: 'Low Stock'    },
+        { value: 'out_of_stock', label: 'Out of Stock' },
+      ],
+    },
+    ...(uniqueStores.length > 0 ? [{
+      key: 'store',
+      label: 'Store / Supplier',
+      options: uniqueStores.map((s) => ({ value: s, label: s })),
+    }] : []),
+    ...(Object.keys(productNames).length > 0 ? [{
+      key: 'product',
+      label: 'Used For Product',
+      options: Object.entries(productNames).map(([id, name]) => ({ value: id, label: name })),
+    }] : []),
+  ]
+
+  const filteredSupplies = supplies
+    .filter((s) => {
+      if (filters.status) {
+        const status = computeStatus(s.qty, s.threshold)
+        if (filters.status !== status) return false
+      }
+      if (filters.store   && s.store !== filters.store)                       return false
+      if (filters.product && s.linked_product_id !== filters.product)         return false
+      return true
+    })
+    .filter((s) =>
+      search.length >= 3
+        ? s.name.toLowerCase().includes(search.toLowerCase()) ||
+          (s.store ?? '').toLowerCase().includes(search.toLowerCase())
+        : true
+    )
 
   const STATUS_LABEL = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }
   const inventoryExportRows = supplies.map((s) => ({
     item:           s.name,
+    supplier:       s.store ?? '',
+    linked_product: s.linked_product_id ? (productNames[s.linked_product_id] ?? '') : '',
+    last_purchase:  s.last_purchased_at ? formatDate(s.last_purchased_at) : '',
     status:         STATUS_LABEL[computeStatus(s.qty, s.threshold)],
     qty:            s.qty,
     threshold:      s.threshold,
     price_per_unit: s.price_per_unit != null ? formatExportAmount(s.price_per_unit) : '',
-    last_purchase:  s.last_purchased_at ? formatDate(s.last_purchased_at) : '',
-    store:          s.store ?? '',
   }))
 
   const handleDeleteSupply = async (item: Supply) => {
@@ -84,6 +122,12 @@ export default function InventoryPage() {
           onSearch={setSearch}
           placeholder="Search items or store…"
           className="flex-1"
+        />
+        <FilterButton
+          groups={inventoryFilterGroups}
+          value={filters}
+          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onReset={() => setFilters({})}
         />
         <Button size="sm" onClick={() => { setEditingSupply(null); setSupplyModalOpen(true) }}>
           <Plus className="h-4 w-4 mr-1.5" />

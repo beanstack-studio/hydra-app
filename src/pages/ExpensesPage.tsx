@@ -15,7 +15,40 @@ import { formatCurrency, formatExportAmount, formatDate, cn } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
+import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
+
+const EXPENSE_STATIC_FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: 'category',
+    label: 'Category',
+    options: [
+      { value: 'supplies',    label: 'Supplies'    },
+      { value: 'gasoline',    label: 'Gasoline'    },
+      { value: 'maintenance', label: 'Maintenance' },
+      { value: 'other',       label: 'Other'       },
+    ],
+  },
+  {
+    key: 'payment_status',
+    label: 'Payment Status',
+    options: [
+      { value: 'paid',   label: 'Paid'   },
+      { value: 'unpaid', label: 'Unpaid' },
+    ],
+  },
+  {
+    key: 'payment_method',
+    label: 'Payment Method',
+    options: [
+      { value: 'cash',        label: 'Cash'        },
+      { value: 'gcash',       label: 'GCash'       },
+      { value: 'maya',        label: 'Maya'        },
+      { value: 'credit_card', label: 'Credit Card' },
+      { value: 'other',       label: 'Other'       },
+    ],
+  },
+]
 
 type Tab = 'expenses' | 'bills' | 'payroll'
 
@@ -37,6 +70,7 @@ export default function ExpensesPage() {
   const isOwner = role === 'owner'
   const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
   const [expenseSearch,  setExpenseSearch]  = useState('')
+  const [expenseFilters, setExpenseFilters] = useState<Record<string, string>>({})
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [isExportOpen,  setIsExportOpen]  = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
@@ -116,13 +150,39 @@ export default function ExpensesPage() {
 
   // Staff see only one-off expense categories (no labor/payroll rows)
   const baseExpenses = data.filter((e) => e.category !== 'labor')
-  const visibleExpenses = expenseSearch.length >= 3
-    ? baseExpenses.filter((e) =>
-        e.item.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-        (e.supplier ?? '').toLowerCase().includes(expenseSearch.toLowerCase()) ||
-        e.category.toLowerCase().includes(expenseSearch.toLowerCase())
-      )
-    : baseExpenses
+
+  const uniqueExpenseSuppliers = [...new Set(
+    baseExpenses.map((e) => e.supplier).filter(Boolean)
+  )] as string[]
+
+  const expenseFilterGroups: FilterGroup[] = [
+    ...EXPENSE_STATIC_FILTER_GROUPS,
+    ...(uniqueExpenseSuppliers.length > 0 ? [{
+      key: 'supplier',
+      label: 'Supplier',
+      options: uniqueExpenseSuppliers.map((s) => ({ value: s, label: s })),
+    }] : []),
+  ]
+
+  const visibleExpenses = baseExpenses
+    .filter((e) => {
+      if (expenseFilters.category && e.category !== expenseFilters.category) return false
+      if (expenseFilters.payment_status) {
+        const isPaid = !!e.payment_method
+        if (expenseFilters.payment_status === 'paid'   && !isPaid) return false
+        if (expenseFilters.payment_status === 'unpaid' &&  isPaid) return false
+      }
+      if (expenseFilters.payment_method && e.payment_method !== expenseFilters.payment_method) return false
+      if (expenseFilters.supplier       && e.supplier        !== expenseFilters.supplier)       return false
+      return true
+    })
+    .filter((e) =>
+      expenseSearch.length >= 3
+        ? e.item.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+          (e.supplier ?? '').toLowerCase().includes(expenseSearch.toLowerCase()) ||
+          e.category.toLowerCase().includes(expenseSearch.toLowerCase())
+        : true
+    )
 
   return (
     <div>
@@ -158,6 +218,12 @@ export default function ExpensesPage() {
                 onSearch={setExpenseSearch}
                 placeholder="Search item, supplier, category…"
                 className="flex-1"
+              />
+              <FilterButton
+                groups={expenseFilterGroups}
+                value={expenseFilters}
+                onChange={(key, val) => setExpenseFilters((prev) => ({ ...prev, [key]: val }))}
+                onReset={() => setExpenseFilters({})}
               />
               <Button size="sm" onClick={() => { setEditingExpense(null); setIsModalOpen(true) }}>
                 <Plus className="h-4 w-4 mr-1" />

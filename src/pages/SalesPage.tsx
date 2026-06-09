@@ -14,20 +14,40 @@ import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatExportAmount } from '@/lib/utils'
+import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
 import type { Sale, SaleInsert } from '@/features/sales/types'
 
+const SALE_FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: 'status',
+    label: 'Status',
+    options: [
+      { value: 'unpaid',  label: 'Unpaid'  },
+      { value: 'partial', label: 'Partial' },
+      { value: 'paid',    label: 'Paid'    },
+    ],
+  },
+  {
+    key: 'order_type',
+    label: 'Order Type',
+    options: [
+      { value: 'walk-in',  label: 'Walk-in'  },
+      { value: 'delivery', label: 'Delivery' },
+      { value: 'pickup',   label: 'Pickup'   },
+    ],
+  },
+]
+
 const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'date',            label: 'Date' },           // visible
-  { key: 'customer',        label: 'Customer' },       // visible
-  { key: 'order_type',      label: 'Order Type' },     // visible
-  { key: 'product',         label: 'Product',         defaultChecked: false },
-  { key: 'qty',             label: 'Qty',             defaultChecked: false },
-  { key: 'price_per_piece', label: 'Price/pc',        defaultChecked: false },
-  { key: 'total',           label: 'Total' },          // visible
-  { key: 'payment',         label: 'Payment' },        // visible
-  { key: 'status',          label: 'Status' },         // visible
-  { key: 'balance_due',     label: 'Balance Due',     defaultChecked: false },
-  { key: 'remarks',         label: 'Remarks',         defaultChecked: false },
+  { key: 'date',        label: 'Date' },                              // visible
+  { key: 'customer',    label: 'Customer' },                         // visible
+  { key: 'order_type',  label: 'Order Type' },                      // visible
+  { key: 'product',     label: 'Product',     defaultChecked: false },
+  { key: 'total',       label: 'Total' },                           // visible
+  { key: 'payment',     label: 'Payment' },                         // visible
+  { key: 'status',      label: 'Status' },                          // visible
+  { key: 'balance_due', label: 'Balance Due' },                     // visible
+  { key: 'remarks',     label: 'Remarks',     defaultChecked: false },
 ]
 
 export default function SalesPage() {
@@ -38,6 +58,7 @@ export default function SalesPage() {
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
   const [search,            setSearch]            = useState('')
   const [isExportOpen,      setIsExportOpen]      = useState(false)
+  const [filters,           setFilters]           = useState<Record<string, string>>({})
 
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
@@ -46,26 +67,30 @@ export default function SalesPage() {
 
   const isLoading = salesLoading || settingsLoading
 
-  const filteredSales = search.length >= 3
-    ? sales.filter((s) =>
-        s.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-        s.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        s.order_type.toLowerCase().includes(search.toLowerCase())
-      )
-    : sales
+  const filteredSales = sales
+    .filter((s) => {
+      if (filters.status     && filters.status     !== s.status)     return false
+      if (filters.order_type && filters.order_type !== s.order_type) return false
+      return true
+    })
+    .filter((s) =>
+      search.length >= 3
+        ? s.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+          s.product_name.toLowerCase().includes(search.toLowerCase()) ||
+          s.order_type.toLowerCase().includes(search.toLowerCase())
+        : true
+    )
 
   const exportRows = sales.map((s) => ({
-    date:            formatDate(s.sale_date),
-    customer:        s.customer_name,
-    order_type:      s.order_type,
-    product:         s.product_name,
-    qty:             s.qty,
-    price_per_piece: formatExportAmount(s.price_per_piece),
-    total:           formatExportAmount(s.total_amount),
-    payment:         s.payment_mode,
-    status:          s.status,
-    balance_due:     s.balance_due > 0 ? formatExportAmount(s.balance_due) : '',
-    remarks:         s.remarks ?? '',
+    date:        formatDate(s.sale_date),
+    customer:    s.customer_name,
+    order_type:  s.order_type,
+    product:     s.product_name,
+    total:       formatExportAmount(s.total_amount),
+    payment:     s.payment_mode,
+    status:      s.status,
+    balance_due: s.balance_due > 0 ? formatExportAmount(s.balance_due) : '',
+    remarks:     s.remarks ?? '',
   }))
 
   const handleRecord = async (
@@ -108,6 +133,12 @@ export default function SalesPage() {
           onSearch={setSearch}
           placeholder="Search customer, product, order type…"
           className="flex-1"
+        />
+        <FilterButton
+          groups={SALE_FILTER_GROUPS}
+          value={filters}
+          onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+          onReset={() => setFilters({})}
         />
         <Button size="sm" onClick={() => setIsSaleModalOpen(true)}>
           <Plus className="h-4 w-4 mr-1" />

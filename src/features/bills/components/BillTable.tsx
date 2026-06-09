@@ -11,13 +11,44 @@ import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
 import { formatCurrency, formatExportAmount, formatDate, nowPH } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+import { FilterButton, type FilterGroup } from '@/components/shared/FilterButton'
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash:        'Cash',
+  gcash:       'GCash',
+  maya:        'Maya',
+  credit_card: 'Credit Card',
+  other:       'Other',
+}
+
+const BILL_FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: 'status',
+    label: 'Status',
+    options: [
+      { value: 'unpaid', label: 'Unpaid' },
+      { value: 'paid',   label: 'Paid'   },
+    ],
+  },
+  {
+    key: 'payment_method',
+    label: 'Payment Method',
+    options: [
+      { value: 'cash',        label: 'Cash'        },
+      { value: 'gcash',       label: 'GCash'       },
+      { value: 'maya',        label: 'Maya'        },
+      { value: 'credit_card', label: 'Credit Card' },
+      { value: 'other',       label: 'Other'       },
+    ],
+  },
+]
 
 const BILLS_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'type',      label: 'Type' },                              // visible
-  { key: 'due_date',  label: 'Due Date' },                         // visible
-  { key: 'amount',    label: 'Amount' },                           // visible
-  { key: 'status',    label: 'Status' },                           // visible
-  { key: 'date_paid', label: 'Date Paid', defaultChecked: false },
+  { key: 'type',      label: 'Type' },                                      // visible
+  { key: 'due_date',  label: 'Due Date',  defaultChecked: false },
+  { key: 'amount',    label: 'Amount' },                                    // visible
+  { key: 'status',    label: 'Status' },                                    // visible
+  { key: 'date_paid', label: 'Date Paid' },                                // visible
   { key: 'remarks',   label: 'Remarks',   defaultChecked: false },
 ]
 import { useToast } from '@/hooks/use-toast'
@@ -53,6 +84,7 @@ export function BillTable() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [payingBill,   setPayingBill]   = useState<Bill | null>(null)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [billFilters,  setBillFilters]  = useState<Record<string, string>>({})
   const [sortKey, setSortKey] = useState<BillSortKey>('due_date')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -66,7 +98,17 @@ export function BillTable() {
     }
   }
 
-  const sorted = [...data].sort((a, b) => {
+  const filteredData = data.filter((b) => {
+    if (billFilters.status) {
+      const isPaid = !!b.date_paid
+      if (billFilters.status === 'paid'   && !isPaid) return false
+      if (billFilters.status === 'unpaid' &&  isPaid) return false
+    }
+    if (billFilters.payment_method && b.payment_method !== billFilters.payment_method) return false
+    return true
+  })
+
+  const sorted = [...filteredData].sort((a, b) => {
     let cmp = 0
     if (sortKey === 'type') cmp = a.bill_type.localeCompare(b.bill_type)
     if (sortKey === 'status') cmp = Number(!!a.date_paid) - Number(!!b.date_paid)
@@ -130,15 +172,27 @@ export function BillTable() {
       header: 'Status',
       sortable: true,
       render: (bill) => (
-        <div className="space-y-0.5">
-          {bill.date_paid
-            ? <Badge variant="success">Paid</Badge>
-            : <Badge variant="destructive">Unpaid</Badge>
-          }
-          {bill.date_paid && (
-            <p className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(bill.date_paid)}</p>
-          )}
-        </div>
+        bill.date_paid
+          ? <Badge variant="success">Paid</Badge>
+          : <Badge variant="destructive">Unpaid</Badge>
+      ),
+    },
+    {
+      key: 'date_paid',
+      header: 'Date Paid',
+      render: (bill) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {bill.date_paid ? formatDate(bill.date_paid) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'payment_method',
+      header: 'Via',
+      render: (bill) => (
+        <span className="text-xs text-muted-foreground">
+          {bill.payment_method ? PAYMENT_METHOD_LABELS[bill.payment_method] : '—'}
+        </span>
       ),
     },
     {
@@ -221,6 +275,12 @@ export function BillTable() {
         >
           {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
+        <FilterButton
+          groups={BILL_FILTER_GROUPS}
+          value={billFilters}
+          onChange={(key, val) => setBillFilters((prev) => ({ ...prev, [key]: val }))}
+          onReset={() => setBillFilters({})}
+        />
         {isOwner && (
           <Button size="sm" className="ml-auto" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
             <Plus className="h-4 w-4 mr-1" />

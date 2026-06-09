@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, Pencil, Trash2, ArrowRight, Download } from 'lucide-react'
+import { Package, Minus, Plus, Pencil, Trash2, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -29,7 +29,7 @@ const STATUS_ORDER: Record<SupplyStatus, number> = {
   in_stock:     2,
 }
 
-type SortKey = 'name' | 'qty' | 'last_purchased_at' | 'status'
+type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at' | 'status'
 
 interface SupplyTableProps {
   items:         Supply[]
@@ -64,6 +64,8 @@ export function SupplyTable({
     let cmp = 0
     switch (sortKey) {
       case 'name':              cmp = a.name.localeCompare(b.name); break
+      case 'store':             cmp = (a.store ?? '').localeCompare(b.store ?? ''); break
+      case 'linked_product':    cmp = (productNames[a.linked_product_id ?? ''] ?? '').localeCompare(productNames[b.linked_product_id ?? ''] ?? ''); break
       case 'qty':               cmp = a.qty - b.qty; break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
       case 'status':            cmp = STATUS_ORDER[computeStatus(a.qty, a.threshold)] - STATUS_ORDER[computeStatus(b.qty, b.threshold)]; break
@@ -78,18 +80,28 @@ export function SupplyTable({
       key: 'name',
       header: 'Item',
       sortable: true,
+      render: (item) => (
+        <p className="text-sm font-semibold text-foreground">{item.name}</p>
+      ),
+    },
+    {
+      key: 'store',
+      header: 'Supplier',
+      sortable: true,
+      render: (item) => (
+        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'linked_product',
+      header: 'Used For',
+      sortable: true,
       render: (item) => {
         const linkedName = item.linked_product_id ? productNames[item.linked_product_id] : null
         return (
-          <div className="space-y-0.5">
-            <p className="text-sm font-semibold text-foreground">{item.name}</p>
-            {linkedName && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1 pt-0.5">
-                <ArrowRight className="h-3 w-3 shrink-0" />
-                {linkedName} · {item.units_per_sale}/sale
-              </p>
-            )}
-          </div>
+          <span className="text-sm text-muted-foreground">
+            {linkedName ?? '—'}
+          </span>
         )
       },
     },
@@ -98,12 +110,9 @@ export function SupplyTable({
       header: 'Last Purchase',
       sortable: true,
       render: (item) => (
-        <div className="space-y-0.5">
-          <p className="text-sm text-foreground">
-            {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
-          </p>
-          <p className="text-xs text-muted-foreground">{item.store ?? '—'}</p>
-        </div>
+        <span className="text-sm text-foreground">
+          {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
+        </span>
       ),
     },
     {
