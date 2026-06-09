@@ -152,6 +152,22 @@ export default function CustomerProfilePage() {
         </div>
       ),
     },
+    {
+      key: 'export',
+      header: (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            title="Export order history"
+            onClick={() => setIsExportOpen(true)}
+            className="text-muted-foreground hover:text-foreground transition-colors duration-150"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+      render: () => null,
+    },
   ]
 
   const handlePayment = async (
@@ -202,22 +218,12 @@ export default function CustomerProfilePage() {
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
                 <Badge variant="outline" className="mt-2">{TYPE_LABELS[customer.type]}</Badge>
               </div>
-              <div className="flex items-center gap-2 mt-1 shrink-0">
-                <button
-                  type="button"
-                  title="Export order history"
-                  onClick={() => setIsExportOpen(true)}
-                  className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
-                {isOwner && (
-                  <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                    Edit
-                  </Button>
-                )}
-              </div>
+              {isOwner && (
+                <Button size="sm" variant="outline" className="shrink-0 mt-1" onClick={() => setIsEditOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Edit
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">
