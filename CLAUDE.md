@@ -399,7 +399,7 @@ Two tiers only — no middle plan.
 | Plan | Users | Features | Price |
 |---|---|---|---|
 | Free | 1 owner | Sales + Expenses only | ₱0 |
-| Pro  | Unlimited | All modules + features + priority support | ₱599/mo |
+| Pro  | Unlimited | All modules + features + priority support | ₱499/mo |
 
 Note: 'basic' still exists in the DB type for backwards compat with legacy rows.
 Treat `plan !== 'free'` as "has Pro access" — both 'basic' and 'pro' map to Pro.

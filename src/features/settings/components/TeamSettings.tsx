@@ -90,7 +90,7 @@ export function TeamSettings() {
     <div className="w-full space-y-6">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-end">
         {isOwner && (
           <Button size="sm" onClick={openAdd}>
             <UserPlus className="h-4 w-4 mr-1" />

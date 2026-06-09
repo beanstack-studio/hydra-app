@@ -1,4 +1,4 @@
-import { Check, X, Mail, Zap, Star } from 'lucide-react'
+import { Check, X, Zap, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/authStore'
@@ -115,7 +115,7 @@ export function PlanSettings() {
                 </span>
               )}
             </div>
-            <p className="text-xl font-bold text-foreground">₱599<span className="text-xs font-normal text-muted-foreground">/month</span></p>
+            <p className="text-xl font-bold text-foreground">₱499<span className="text-xs font-normal text-muted-foreground">/month</span></p>
             <p className="text-xs text-muted-foreground mt-0.5">Unlimited staff accounts</p>
           </div>
           <ul className="space-y-1.5 flex-1">
@@ -144,15 +144,6 @@ export function PlanSettings() {
           <p className="text-xs text-muted-foreground leading-relaxed">
             Send us an email and we'll activate your Pro plan within the day — no credit cards or sign-ups required.
           </p>
-          <div className="flex items-center gap-2 pt-1">
-            <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
-            <a
-              href={`mailto:${UPGRADE_EMAIL}?subject=Upgrade%20to%20Pro%20—%20${encodeURIComponent(stationName)}`}
-              className="text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors duration-150"
-            >
-              {UPGRADE_EMAIL}
-            </a>
-          </div>
         </div>
       )}
 

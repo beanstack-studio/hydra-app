@@ -197,28 +197,25 @@ export function StaffProfileModal({
         </div>
 
         {/* ── Pay ─────────────────────────────────────────────────────── */}
-        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Daily Pay Rate</p>
-          <div className="space-y-1.5">
-            <Label htmlFor="sp-rate">Rate per day</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
-                ₱
-              </span>
-              <Input
-                id="sp-rate"
-                type="number"
-                step="0.01"
-                min="0"
-                className="pl-7"
-                placeholder="0.00"
-                {...register('pay_rate')}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {rateLabel ? `${rateLabel} — used to compute payroll` : 'Per day — used to compute payroll'}
-            </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="sp-rate">Daily Rate (₱)</Label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+              ₱
+            </span>
+            <Input
+              id="sp-rate"
+              type="number"
+              step="0.01"
+              min="0"
+              className="pl-7"
+              placeholder="0.00"
+              {...register('pay_rate')}
+            />
           </div>
+          {rateLabel && (
+            <p className="text-xs text-muted-foreground">{rateLabel}</p>
+          )}
         </div>
 
         {/* ── Actions ──────────────────────────────────────────────────── */}
