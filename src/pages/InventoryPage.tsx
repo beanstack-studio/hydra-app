@@ -8,7 +8,18 @@ import { SupplyModal } from '@/features/supplies/components/SupplyModal'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency, downloadCSV } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
+import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+
+const INVENTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'item',           label: 'Item' },
+  { key: 'status',         label: 'Status' },
+  { key: 'qty',            label: 'Qty' },
+  { key: 'threshold',      label: 'Low Stock Threshold', defaultChecked: false },
+  { key: 'price_per_unit', label: 'Price/Unit' },
+  { key: 'last_purchase',  label: 'Last Purchase' },
+  { key: 'store',          label: 'Store' },
+]
 import { computeStatus } from '@/features/supplies/hooks/useSupplies'
 import type { Supply, SupplyInput } from '@/features/supplies/types'
 
@@ -22,6 +33,7 @@ export default function InventoryPage() {
   const [supplyModalOpen, setSupplyModalOpen] = useState(false)
   const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
   const [search,          setSearch]          = useState('')
+  const [isExportOpen,    setIsExportOpen]    = useState(false)
 
   const productNames: Record<string, string> = Object.fromEntries(
     products.map((p) => [p.id, p.name])
@@ -34,21 +46,16 @@ export default function InventoryPage() {
       )
     : supplies
 
-  const handleExport = () => {
-    const statusLabel = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }
-    downloadCSV(
-      `hydra-inventory-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Item', 'Status', 'Qty', 'Price/Unit', 'Last Purchase', 'Store'],
-      supplies.map((s) => [
-        s.name,
-        statusLabel[computeStatus(s.qty, s.threshold)],
-        s.qty,
-        s.price_per_unit != null ? formatCurrency(s.price_per_unit) : '',
-        s.last_purchased_at ? formatDate(s.last_purchased_at) : '',
-        s.store ?? '',
-      ])
-    )
-  }
+  const STATUS_LABEL = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' }
+  const inventoryExportRows = supplies.map((s) => ({
+    item:           s.name,
+    status:         STATUS_LABEL[computeStatus(s.qty, s.threshold)],
+    qty:            s.qty,
+    threshold:      s.threshold,
+    price_per_unit: s.price_per_unit != null ? formatCurrency(s.price_per_unit) : '',
+    last_purchase:  s.last_purchased_at ? formatDate(s.last_purchased_at) : '',
+    store:          s.store ?? '',
+  }))
 
   const handleDeleteSupply = async (item: Supply) => {
     if (!confirm(`Delete "${item.name}"?`)) return
@@ -93,7 +100,16 @@ export default function InventoryPage() {
         onEditClick={(item) => { setEditingSupply(item); setSupplyModalOpen(true) }}
         onDeleteClick={handleDeleteSupply}
         onQuickAdjust={handleQuickAdjust}
-        onExport={handleExport}
+        onExport={() => setIsExportOpen(true)}
+      />
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Inventory"
+        filename="hydra-inventory"
+        columns={INVENTORY_EXPORT_COLUMNS}
+        rows={inventoryExportRows}
       />
 
       <SupplyModal

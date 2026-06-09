@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SearchInput } from '@/components/shared/SearchInput'
+import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { SaleModal } from '@/features/sales/components/SaleModal'
 import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
@@ -12,8 +13,22 @@ import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency, downloadCSV } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Sale, SaleInsert } from '@/features/sales/types'
+
+const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'date',            label: 'Date' },
+  { key: 'customer',        label: 'Customer' },
+  { key: 'order_type',      label: 'Order Type' },
+  { key: 'product',         label: 'Product' },
+  { key: 'qty',             label: 'Qty' },
+  { key: 'price_per_piece', label: 'Price/pc' },
+  { key: 'total',           label: 'Total' },
+  { key: 'payment',         label: 'Payment' },
+  { key: 'status',          label: 'Status' },
+  { key: 'balance_due',     label: 'Balance Due' },
+  { key: 'remarks',         label: 'Remarks', defaultChecked: false },
+]
 
 export default function SalesPage() {
   const { toast } = useToast()
@@ -22,6 +37,7 @@ export default function SalesPage() {
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
   const [search,            setSearch]            = useState('')
+  const [isExportOpen,      setIsExportOpen]      = useState(false)
 
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: settings, isLoading: settingsLoading } = useSettings()
@@ -38,24 +54,19 @@ export default function SalesPage() {
       )
     : sales
 
-  const handleExport = () => {
-    downloadCSV(
-      `hydra-sales-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Date', 'Customer', 'Order Type', 'Product', 'Qty', 'Price/pc', 'Total', 'Payment', 'Status', 'Balance Due'],
-      sales.map((s) => [
-        formatDate(s.sale_date),
-        s.customer_name,
-        s.order_type,
-        s.product_name,
-        s.qty,
-        formatCurrency(s.price_per_piece),
-        formatCurrency(s.total_amount),
-        s.payment_mode,
-        s.status,
-        s.balance_due > 0 ? formatCurrency(s.balance_due) : '',
-      ])
-    )
-  }
+  const exportRows = sales.map((s) => ({
+    date:            formatDate(s.sale_date),
+    customer:        s.customer_name,
+    order_type:      s.order_type,
+    product:         s.product_name,
+    qty:             s.qty,
+    price_per_piece: formatCurrency(s.price_per_piece),
+    total:           formatCurrency(s.total_amount),
+    payment:         s.payment_mode,
+    status:          s.status,
+    balance_due:     s.balance_due > 0 ? formatCurrency(s.balance_due) : '',
+    remarks:         s.remarks ?? '',
+  }))
 
   const handleRecord = async (
     saleId: string, amount: number,
@@ -111,7 +122,7 @@ export default function SalesPage() {
         <SaleTable
           sales={filteredSales}
           onSelect={setSelectedSale}
-          onExport={handleExport}
+          onExport={() => setIsExportOpen(true)}
           onPay={(sale) => {
             setSelectedSale(null)
             setPayingSale(sale)
@@ -142,6 +153,15 @@ export default function SalesPage() {
         isOpen={!!payingSale}
         onClose={() => setPayingSale(null)}
         onRecord={handleRecord}
+      />
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Sales"
+        filename="hydra-sales"
+        columns={SALES_EXPORT_COLUMNS}
+        rows={exportRows}
       />
 
       {/* Record sale modal */}

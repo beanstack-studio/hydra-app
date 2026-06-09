@@ -11,12 +11,25 @@ import { PayrollSection } from '@/features/payroll/components/PayrollSection'
 import { useExpenses } from '@/features/expenses/hooks/useExpenses'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { SearchInput } from '@/components/shared/SearchInput'
-import { formatCurrency, formatDate, downloadCSV, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
 
 type Tab = 'expenses' | 'bills' | 'payroll'
+
+const EXPENSE_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'date',           label: 'Date' },
+  { key: 'category',       label: 'Category' },
+  { key: 'item',           label: 'Item' },
+  { key: 'qty',            label: 'Qty',            defaultChecked: false },
+  { key: 'price_per_unit', label: 'Price/Unit',     defaultChecked: false },
+  { key: 'supplier',       label: 'Supplier',       defaultChecked: false },
+  { key: 'total_price',    label: 'Total Price' },
+  { key: 'payment_method', label: 'Payment Method' },
+  { key: 'remarks',        label: 'Remarks',        defaultChecked: false },
+]
 
 export default function ExpensesPage() {
   const { toast } = useToast()
@@ -24,7 +37,8 @@ export default function ExpensesPage() {
   const isOwner = role === 'owner'
   const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
   const [expenseSearch,  setExpenseSearch]  = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isModalOpen,   setIsModalOpen]   = useState(false)
+  const [isExportOpen,  setIsExportOpen]  = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -88,22 +102,17 @@ export default function ExpensesPage() {
   ]
   const TABS = ALL_EXPENSE_TABS.filter((t) => !t.ownerOnly || isOwner)
 
-  const handleExportExpenses = () => {
-    downloadCSV(
-      `hydra-expenses-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Date', 'Category', 'Item', 'Qty', 'Price/Unit', 'Supplier', 'Total Price', 'Payment Method'],
-      data.filter((e) => e.category !== 'labor').map((e) => [
-        formatDate(e.expense_date),
-        e.category,
-        e.item,
-        e.qty ?? '',
-        e.qty && e.qty > 0 ? formatCurrency(e.amount / e.qty) : '',
-        e.supplier ?? '',
-        formatCurrency(e.amount),
-        e.payment_method ?? '',
-      ])
-    )
-  }
+  const expenseExportRows = data.filter((e) => e.category !== 'labor').map((e) => ({
+    date:           formatDate(e.expense_date),
+    category:       e.category,
+    item:           e.item,
+    qty:            e.qty ?? '',
+    price_per_unit: e.qty && e.qty > 0 ? formatCurrency(e.amount / e.qty) : '',
+    supplier:       e.supplier ?? '',
+    total_price:    formatCurrency(e.amount),
+    payment_method: e.payment_method ?? '',
+    remarks:        e.remarks ?? '',
+  }))
 
   // Staff see only one-off expense categories (no labor/payroll rows)
   const baseExpenses = data.filter((e) => e.category !== 'labor')
@@ -164,7 +173,7 @@ export default function ExpensesPage() {
                 onDelete={openDelete}
                 onViewReceipt={(e) => { void handleViewReceipt(e) }}
                 onPay={(e) => { setPayingExpense(e); setPayMethod('') }}
-                onExport={handleExportExpenses}
+                onExport={() => setIsExportOpen(true)}
               />
             )}
           </>
@@ -174,6 +183,15 @@ export default function ExpensesPage() {
           <PayrollSection />
         )}
       </div>
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Expenses"
+        filename="hydra-expenses"
+        columns={EXPENSE_EXPORT_COLUMNS}
+        rows={expenseExportRows}
+      />
 
       <ExpenseModal
         isOpen={isModalOpen}

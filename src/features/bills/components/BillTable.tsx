@@ -9,7 +9,17 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { formatCurrency, formatDate, downloadCSV, nowPH } from '@/lib/utils'
+import { formatCurrency, formatDate, nowPH } from '@/lib/utils'
+import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+
+const BILLS_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'type',      label: 'Type' },
+  { key: 'due_date',  label: 'Due Date' },
+  { key: 'amount',    label: 'Amount' },
+  { key: 'status',    label: 'Status' },
+  { key: 'date_paid', label: 'Date Paid' },
+  { key: 'remarks',   label: 'Remarks', defaultChecked: false },
+]
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
@@ -41,7 +51,8 @@ export function BillTable() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [deletingBill, setDeletingBill] = useState<Bill | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [payingBill, setPayingBill] = useState<Bill | null>(null)
+  const [payingBill,   setPayingBill]   = useState<Bill | null>(null)
+  const [isExportOpen, setIsExportOpen] = useState(false)
   const [sortKey, setSortKey] = useState<BillSortKey>('due_date')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -83,19 +94,14 @@ export function BillTable() {
     }
   }
 
-  const handleExport = () => {
-    downloadCSV(
-      `hydra-bills-${MONTHS[month - 1]}-${year}.csv`,
-      ['Type', 'Due Date', 'Amount', 'Status', 'Date Paid'],
-      data.map((b) => [
-        BILL_TYPE_LABELS[b.bill_type] ?? b.bill_type,
-        b.due_date ? formatDate(b.due_date) : '',
-        formatCurrency(b.amount),
-        b.date_paid ? 'Paid' : 'Unpaid',
-        b.date_paid ? formatDate(b.date_paid) : '',
-      ])
-    )
-  }
+  const billExportRows = data.map((b) => ({
+    type:      BILL_TYPE_LABELS[b.bill_type] ?? b.bill_type,
+    due_date:  b.due_date ? formatDate(b.due_date) : '',
+    amount:    formatCurrency(b.amount),
+    status:    b.date_paid ? 'Paid' : 'Unpaid',
+    date_paid: b.date_paid ? formatDate(b.date_paid) : '',
+    remarks:   b.remarks ?? '',
+  }))
 
   const currentYear = nowPH().getFullYear()
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
@@ -147,7 +153,7 @@ export function BillTable() {
       key: 'actions',
       header: (
         <div className="flex items-center justify-end">
-          <button type="button" title="Export to Excel" onClick={handleExport}
+          <button type="button" title="Export" onClick={() => setIsExportOpen(true)}
             className="text-muted-foreground hover:text-foreground transition-colors duration-150">
             <Download className="h-4 w-4" />
           </button>
@@ -237,6 +243,15 @@ export function BillTable() {
             description="Add electricity, water, internet or rent bills."
           />
         }
+      />
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Bills"
+        filename={`hydra-bills-${MONTHS[month - 1]}-${year}`}
+        columns={BILLS_EXPORT_COLUMNS}
+        rows={billExportRows}
       />
 
       <BillModal

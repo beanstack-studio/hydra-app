@@ -10,13 +10,25 @@ import { CustomerList } from '@/features/customers/components/CustomerList'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency, downloadCSV } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
+import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
+
+const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'name',       label: 'Name' },
+  { key: 'type',       label: 'Type' },
+  { key: 'phone',      label: 'Phone' },
+  { key: 'messenger',  label: 'Messenger', defaultChecked: false },
+  { key: 'address',    label: 'Address',   defaultChecked: false },
+  { key: 'last_order', label: 'Last Order' },
+  { key: 'balance',    label: 'Balance Due' },
+]
 import type { Customer } from '@/features/customers/types'
 
 export default function CustomersPage() {
   const { toast } = useToast()
   const navigate = useNavigate()
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isModalOpen,  setIsModalOpen]  = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -33,19 +45,15 @@ export default function CustomersPage() {
     setIsModalOpen(true)
   }
 
-  const handleExport = () => {
-    downloadCSV(
-      `hydra-customers-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Name', 'Type', 'Phone', 'Last Order', 'Balance'],
-      data.map((c) => [
-        c.name,
-        c.type,
-        c.phone ?? '',
-        c.last_ordered_at ? formatDate(c.last_ordered_at + 'T00:00:00') : '',
-        c.total_balance && c.total_balance > 0 ? formatCurrency(c.total_balance) : '',
-      ])
-    )
-  }
+  const customerExportRows = data.map((c) => ({
+    name:       c.name,
+    type:       c.type,
+    phone:      c.phone ?? '',
+    messenger:  c.messenger ?? '',
+    address:    c.address ?? '',
+    last_order: c.last_ordered_at ? formatDate(c.last_ordered_at + 'T00:00:00') : '',
+    balance:    c.total_balance && c.total_balance > 0 ? formatCurrency(c.total_balance) : '',
+  }))
 
   const handleDelete = async () => {
     if (!deletingCustomer) return
@@ -88,9 +96,18 @@ export default function CustomersPage() {
           onEdit={openEdit}
           onDelete={setDeletingCustomer}
           onView={(c) => navigate(`/customers/${c.id}`)}
-          onExport={handleExport}
+          onExport={() => setIsExportOpen(true)}
         />
       )}
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Customers"
+        filename="hydra-customers"
+        columns={CUSTOMER_EXPORT_COLUMNS}
+        rows={customerExportRows}
+      />
 
       <CustomerModal
         isOpen={isModalOpen}
