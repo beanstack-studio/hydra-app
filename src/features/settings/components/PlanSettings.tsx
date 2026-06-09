@@ -137,22 +137,11 @@ export function PlanSettings() {
         </div>
       </div>
 
-      {/* Upgrade instructions */}
-      {!isPro && (
-        <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 space-y-2">
-          <p className="text-sm font-semibold text-foreground">How to upgrade</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Send us an email and we'll activate your Pro plan within the day — no credit cards or sign-ups required.
-          </p>
-        </div>
-      )}
-
-      {isPro && (
-        <p className="text-xs text-muted-foreground text-center">
-          You're on the Pro plan — thank you for supporting Hydra!{' '}
-          Questions? <a href={`mailto:${UPGRADE_EMAIL}`} className="text-primary hover:underline">{UPGRADE_EMAIL}</a>
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground text-center">
+        {isPro && <>You're on the Pro plan — thank you for supporting Hydra! </>}
+        Questions?{' '}
+        <a href={`mailto:${UPGRADE_EMAIL}`} className="text-primary hover:underline">{UPGRADE_EMAIL}</a>
+      </p>
     </div>
   )
 }

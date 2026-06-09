@@ -23,7 +23,7 @@ export function UpgradeWall({ title, feature, showTitle = true }: UpgradeWallPro
             {feature} is not available on the Free plan
           </p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Upgrade to Basic or Pro to unlock {feature.toLowerCase()} and all premium features.
+            Upgrade to Pro to unlock {feature.toLowerCase()} and all premium features.
           </p>
         </div>
         <Button size="sm" onClick={() => navigate('/settings?section=plan')}>

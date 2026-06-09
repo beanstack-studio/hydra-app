@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Mail, Lock, Pencil } from 'lucide-react'
+import { Mail, Lock, Pencil, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,9 @@ const emailSchema = z.object({
 })
 
 const passwordSchema = z.object({
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string()
+    .min(8, 'At least 8 characters')
+    .regex(/\d/, 'Must include at least one number'),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, {
   message: "Passwords don't match",
@@ -44,6 +46,8 @@ export function AccountSettings() {
   const [editingName,     setEditingName]     = useState(false)
   const [editingEmail,    setEditingEmail]    = useState(false)
   const [editingPassword, setEditingPassword] = useState(false)
+  const [showNewPw,       setShowNewPw]       = useState(false)
+  const [showConfirmPw,   setShowConfirmPw]   = useState(false)
 
   const nameForm = useForm<NameValues>({
     resolver: zodResolver(nameSchema),
@@ -209,25 +213,46 @@ export function AccountSettings() {
             <form onSubmit={onSavePassword} className="space-y-3 pt-1">
               <div>
                 <Label htmlFor="new_password" className="text-xs">New password</Label>
-                <Input
-                  id="new_password"
-                  type="password"
-                  {...passwordForm.register('password')}
-                  className="mt-1"
-                  autoFocus
-                />
-                {passwordForm.formState.errors.password && (
-                  <p className="text-xs text-destructive mt-1">{passwordForm.formState.errors.password.message}</p>
-                )}
+                <div className="relative mt-1">
+                  <Input
+                    id="new_password"
+                    type={showNewPw ? 'text' : 'password'}
+                    {...passwordForm.register('password')}
+                    className="pr-10"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    onClick={() => setShowNewPw((v) => !v)}
+                  >
+                    {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {passwordForm.formState.errors.password
+                  ? <p className="text-xs text-destructive mt-1">{passwordForm.formState.errors.password.message}</p>
+                  : <p className="text-[11px] text-muted-foreground mt-1">8+ characters · at least one number</p>
+                }
               </div>
               <div>
                 <Label htmlFor="confirm_password" className="text-xs">Confirm password</Label>
-                <Input
-                  id="confirm_password"
-                  type="password"
-                  {...passwordForm.register('confirm')}
-                  className="mt-1"
-                />
+                <div className="relative mt-1">
+                  <Input
+                    id="confirm_password"
+                    type={showConfirmPw ? 'text' : 'password'}
+                    {...passwordForm.register('confirm')}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    onClick={() => setShowConfirmPw((v) => !v)}
+                  >
+                    {showConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 {passwordForm.formState.errors.confirm && (
                   <p className="text-xs text-destructive mt-1">{passwordForm.formState.errors.confirm.message}</p>
                 )}

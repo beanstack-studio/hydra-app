@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +20,13 @@ const loginSchema = z.object({
 const signUpSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string()
+    .min(8, 'At least 8 characters')
+    .regex(/\d/, 'Must include at least one number'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 })
 
 const forgotSchema = z.object({
@@ -27,8 +34,10 @@ const forgotSchema = z.object({
 })
 
 const recoverSchema = z.object({
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Please confirm your password'),
+  password: z.string()
+    .min(8, 'At least 8 characters')
+    .regex(/\d/, 'Must include at least one number'),
+  confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
@@ -47,6 +56,12 @@ export default function LoginPage() {
   const [authError,      setAuthError]      = useState<string | null>(null)
   const [signUpSuccess,  setSignUpSuccess]  = useState(false)
   const [forgotSuccess,  setForgotSuccess]  = useState(false)
+
+  const [showLoginPw,        setShowLoginPw]        = useState(false)
+  const [showSignUpPw,       setShowSignUpPw]       = useState(false)
+  const [showSignUpConfirm,  setShowSignUpConfirm]  = useState(false)
+  const [showRecoverPw,      setShowRecoverPw]      = useState(false)
+  const [showRecoverConfirm, setShowRecoverConfirm] = useState(false)
 
   useEffect(() => {
     if (isPasswordRecovery) setView('recover')
@@ -204,7 +219,24 @@ export default function LoginPage() {
                       Forgot password?
                     </button>
                   </div>
-                  <Input id="login-pw" type="password" placeholder="••••••••" autoComplete="current-password" {...regLogin('password')} />
+                  <div className="relative">
+                    <Input
+                      id="login-pw"
+                      type={showLoginPw ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      className="pr-10"
+                      {...regLogin('password')}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                      onClick={() => setShowLoginPw((v) => !v)}
+                    >
+                      {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {loginErrors.password && <p className="text-xs text-destructive">{loginErrors.password.message}</p>}
                 </div>
                 {authError && <p className="text-sm text-destructive">{authError}</p>}
@@ -246,8 +278,48 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="su-pw">Password</Label>
-                    <Input id="su-pw" type="password" placeholder="6+ characters" {...regSignUp('password')} />
-                    {signUpErrors.password && <p className="text-xs text-destructive">{signUpErrors.password.message}</p>}
+                    <div className="relative">
+                      <Input
+                        id="su-pw"
+                        type={showSignUpPw ? 'text' : 'password'}
+                        placeholder="8+ characters"
+                        className="pr-10"
+                        {...regSignUp('password')}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                        onClick={() => setShowSignUpPw((v) => !v)}
+                      >
+                        {showSignUpPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {signUpErrors.password
+                      ? <p className="text-xs text-destructive">{signUpErrors.password.message}</p>
+                      : <p className="text-[11px] text-muted-foreground">8+ characters · at least one number</p>
+                    }
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="su-pw2">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="su-pw2"
+                        type={showSignUpConfirm ? 'text' : 'password'}
+                        placeholder="Repeat password"
+                        className="pr-10"
+                        {...regSignUp('confirmPassword')}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                        onClick={() => setShowSignUpConfirm((v) => !v)}
+                      >
+                        {showSignUpConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {signUpErrors.confirmPassword && <p className="text-xs text-destructive">{signUpErrors.confirmPassword.message}</p>}
                   </div>
                   {authError && <p className="text-sm text-destructive">{authError}</p>}
                   <Button type="submit" className="w-full" disabled={signUpSubmitting}>
@@ -306,12 +378,48 @@ export default function LoginPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="rec-pw">New Password</Label>
-                  <Input id="rec-pw" type="password" placeholder="6+ characters" autoFocus {...regRecover('password')} />
-                  {recoverErrors.password && <p className="text-xs text-destructive">{recoverErrors.password.message}</p>}
+                  <div className="relative">
+                    <Input
+                      id="rec-pw"
+                      type={showRecoverPw ? 'text' : 'password'}
+                      placeholder="8+ characters"
+                      autoFocus
+                      className="pr-10"
+                      {...regRecover('password')}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                      onClick={() => setShowRecoverPw((v) => !v)}
+                    >
+                      {showRecoverPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {recoverErrors.password
+                    ? <p className="text-xs text-destructive">{recoverErrors.password.message}</p>
+                    : <p className="text-[11px] text-muted-foreground">8+ characters · at least one number</p>
+                  }
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="rec-pw2">Confirm Password</Label>
-                  <Input id="rec-pw2" type="password" placeholder="Repeat password" {...regRecover('confirmPassword')} />
+                  <div className="relative">
+                    <Input
+                      id="rec-pw2"
+                      type={showRecoverConfirm ? 'text' : 'password'}
+                      placeholder="Repeat password"
+                      className="pr-10"
+                      {...regRecover('confirmPassword')}
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                      onClick={() => setShowRecoverConfirm((v) => !v)}
+                    >
+                      {showRecoverConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {recoverErrors.confirmPassword && <p className="text-xs text-destructive">{recoverErrors.confirmPassword.message}</p>}
                 </div>
                 {authError && <p className="text-sm text-destructive">{authError}</p>}
