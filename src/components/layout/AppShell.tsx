@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { AlertTriangle, Settings } from 'lucide-react'
+import { AlertTriangle, Building2 } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
@@ -67,10 +67,13 @@ function RoleViewToggle() {
 
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
-  const role     = useAuthStore((s) => s.role)
-  const location = useLocation()
-  const isOwner  = role === 'owner' || role === 'super_admin'
+  const role           = useAuthStore((s) => s.role)
+  const station        = useAuthStore((s) => s.station)
+  const location       = useLocation()
+  const isOwner        = role === 'owner' || role === 'super_admin'
   const onSettingsPage = location.pathname.startsWith('/settings')
+  const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
+  const stationName    = station?.name ?? ''
 
   useEffect(() => {
     startReminderPolling((reminders) => {
@@ -93,21 +96,35 @@ export function AppShell() {
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
         <DevBanner />
         <RoleViewToggle />
+
+        {/* Mobile station header — owner only, hidden on settings page */}
+        {isOwner && !onSettingsPage && (
+          <div className="lg:hidden flex items-center justify-end px-4 h-12 border-b border-border shrink-0">
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 rounded-full pl-2.5 pr-1 py-1 border border-border hover:bg-accent transition-colors duration-150"
+              title="Settings"
+            >
+              <span className="text-xs font-medium text-foreground truncate max-w-[120px]">
+                {stationName || 'My Station'}
+              </span>
+              <div className="h-7 w-7 rounded-full overflow-hidden shrink-0 border border-border">
+                {stationPhotoUrl ? (
+                  <img src={stationPhotoUrl} alt={stationName} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full bg-primary/15 flex items-center justify-center">
+                    <Building2 className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
+
         <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
-
-      {/* Settings shortcut — mobile only, owner only, hidden when already on settings */}
-      {isOwner && !onSettingsPage && (
-        <Link
-          to="/settings"
-          className="fixed top-3 right-4 z-40 lg:hidden flex items-center justify-center h-8 w-8 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground shadow-sm transition-colors duration-150"
-          title="Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </Link>
-      )}
 
       <BottomNav />
       <ReminderModal reminders={pendingReminders} onDismiss={handleDismiss} />

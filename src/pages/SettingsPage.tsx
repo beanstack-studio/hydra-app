@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Building2, Package, Wrench, Users, CreditCard,
-  ChevronRight, LogOut,
+  ChevronRight, LogOut, X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSettings } from '@/features/settings/hooks/useSettings'
@@ -50,6 +51,8 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 export default function SettingsPage() {
+  const navigate      = useNavigate()
+  const [searchParams] = useSearchParams()
   const role    = useAuthStore((s) => s.role)
   const station = useAuthStore((s) => s.station)
   const isOwner = role === 'owner' || role === 'super_admin'
@@ -62,6 +65,15 @@ export default function SettingsPage() {
       setActive('business')
     }
   }, [])
+
+  // Navigate to a specific section via ?section= URL param (e.g. from sidebar dropdown)
+  useEffect(() => {
+    const param = searchParams.get('section') as Section | null
+    const VALID: Section[] = ['business', 'products', 'maintenance', 'team', 'plan']
+    if (param && VALID.includes(param)) {
+      setActive(param)
+    }
+  }, [searchParams])
 
   const {
     data, isLoading, error,
@@ -124,9 +136,9 @@ export default function SettingsPage() {
   }
 
   // ── Profile card — reused in both hub and desktop sidebar ──────────────────
-  function ProfileCard({ compact = false }: { compact?: boolean }) {
+  function ProfileCard({ compact = false, noMargin = false }: { compact?: boolean; noMargin?: boolean }) {
     return (
-      <div className={cn('flex items-center gap-3', compact ? 'p-4' : 'mb-8')}>
+      <div className={cn('flex items-center gap-3', compact ? 'p-4' : (!noMargin && 'mb-8'))}>
         {stationPhotoUrl ? (
           <img
             src={stationPhotoUrl}
@@ -240,7 +252,17 @@ export default function SettingsPage() {
         {active === null ? (
           /* Hub */
           <div className="space-y-6">
-            <ProfileCard />
+            <div className="flex items-center justify-between mb-8">
+              <ProfileCard noMargin />
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="self-start flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150 shrink-0"
+                aria-label="Close settings"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
             <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-1">
