@@ -70,7 +70,7 @@ export function useReports(): UseReportsReturn {
       const [salesRes, expensesRes, billsRes] = await Promise.all([
         supabase
           .from('sales')
-          .select('sale_date, total_amount, status, product_name, qty, customer_name')
+          .select('sale_date, total_amount, status, product_name, qty, customer_name, items')
           .eq('station_id', stationId)
           .gte('sale_date', startDate)
           .lte('sale_date', endDate),
@@ -129,8 +129,16 @@ export function useReports(): UseReportsReturn {
       // ── Product sales summary (donut chart) ─────────────────────────────
       const productMap = new Map<string, number>()
       for (const s of sales) {
-        const name = (s.product_name as string) || 'Unknown'
-        productMap.set(name, (productMap.get(name) ?? 0) + (s.total_amount as number))
+        const items = s.items as Array<{ product_name: string; qty: number; price: number }> | null
+        if (items && items.length > 0) {
+          for (const item of items) {
+            const name = item.product_name || 'Unknown'
+            productMap.set(name, (productMap.get(name) ?? 0) + item.qty * item.price)
+          }
+        } else {
+          const name = (s.product_name as string) || 'Unknown'
+          productMap.set(name, (productMap.get(name) ?? 0) + (s.total_amount as number))
+        }
       }
       const productSales: ProductSalesSummary[] = Array.from(productMap.entries())
         .map(([product_name, total_amount]) => ({ product_name, total_amount }))
@@ -139,13 +147,26 @@ export function useReports(): UseReportsReturn {
       // ── Top products ranking (by qty) ────────────────────────────────────
       const productRankMap = new Map<string, { qty: number; order_count: number; total_amount: number }>()
       for (const s of sales) {
-        const name = (s.product_name as string) || 'Unknown'
-        const prev = productRankMap.get(name) ?? { qty: 0, order_count: 0, total_amount: 0 }
-        productRankMap.set(name, {
-          qty: prev.qty + ((s.qty as number) ?? 0),
-          order_count: prev.order_count + 1,
-          total_amount: prev.total_amount + (s.total_amount as number),
-        })
+        const items = s.items as Array<{ product_name: string; qty: number; price: number }> | null
+        if (items && items.length > 0) {
+          for (const item of items) {
+            const name = item.product_name || 'Unknown'
+            const prev = productRankMap.get(name) ?? { qty: 0, order_count: 0, total_amount: 0 }
+            productRankMap.set(name, {
+              qty:          prev.qty + item.qty,
+              order_count:  prev.order_count + 1,
+              total_amount: prev.total_amount + item.qty * item.price,
+            })
+          }
+        } else {
+          const name = (s.product_name as string) || 'Unknown'
+          const prev = productRankMap.get(name) ?? { qty: 0, order_count: 0, total_amount: 0 }
+          productRankMap.set(name, {
+            qty:          prev.qty + ((s.qty as number) ?? 0),
+            order_count:  prev.order_count + 1,
+            total_amount: prev.total_amount + (s.total_amount as number),
+          })
+        }
       }
       const topProducts: ProductRanking[] = Array.from(productRankMap.entries())
         .map(([product_name, v]) => ({ product_name, ...v }))
