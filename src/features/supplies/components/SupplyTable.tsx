@@ -50,7 +50,8 @@ export function SupplyTable({
   onQuickAdjust,
   onExport,
 }: SupplyTableProps) {
-  const isOwner = useAuthStore((s) => s.role) === 'owner'
+  const role    = useAuthStore((s) => s.role)
+  const isOwner = role === 'owner' || role === 'super_admin'
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -139,24 +140,28 @@ export function SupplyTable({
       sortable: true,
       render: (item) => (
         <div className="flex items-center gap-1.5">
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-7 w-7 shrink-0"
-            onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
-            disabled={item.qty <= 0}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
+          {isOwner && (
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7 shrink-0"
+              onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
+              disabled={item.qty <= 0}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+          )}
           <span className="w-8 text-center text-sm font-bold text-foreground">{item.qty}</span>
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-7 w-7 shrink-0"
-            onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
+          {isOwner && (
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7 shrink-0"
+              onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -172,23 +177,25 @@ export function SupplyTable({
       ),
       render: (item) => (
         <div className="flex items-center gap-1 justify-end">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={(e) => { e.stopPropagation(); onEditClick(item) }}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
           {isOwner && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={(e) => { e.stopPropagation(); onEditClick(item) }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </>
           )}
         </div>
       ),

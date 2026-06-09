@@ -11,6 +11,7 @@ import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentMod
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
+import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, cn } from '@/lib/utils'
 
 const ORDER_HISTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
@@ -54,6 +55,8 @@ export default function CustomerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
+  const role    = useAuthStore((s) => s.role)
+  const isOwner = role === 'owner' || role === 'super_admin'
   const { customer, sales, isLoading, error, recordPayment, updateCustomer } = useCustomerProfile(id)
   const [payingSale, setPayingSale] = useState<SaleWithPayments | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -199,10 +202,12 @@ export default function CustomerProfilePage() {
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
                 <Badge variant="outline" className="mt-2">{TYPE_LABELS[customer.type]}</Badge>
               </div>
-              <Button size="sm" variant="outline" className="shrink-0 mt-1" onClick={() => setIsEditOpen(true)}>
-                <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                Edit
-              </Button>
+              {isOwner && (
+                <Button size="sm" variant="outline" className="shrink-0 mt-1" onClick={() => setIsEditOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Edit
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">

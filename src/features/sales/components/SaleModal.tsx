@@ -100,7 +100,7 @@ function ProductCard({ product, cartQty, onAdd, onDecrement, isDisabled = false,
       <button
         type="button"
         onClick={onAdd}
-        className="aspect-square w-full bg-muted flex items-center justify-center overflow-hidden hover:opacity-90 transition-opacity"
+        className="h-28 w-full bg-muted flex items-center justify-center overflow-hidden hover:opacity-90 transition-opacity"
       >
         {product.image_url ? (
           <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
@@ -572,7 +572,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
                 <p className="text-sm">No products. Add them in Settings.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 xl:grid-cols-4 gap-2">
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product.id}

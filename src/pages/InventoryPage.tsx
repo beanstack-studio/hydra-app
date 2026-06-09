@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { usePlan } from '@/hooks/usePlan'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { SupplyTable } from '@/features/supplies/components/SupplyTable'
@@ -29,6 +30,8 @@ import type { Supply, SupplyInput } from '@/features/supplies/types'
 
 export default function InventoryPage() {
   const plan    = usePlan()
+  const role    = useAuthStore((s) => s.role)
+  const isOwner = role === 'owner' || role === 'super_admin'
   const { toast } = useToast()
 
   const { data: supplies, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty } = useSupplies()
@@ -134,10 +137,12 @@ export default function InventoryPage() {
           onChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
           onReset={() => setFilters({})}
         />
-        <Button size="sm" onClick={() => { setEditingSupply(null); setSupplyModalOpen(true) }}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add Item
-        </Button>
+        {isOwner && (
+          <Button size="sm" onClick={() => { setEditingSupply(null); setSupplyModalOpen(true) }}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add Item
+          </Button>
+        )}
       </div>
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
