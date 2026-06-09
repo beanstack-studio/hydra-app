@@ -59,12 +59,12 @@ export default function SettingsPage() {
 
   const [active, setActive] = useState<Section | null>(null)
 
-  // On desktop, default to Business Info immediately
+  // On desktop, default to Business Info via URL if no section param present
   useEffect(() => {
-    if (window.matchMedia('(min-width: 1024px)').matches) {
-      setActive('business')
+    if (window.matchMedia('(min-width: 1024px)').matches && !searchParams.get('section')) {
+      navigate('/settings?section=business', { replace: true })
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Navigate to a specific section via ?section= URL param (e.g. from sidebar dropdown)
   useEffect(() => {
@@ -89,7 +89,6 @@ export default function SettingsPage() {
 
   const visibleStore   = STORE_SECTIONS
   const visibleAccount = isOwner ? ACCOUNT_SECTIONS : []
-  const allSections    = [...visibleStore, ...visibleAccount]
 
   function renderDetail() {
     if (!active) return null
@@ -179,27 +178,6 @@ export default function SettingsPage() {
     )
   }
 
-  // ── Desktop left nav item ──────────────────────────────────────────────────
-  function NavItem({ section }: { section: SectionDef }) {
-    const Icon = section.icon
-    const isActive = active === section.id
-    return (
-      <button
-        type="button"
-        onClick={() => setActive(section.id)}
-        className={cn(
-          'flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-sm transition-colors duration-150',
-          isActive
-            ? 'bg-primary/10 text-primary font-semibold'
-            : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground font-medium'
-        )}
-      >
-        <Icon className="h-4 w-4 shrink-0" />
-        {section.label}
-      </button>
-    )
-  }
-
   return (
     <>
       {error && (
@@ -208,43 +186,14 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── Desktop: master-detail layout ─────────────────────────────────── */}
-      <div className="hidden lg:grid lg:grid-cols-[220px_1fr] lg:gap-8 lg:min-h-[calc(100vh-6rem)]">
-
-        {/* Left nav */}
-        <aside className="space-y-6">
-          <ProfileCard compact />
-
-          <nav className="space-y-0.5">
-            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Store
-            </p>
-            {visibleStore.map((s) => <NavItem key={s.id} section={s} />)}
-          </nav>
-
-          {visibleAccount.length > 0 && (
-            <nav className="space-y-0.5">
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Account
-              </p>
-              {visibleAccount.map((s) => <NavItem key={s.id} section={s} />)}
-            </nav>
-          )}
-        </aside>
-
-        {/* Right content */}
-        <div className="border-l border-border pl-8 min-w-0">
-          {active ? (
-            <>
-              <h1 className="text-2xl font-bold text-foreground mb-6">{SECTION_LABELS[active]}</h1>
-              {renderDetail()}
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-              Select a section
-            </div>
-          )}
-        </div>
+      {/* ── Desktop: full-width content (nav lives in Sidebar) ───────────── */}
+      <div className="hidden lg:block">
+        {active && (
+          <>
+            <h1 className="text-2xl font-bold text-foreground mb-6">{SECTION_LABELS[active]}</h1>
+            {renderDetail()}
+          </>
+        )}
       </div>
 
       {/* ── Mobile: hub → detail ──────────────────────────────────────────── */}

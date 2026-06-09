@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ShoppingCart,
   Receipt,
@@ -9,9 +8,9 @@ import {
   Settings,
   LogOut,
   Building2,
-  ChevronDown,
   Wrench,
   CreditCard,
+  LayoutGrid,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -40,140 +39,123 @@ const STORE_MENU = [
 ]
 
 const ACCOUNT_MENU = [
-  { id: 'team', label: 'Team Members',  icon: Users },
+  { id: 'team', label: 'Team Members',   icon: Users },
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard },
 ]
 
-/* Deep teal derived from primary hue — clearly themed, not pitch-black */
-const SIDEBAR_BG  = 'bg-[hsl(191,72%,14%)]'
-const BORDER      = 'border-white/10'
+const SIDEBAR_BG = 'bg-[hsl(191,72%,14%)]'
+const BORDER     = 'border-white/10'
 
 export function Sidebar() {
-  const navigate       = useNavigate()
-  const station        = useAuthStore((s) => s.station)
-  const user           = useAuthStore((s) => s.user)
-  const role           = useAuthStore((s) => s.role)
-  const userName       = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
-  const navItems       = (role === 'owner' || role === 'super_admin') ? ALL_NAV_ITEMS : STAFF_NAV_ITEMS
-  const isOwner        = role === 'owner' || role === 'super_admin'
+  const navigate        = useNavigate()
+  const location        = useLocation()
+  const station         = useAuthStore((s) => s.station)
+  const user            = useAuthStore((s) => s.user)
+  const role            = useAuthStore((s) => s.role)
+  const userName        = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
+  const navItems        = (role === 'owner' || role === 'super_admin') ? ALL_NAV_ITEMS : STAFF_NAV_ITEMS
+  const isOwner         = role === 'owner' || role === 'super_admin'
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
-  const stationName    = station?.name ?? 'My Station'
-  const planLabel      = station?.plan ? station.plan.charAt(0).toUpperCase() + station.plan.slice(1) : 'Free'
+  const stationName     = station?.name ?? 'My Station'
+  const planLabel       = station?.plan ? station.plan.charAt(0).toUpperCase() + station.plan.slice(1) : 'Free'
 
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const onSettingsPage  = location.pathname.startsWith('/settings')
+  const activeSection   = onSettingsPage
+    ? new URLSearchParams(location.search).get('section')
+    : null
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
-
-  function goToSection(sectionId: string) {
-    navigate(`/settings?section=${sectionId}`)
-    setMenuOpen(false)
+  function navItemClass(isActive: boolean) {
+    return cn(
+      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+      isActive
+        ? 'bg-white/15 text-white'
+        : 'text-white/55 hover:bg-white/8 hover:text-white/90'
+    )
   }
 
   return (
     <aside className={cn('hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 z-40', SIDEBAR_BG, 'border-r', BORDER)}>
 
-      {/* Station profile header — toggles section dropdown */}
-      <div ref={menuRef} className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((o) => !o)}
-          className={cn(
-            'flex h-16 w-full items-center gap-2.5 px-4 border-b transition-colors duration-150 group',
-            BORDER,
-            menuOpen ? 'bg-white/10' : 'hover:bg-white/8'
-          )}
-        >
-          {stationPhotoUrl ? (
-            <img
-              src={stationPhotoUrl}
-              alt={stationName}
-              className="h-8 w-8 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-              <Building2 className="h-4 w-4 text-white/70" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-sm font-bold text-white truncate leading-tight">{stationName}</p>
-            <p className="text-[10px] text-white/45 mt-0.5">{planLabel} Plan</p>
+      {/* Station profile header */}
+      <button
+        type="button"
+        onClick={() => navigate(onSettingsPage ? '/sales' : '/settings?section=business')}
+        className={cn('flex h-16 w-full items-center gap-2.5 px-4 border-b transition-colors duration-150 hover:bg-white/8', BORDER)}
+      >
+        {stationPhotoUrl ? (
+          <img src={stationPhotoUrl} alt={stationName} className="h-8 w-8 rounded-full object-cover shrink-0" />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <Building2 className="h-4 w-4 text-white/70" />
           </div>
-          <ChevronDown
-            className={cn(
-              'h-3.5 w-3.5 text-white/40 shrink-0 transition-transform duration-200',
-              menuOpen && 'rotate-180'
-            )}
-          />
-        </button>
+        )}
+        <div className="min-w-0 flex-1 text-left">
+          <p className="text-sm font-bold text-white truncate leading-tight">{stationName}</p>
+          <p className="text-[10px] text-white/45 mt-0.5">{planLabel} Plan</p>
+        </div>
+      </button>
 
-        {/* Section dropdown */}
-        {menuOpen && (
-          <div className={cn('absolute top-full left-0 right-0 z-50 py-2 shadow-xl', SIDEBAR_BG, 'border-b', BORDER)}>
-            <p className="px-4 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        {onSettingsPage ? (
+          <>
+            {/* Back to main app */}
+            <button
+              type="button"
+              onClick={() => navigate('/sales')}
+              className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium text-white/40 hover:bg-white/8 hover:text-white/70 transition-all duration-150 mb-2"
+            >
+              <LayoutGrid className="h-[18px] w-[18px] shrink-0" />
+              Main Menu
+            </button>
+
+            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
               Store
             </p>
             {STORE_MENU.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => goToSection(id)}
-                className="flex items-center gap-3 w-full px-4 py-2 text-sm text-white/65 hover:bg-white/8 hover:text-white transition-colors duration-150"
+                onClick={() => navigate(`/settings?section=${id}`)}
+                className={navItemClass(activeSection === id)}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-[18px] w-[18px] shrink-0" />
                 {label}
               </button>
             ))}
 
             {isOwner && (
               <>
-                <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
                   Account
                 </p>
                 {ACCOUNT_MENU.map(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => goToSection(id)}
-                    className="flex items-center gap-3 w-full px-4 py-2 text-sm text-white/65 hover:bg-white/8 hover:text-white transition-colors duration-150"
+                    onClick={() => navigate(`/settings?section=${id}`)}
+                    className={navItemClass(activeSection === id)}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className="h-[18px] w-[18px] shrink-0" />
                     {label}
                   </button>
                 ))}
               </>
             )}
-          </div>
+          </>
+        ) : (
+          navItems.map(({ to, label, icon: Icon }) => (
+            <button
+              key={to}
+              type="button"
+              onClick={() => navigate(to)}
+              className={navItemClass(location.pathname.startsWith(to))}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" />
+              {label}
+            </button>
+          ))
         )}
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                isActive
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/55 hover:bg-white/8 hover:text-white/90'
-              )
-            }
-          >
-            <Icon className="h-[18px] w-[18px] shrink-0" />
-            {label}
-          </NavLink>
-        ))}
       </nav>
 
       {/* User + sign out */}
