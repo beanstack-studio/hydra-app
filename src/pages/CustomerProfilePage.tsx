@@ -202,12 +202,22 @@ export default function CustomerProfilePage() {
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
                 <Badge variant="outline" className="mt-2">{TYPE_LABELS[customer.type]}</Badge>
               </div>
-              {isOwner && (
-                <Button size="sm" variant="outline" className="shrink-0 mt-1" onClick={() => setIsEditOpen(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Edit
-                </Button>
-              )}
+              <div className="flex items-center gap-2 mt-1 shrink-0">
+                <button
+                  type="button"
+                  title="Export order history"
+                  onClick={() => setIsExportOpen(true)}
+                  className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+                {isOwner && (
+                  <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -251,19 +261,9 @@ export default function CustomerProfilePage() {
 
           {/* ── Right column: order history ── */}
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                Order History
-              </h2>
-              <button
-                type="button"
-                title="Export"
-                onClick={() => setIsExportOpen(true)}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-            </div>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+              Order History
+            </h2>
 
             <DataTable
               columns={orderHistoryColumns}

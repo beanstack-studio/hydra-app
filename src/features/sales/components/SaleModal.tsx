@@ -100,7 +100,7 @@ function ProductCard({ product, cartQty, onAdd, onDecrement, isDisabled = false,
       <button
         type="button"
         onClick={onAdd}
-        className="h-28 w-full bg-muted flex items-center justify-center overflow-hidden hover:opacity-90 transition-opacity"
+        className="aspect-square w-full bg-muted flex items-center justify-center overflow-hidden hover:opacity-90 transition-opacity"
       >
         {product.image_url ? (
           <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
