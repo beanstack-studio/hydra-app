@@ -8,17 +8,17 @@ import { SupplyModal } from '@/features/supplies/components/SupplyModal'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatExportAmount } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 
 const INVENTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'item',           label: 'Item' },
-  { key: 'status',         label: 'Status' },
-  { key: 'qty',            label: 'Qty' },
+  { key: 'item',           label: 'Item' },                                      // visible
+  { key: 'last_purchase',  label: 'Last Purchase' },                             // visible
+  { key: 'status',         label: 'Status' },                                    // visible
+  { key: 'qty',            label: 'Qty' },                                       // visible
   { key: 'threshold',      label: 'Low Stock Threshold', defaultChecked: false },
-  { key: 'price_per_unit', label: 'Price/Unit' },
-  { key: 'last_purchase',  label: 'Last Purchase' },
-  { key: 'store',          label: 'Store' },
+  { key: 'price_per_unit', label: 'Price/Unit',          defaultChecked: false },
+  { key: 'store',          label: 'Store',               defaultChecked: false },
 ]
 import { computeStatus } from '@/features/supplies/hooks/useSupplies'
 import type { Supply, SupplyInput } from '@/features/supplies/types'
@@ -52,7 +52,7 @@ export default function InventoryPage() {
     status:         STATUS_LABEL[computeStatus(s.qty, s.threshold)],
     qty:            s.qty,
     threshold:      s.threshold,
-    price_per_unit: s.price_per_unit != null ? formatCurrency(s.price_per_unit) : '',
+    price_per_unit: s.price_per_unit != null ? formatExportAmount(s.price_per_unit) : '',
     last_purchase:  s.last_purchased_at ? formatDate(s.last_purchased_at) : '',
     store:          s.store ?? '',
   }))

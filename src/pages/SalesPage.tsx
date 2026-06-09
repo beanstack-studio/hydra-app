@@ -13,21 +13,21 @@ import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatExportAmount } from '@/lib/utils'
 import type { Sale, SaleInsert } from '@/features/sales/types'
 
 const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'date',            label: 'Date' },
-  { key: 'customer',        label: 'Customer' },
-  { key: 'order_type',      label: 'Order Type' },
-  { key: 'product',         label: 'Product' },
-  { key: 'qty',             label: 'Qty' },
-  { key: 'price_per_piece', label: 'Price/pc' },
-  { key: 'total',           label: 'Total' },
-  { key: 'payment',         label: 'Payment' },
-  { key: 'status',          label: 'Status' },
-  { key: 'balance_due',     label: 'Balance Due' },
-  { key: 'remarks',         label: 'Remarks', defaultChecked: false },
+  { key: 'date',            label: 'Date' },           // visible
+  { key: 'customer',        label: 'Customer' },       // visible
+  { key: 'order_type',      label: 'Order Type' },     // visible
+  { key: 'product',         label: 'Product',         defaultChecked: false },
+  { key: 'qty',             label: 'Qty',             defaultChecked: false },
+  { key: 'price_per_piece', label: 'Price/pc',        defaultChecked: false },
+  { key: 'total',           label: 'Total' },          // visible
+  { key: 'payment',         label: 'Payment' },        // visible
+  { key: 'status',          label: 'Status' },         // visible
+  { key: 'balance_due',     label: 'Balance Due',     defaultChecked: false },
+  { key: 'remarks',         label: 'Remarks',         defaultChecked: false },
 ]
 
 export default function SalesPage() {
@@ -60,11 +60,11 @@ export default function SalesPage() {
     order_type:      s.order_type,
     product:         s.product_name,
     qty:             s.qty,
-    price_per_piece: formatCurrency(s.price_per_piece),
-    total:           formatCurrency(s.total_amount),
+    price_per_piece: formatExportAmount(s.price_per_piece),
+    total:           formatExportAmount(s.total_amount),
     payment:         s.payment_mode,
     status:          s.status,
-    balance_due:     s.balance_due > 0 ? formatCurrency(s.balance_due) : '',
+    balance_due:     s.balance_due > 0 ? formatExportAmount(s.balance_due) : '',
     remarks:         s.remarks ?? '',
   }))
 

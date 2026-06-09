@@ -11,7 +11,7 @@ import { PayrollSection } from '@/features/payroll/components/PayrollSection'
 import { useExpenses } from '@/features/expenses/hooks/useExpenses'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { SearchInput } from '@/components/shared/SearchInput'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatCurrency, formatExportAmount, formatDate, cn } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -20,15 +20,15 @@ import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
 type Tab = 'expenses' | 'bills' | 'payroll'
 
 const EXPENSE_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'date',           label: 'Date' },
-  { key: 'category',       label: 'Category' },
-  { key: 'item',           label: 'Item' },
-  { key: 'qty',            label: 'Qty',            defaultChecked: false },
-  { key: 'price_per_unit', label: 'Price/Unit',     defaultChecked: false },
-  { key: 'supplier',       label: 'Supplier',       defaultChecked: false },
-  { key: 'total_price',    label: 'Total Price' },
-  { key: 'payment_method', label: 'Payment Method' },
-  { key: 'remarks',        label: 'Remarks',        defaultChecked: false },
+  { key: 'date',           label: 'Date' },           // visible
+  { key: 'category',       label: 'Category' },       // visible
+  { key: 'item',           label: 'Item' },           // visible
+  { key: 'qty',            label: 'Qty' },            // visible
+  { key: 'price_per_unit', label: 'Price/Unit' },     // visible
+  { key: 'supplier',       label: 'Supplier' },       // visible
+  { key: 'total_price',    label: 'Total Price' },    // visible
+  { key: 'payment_method', label: 'Payment Method' }, // visible (Via)
+  { key: 'remarks',        label: 'Remarks',         defaultChecked: false },
 ]
 
 export default function ExpensesPage() {
@@ -107,9 +107,9 @@ export default function ExpensesPage() {
     category:       e.category,
     item:           e.item,
     qty:            e.qty ?? '',
-    price_per_unit: e.qty && e.qty > 0 ? formatCurrency(e.amount / e.qty) : '',
+    price_per_unit: e.qty && e.qty > 0 ? formatExportAmount(e.amount / e.qty) : '',
     supplier:       e.supplier ?? '',
-    total_price:    formatCurrency(e.amount),
+    total_price:    formatExportAmount(e.amount),
     payment_method: e.payment_method ?? '',
     remarks:        e.remarks ?? '',
   }))

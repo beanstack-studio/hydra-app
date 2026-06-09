@@ -10,17 +10,17 @@ import { CustomerList } from '@/features/customers/components/CustomerList'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useToast } from '@/hooks/use-toast'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatExportAmount } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 
 const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'name',       label: 'Name' },
-  { key: 'type',       label: 'Type' },
-  { key: 'phone',      label: 'Phone' },
+  { key: 'name',       label: 'Name' },                                    // visible
+  { key: 'type',       label: 'Type' },                                    // visible
+  { key: 'phone',      label: 'Phone',     defaultChecked: false },
   { key: 'messenger',  label: 'Messenger', defaultChecked: false },
   { key: 'address',    label: 'Address',   defaultChecked: false },
-  { key: 'last_order', label: 'Last Order' },
-  { key: 'balance',    label: 'Balance Due' },
+  { key: 'last_order', label: 'Last Order' },                              // visible
+  { key: 'balance',    label: 'Balance Due' },                             // visible
 ]
 import type { Customer } from '@/features/customers/types'
 
@@ -52,7 +52,7 @@ export default function CustomersPage() {
     messenger:  c.messenger ?? '',
     address:    c.address ?? '',
     last_order: c.last_ordered_at ? formatDate(c.last_ordered_at + 'T00:00:00') : '',
-    balance:    c.total_balance && c.total_balance > 0 ? formatCurrency(c.total_balance) : '',
+    balance:    c.total_balance && c.total_balance > 0 ? formatExportAmount(c.total_balance) : '',
   }))
 
   const handleDelete = async () => {

@@ -9,16 +9,16 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { formatCurrency, formatDate, nowPH } from '@/lib/utils'
+import { formatCurrency, formatExportAmount, formatDate, nowPH } from '@/lib/utils'
 import { ExportModal, type ExportColumnDef } from '@/components/shared/ExportModal'
 
 const BILLS_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'type',      label: 'Type' },
-  { key: 'due_date',  label: 'Due Date' },
-  { key: 'amount',    label: 'Amount' },
-  { key: 'status',    label: 'Status' },
-  { key: 'date_paid', label: 'Date Paid' },
-  { key: 'remarks',   label: 'Remarks', defaultChecked: false },
+  { key: 'type',      label: 'Type' },                              // visible
+  { key: 'due_date',  label: 'Due Date' },                         // visible
+  { key: 'amount',    label: 'Amount' },                           // visible
+  { key: 'status',    label: 'Status' },                           // visible
+  { key: 'date_paid', label: 'Date Paid', defaultChecked: false },
+  { key: 'remarks',   label: 'Remarks',   defaultChecked: false },
 ]
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -97,7 +97,7 @@ export function BillTable() {
   const billExportRows = data.map((b) => ({
     type:      BILL_TYPE_LABELS[b.bill_type] ?? b.bill_type,
     due_date:  b.due_date ? formatDate(b.due_date) : '',
-    amount:    formatCurrency(b.amount),
+    amount:    formatExportAmount(b.amount),
     status:    b.date_paid ? 'Paid' : 'Unpaid',
     date_paid: b.date_paid ? formatDate(b.date_paid) : '',
     remarks:   b.remarks ?? '',

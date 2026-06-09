@@ -17,6 +17,13 @@ export const formatCurrency = (amount: number): string =>
     maximumFractionDigits: 2,
   })}`
 
+/** For exports — plain number, no ₱ symbol, no negative sign */
+export const formatExportAmount = (amount: number): string =>
+  Math.abs(amount).toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
 export const formatDate = (date: Date | string): string =>
   formatInTimeZone(new Date(date), PH_TZ, 'dd-MMM-yyyy')
 
