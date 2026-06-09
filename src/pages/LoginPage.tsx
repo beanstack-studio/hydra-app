@@ -144,10 +144,7 @@ export default function LoginPage() {
         alt="Hydra"
         className="h-16 w-16 rounded-full object-cover shadow-md ring-2 ring-primary/20"
       />
-      <div className="text-center">
-        <p className="text-xl font-bold text-foreground tracking-tight">Hydra</p>
-        <p className="text-xs text-muted-foreground">Water Station Management</p>
-      </div>
+      <p className="text-xl font-bold text-foreground tracking-tight">Hydra</p>
     </div>
   )
 
@@ -326,9 +323,11 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Hydra · Water Station Management
-        </p>
+        <div className="mt-6 flex items-center justify-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Powered by</span>
+          <img src="/beanstack-logo.png" alt="Beanstack Studio" className="h-4 w-4 rounded-sm object-contain" />
+          <span className="text-xs font-medium text-muted-foreground">Beanstack Studio</span>
+        </div>
       </div>
     </div>
   )
