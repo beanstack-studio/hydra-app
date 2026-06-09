@@ -43,11 +43,9 @@ function safeData<T>(
 }
 
 export function useSettings(): UseSettingsReturn {
-  const stationId = useAuthStore((s) => s.stationId)
-  const authUser = useAuthStore((s) => s.user)
-  const authRole = useAuthStore((s) => s.role)
+  const stationId   = useAuthStore((s) => s.stationId)
   const authStation = useAuthStore((s) => s.station)
-  const setAuth = useAuthStore((s) => s.setAuth)
+  const setStation  = useAuthStore((s) => s.setStation)
 
   const [data, setData] = useState<SettingsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -197,20 +195,20 @@ export function useSettings(): UseSettingsReturn {
     await fetchData()
   }, [stationId, fetchData])
 
-  const updateStationName = useCallback(async (name: string) => {
-    if (!stationId || !authUser || !authRole || !authStation) return
+  const updateStationName = useCallback(async (name: string): Promise<void> => {
+    if (!stationId || !authStation) throw new Error('Not authenticated')
     const { error: e } = await supabase.from('stations').update({ name }).eq('id', stationId)
     if (e) throw new Error(e.message)
-    setAuth({ user: authUser, stationId, role: authRole, station: { ...authStation, name } })
-  }, [stationId, authUser, authRole, authStation, setAuth])
+    setStation({ ...authStation, name })
+  }, [stationId, authStation, setStation])
 
-  const uploadStationPhoto = useCallback(async (file: File) => {
-    if (!stationId || !authUser || !authRole || !authStation) return
+  const uploadStationPhoto = useCallback(async (file: File): Promise<void> => {
+    if (!stationId || !authStation) throw new Error('Not authenticated')
     const publicUrl = await uploadStationPhotoToStorage(stationId, file)
     const { error: e } = await supabase.from('stations').update({ photo_url: publicUrl }).eq('id', stationId)
     if (e) throw new Error(e.message)
-    setAuth({ user: authUser, stationId, role: authRole, station: { ...authStation, photo_url: publicUrl } })
-  }, [stationId, authUser, authRole, authStation, setAuth])
+    setStation({ ...authStation, photo_url: publicUrl })
+  }, [stationId, authStation, setStation])
 
   const addContact = useCallback(async (input: ContactDetailInput) => {
     if (!stationId) return

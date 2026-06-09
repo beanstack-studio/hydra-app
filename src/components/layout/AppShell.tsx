@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
-import { AlertTriangle, Building2 } from 'lucide-react'
+import { Outlet } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
@@ -67,13 +67,6 @@ function RoleViewToggle() {
 
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
-  const role           = useAuthStore((s) => s.role)
-  const station        = useAuthStore((s) => s.station)
-  const location       = useLocation()
-  const isOwner        = role === 'owner' || role === 'super_admin'
-  const onSettingsPage = location.pathname.startsWith('/settings')
-  const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
-  const stationName    = station?.name ?? ''
 
   useEffect(() => {
     startReminderPolling((reminders) => {
@@ -96,25 +89,6 @@ export function AppShell() {
       <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
         <DevBanner />
         <RoleViewToggle />
-
-        {/* Mobile station avatar — owner only, hidden on settings page */}
-        {isOwner && !onSettingsPage && (
-          <div className="lg:hidden flex items-center justify-end px-4 h-10 border-b border-border/40 shrink-0">
-            <Link
-              to="/settings"
-              className="h-7 w-7 rounded-full overflow-hidden border border-border shadow-sm shrink-0"
-              title="Settings"
-            >
-              {stationPhotoUrl ? (
-                <img key={stationPhotoUrl} src={stationPhotoUrl} alt={stationName} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full bg-primary/15 flex items-center justify-center">
-                  <Building2 className="h-3.5 w-3.5 text-primary" />
-                </div>
-              )}
-            </Link>
-          </div>
-        )}
 
         <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
           <Outlet />

@@ -72,7 +72,7 @@ export default function SettingsPage() {
   // Navigate to a specific section via ?section= URL param (e.g. from sidebar dropdown)
   useEffect(() => {
     const param = searchParams.get('section') as Section | null
-    const VALID: Section[] = ['business', 'products', 'maintenance', 'team', 'plan']
+    const VALID: Section[] = ['business', 'products', 'maintenance', 'team', 'plan', 'account']
     if (param && VALID.includes(param)) {
       setActive(param)
     }
