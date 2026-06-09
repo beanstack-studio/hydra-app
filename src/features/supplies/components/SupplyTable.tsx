@@ -220,6 +220,7 @@ export function SupplyTable({
       )}
 
       <DataTable
+        tableId="supplies"
         columns={columns}
         data={sorted}
         rowKey={(item) => item.id}

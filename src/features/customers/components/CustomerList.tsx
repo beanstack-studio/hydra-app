@@ -155,6 +155,7 @@ export function CustomerList({
 
   return (
     <DataTable
+      tableId="customers"
       columns={columns}
       data={sorted}
       rowKey={(c) => c.id}

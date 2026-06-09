@@ -331,6 +331,7 @@ export function BillTable() {
       </div>
 
       <DataTable
+        tableId="bills"
         columns={columns}
         data={sorted}
         rowKey={(bill) => bill.id}

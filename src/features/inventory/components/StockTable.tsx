@@ -118,6 +118,7 @@ export function StockTable({ items, isLoading, onAdjustClick, onQuickAdjust }: S
       )}
 
       <DataTable
+        tableId="inventory"
         columns={columns}
         data={sorted}
         rowKey={(item) => item.id}

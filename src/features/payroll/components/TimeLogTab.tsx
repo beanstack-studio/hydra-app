@@ -158,6 +158,7 @@ export function TimeLogTab({ staff, timeLogs, onAdd, onUpdate, onDelete }: TimeL
         </div>
 
         <DataTable
+          tableId="timelog"
           columns={columns}
           data={filtered}
           rowKey={(l) => l.id}

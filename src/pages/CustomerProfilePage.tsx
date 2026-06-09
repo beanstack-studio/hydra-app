@@ -264,6 +264,7 @@ export default function CustomerProfilePage() {
             </div>
 
             <DataTable
+              tableId="customer-order-history"
               columns={orderHistoryColumns}
               data={sortedSales}
               rowKey={(sale) => sale.id}

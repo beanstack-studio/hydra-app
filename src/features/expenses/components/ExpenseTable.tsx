@@ -222,6 +222,7 @@ export function ExpenseTable({
 
   return (
     <DataTable
+      tableId="expenses"
       columns={columns}
       data={sorted}
       rowKey={(e) => e.id}

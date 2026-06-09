@@ -197,6 +197,7 @@ export function SaleTable({
 
   return (
     <DataTable
+      tableId="sales"
       columns={columns}
       data={sorted}
       rowKey={(s) => s.id}
