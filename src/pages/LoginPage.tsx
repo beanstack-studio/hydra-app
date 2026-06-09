@@ -325,7 +325,7 @@ export default function LoginPage() {
 
         <div className="mt-6 flex items-center justify-center gap-1.5">
           <span className="text-xs text-muted-foreground">Powered by</span>
-          <img src="/beanstack-logo.png" alt="Beanstack Studio" className="h-4 w-4 rounded-sm object-contain" />
+          <img src="/beanstack-logo.png" alt="Beanstack Studio" className="h-7 w-7 rounded-md object-contain" />
           <span className="text-xs font-medium text-muted-foreground">Beanstack Studio</span>
         </div>
       </div>
