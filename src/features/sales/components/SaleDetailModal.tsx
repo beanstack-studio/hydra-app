@@ -88,15 +88,12 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
             <p className="text-xs font-medium text-foreground">{orderLabel} Details</p>
 
             {(displayAddress || sale.scheduled_at) && (
-              <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                 {displayAddress && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5 shrink-0 mt-px" />
                     {displayAddress}
                   </span>
-                )}
-                {displayAddress && sale.scheduled_at && (
-                  <span className="text-muted-foreground/50">·</span>
                 )}
                 {sale.scheduled_at && (
                   <span className="flex items-center gap-1">
