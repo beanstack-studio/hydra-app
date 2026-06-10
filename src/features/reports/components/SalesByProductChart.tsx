@@ -44,7 +44,7 @@ export function SalesByProductChart({ data, total }: SalesByProductChartProps) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-        Sales by Product
+        Revenue by Product
       </p>
 
       {chartData.length === 0 ? (

@@ -11,6 +11,7 @@ import { SaleTable } from '@/features/sales/components/SaleTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
 import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
+import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatCurrency, formatExportAmount } from '@/lib/utils'
@@ -75,6 +76,7 @@ export default function SalesPage() {
   const [filters,           setFilters]           = useState<Record<string, string>>({})
 
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
+  const { data: customers } = useCustomers()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
   const handleAddSale = async (input: SaleInsert) => addSale(input)
@@ -211,6 +213,7 @@ export default function SalesPage() {
         onClose={() => setSelectedSale(null)}
         onReschedule={handleRescheduleClick}
         onConfirmFulfillment={handleConfirmFulfillment}
+        customerPhone={customers.find((c) => c.id === selectedSale?.customer_id)?.phone ?? null}
       />
 
       {/* Reschedule modal */}

@@ -28,16 +28,16 @@ function getAudioCtx(): AudioContext | null {
 function playReminderAlert() {
   // Vibration — works on Android, silently ignored on iOS
   if ('vibrate' in navigator) {
-    navigator.vibrate([200, 100, 200])
+    navigator.vibrate([300, 100, 300, 100, 400])
   }
 
-  // Two-tone chime via Web Audio API — no audio file needed
+  // 5-tone ascending chime via Web Audio API — no audio file needed
   const ctx = getAudioCtx()
   if (!ctx) return
 
   const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve()
   void resume.then(() => {
-    const playTone = (freq: number, start: number, duration: number) => {
+    const playTone = (freq: number, start: number, duration: number, vol = 0.28) => {
       const osc  = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain)
@@ -45,14 +45,18 @@ function playReminderAlert() {
       osc.type = 'sine'
       osc.frequency.value = freq
       gain.gain.setValueAtTime(0, start)
-      gain.gain.linearRampToValueAtTime(0.25, start + 0.01)
+      gain.gain.linearRampToValueAtTime(vol, start + 0.02)
       gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
       osc.start(start)
       osc.stop(start + duration)
     }
     const now = ctx.currentTime
-    playTone(880,  now,        0.35)  // A5
-    playTone(1108, now + 0.18, 0.45)  // C#6
+    // Ascending 5-note chime: D5 → F#5 → A5 → D6 → A5 (resolve)
+    playTone(587,  now,        0.35)
+    playTone(740,  now + 0.25, 0.35)
+    playTone(880,  now + 0.50, 0.40)
+    playTone(1175, now + 0.75, 0.55, 0.32)
+    playTone(880,  now + 1.15, 0.70, 0.20)
   })
 }
 
@@ -100,4 +104,15 @@ export async function dismissReminder(id: string) {
 export async function snoozeReminder(id: string, minutes = 5) {
   const snoozeUntil = new Date(Date.now() + minutes * 60_000).toISOString()
   await supabase.from('reminders').update({ scheduled_at: snoozeUntil }).eq('id', id)
+}
+
+export async function fulfillSale(saleId: string) {
+  await supabase
+    .from('sales')
+    .update({ fulfilled_at: new Date().toISOString() })
+    .eq('id', saleId)
+  await supabase
+    .from('reminders')
+    .update({ is_dismissed: true })
+    .eq('sale_id', saleId)
 }

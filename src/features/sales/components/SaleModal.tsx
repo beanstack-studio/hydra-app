@@ -506,7 +506,11 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
           customer_name: customerName,
           order_type: values.order_type,
           scheduled_at: reminderAt,
-          message: `${values.order_type === 'delivery' ? 'Delivery' : 'Pickup'} — ${customerName} — ${cartItems.map((i) => `${i.product_name} ×${i.qty}`).join(', ')}`,
+          message: [
+            `${values.order_type === 'delivery' ? 'Delivery' : 'Pickup'} — ${customerName} — ${cartItems.map((i) => `${i.product_name} ×${i.qty}`).join(', ')}`,
+            cleanPhone(values.customer_phone) || '',
+            values.order_type === 'delivery' ? (values.delivery_address || '') : '',
+          ].join('|||'),
           is_dismissed: false,
         })
       }

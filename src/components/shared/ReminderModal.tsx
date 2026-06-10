@@ -1,7 +1,8 @@
-import { Truck, ShoppingBag, X, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { Truck, ShoppingBag, X, Clock, MapPin, Phone, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatTime } from '@/lib/utils'
-import { dismissReminder, snoozeReminder } from '@/lib/reminders'
+import { dismissReminder, snoozeReminder, fulfillSale } from '@/lib/reminders'
 import type { Reminder } from '@/lib/reminders'
 
 interface ReminderModalProps {
@@ -10,15 +11,18 @@ interface ReminderModalProps {
 }
 
 export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
+  const [isMarking, setIsMarking] = useState(false)
+
   if (reminders.length === 0) return null
 
   const current = reminders[0]
   const remaining = reminders.length - 1
 
-  // Parse items from message: "Delivery — Name — Item1, Item2"
-  const msgParts = current.message.split(' — ')
-  const itemsStr = msgParts.length >= 3 ? msgParts.slice(2).join(' — ') : current.message
-  const itemLines = itemsStr.split(', ').filter(Boolean).slice(0, 5)
+  // Parse: "Type — Name — Items|||phone|||address"
+  const [mainPart = '', phone = '', address = ''] = current.message.split('|||')
+  const msgParts = mainPart.split(' — ')
+  const itemsStr = msgParts.length >= 3 ? msgParts.slice(2).join(' — ') : mainPart
+  const itemLines = itemsStr.split(', ').filter(Boolean).slice(0, 6)
 
   const handleDismiss = async () => {
     await dismissReminder(current.id)
@@ -30,8 +34,20 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
     onDismiss(current.id)
   }
 
-  const Icon = current.order_type === 'delivery' ? Truck : ShoppingBag
+  const handleMarkDone = async () => {
+    if (!current.sale_id) { await handleDismiss(); return }
+    setIsMarking(true)
+    try {
+      await fulfillSale(current.sale_id)
+      onDismiss(current.id)
+    } finally {
+      setIsMarking(false)
+    }
+  }
+
+  const Icon  = current.order_type === 'delivery' ? Truck : ShoppingBag
   const label = current.order_type === 'delivery' ? 'Delivery' : 'Pickup'
+  const doneLabel = current.order_type === 'delivery' ? 'Mark Delivered' : 'Mark Picked Up'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
@@ -59,29 +75,56 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
         </div>
 
         {/* Body */}
-        <div className="px-4 py-4 space-y-2">
-          <p className="text-base font-semibold text-foreground">{current.customer_name}</p>
-          <p className="text-sm font-semibold text-muted-foreground">
-            {formatDate(current.scheduled_at)} · {formatTime(current.scheduled_at)}
-          </p>
-          <ul className="space-y-0.5 pt-1">
+        <div className="px-4 py-4 space-y-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-base font-semibold text-foreground">{current.customer_name}</p>
+            <p className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              {formatDate(current.scheduled_at)} · {formatTime(current.scheduled_at)}
+            </p>
+          </div>
+
+          {phone && (
+            <div className="flex items-center gap-1.5 text-sm text-foreground">
+              <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <a href={`tel:${phone}`} className="hover:underline">{phone}</a>
+            </div>
+          )}
+
+          {address && (
+            <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0 mt-px" />
+              <span>{address}</span>
+            </div>
+          )}
+
+          <ul className="space-y-0.5 pt-0.5 border-t border-border/60">
             {itemLines.map((line, i) => (
-              <li key={i} className="text-sm text-foreground">
-                {line}
-              </li>
+              <li key={i} className="text-sm text-foreground pt-1">{line}</li>
             ))}
           </ul>
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 px-4 pb-4">
-          <Button variant="outline" className="flex-1" onClick={handleDismiss}>
-            Dismiss
-          </Button>
-          <Button variant="outline" className="flex-1 gap-1" onClick={handleSnooze}>
-            <Clock className="h-3.5 w-3.5" />
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleSnooze}>
+            <Clock className="h-3.5 w-3.5 mr-1" />
             Snooze 5m
           </Button>
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleDismiss}>
+            Dismiss
+          </Button>
+          {current.sale_id && (
+            <Button
+              size="sm"
+              className="flex-1 gap-1 text-green-700 border-green-300 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:border-green-800 dark:bg-green-950/40"
+              variant="outline"
+              disabled={isMarking}
+              onClick={handleMarkDone}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {isMarking ? '…' : doneLabel}
+            </Button>
+          )}
         </div>
 
         {/* Queue indicator */}

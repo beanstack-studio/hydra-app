@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, MapPin, Clock, AlertTriangle } from 'lucide-react'
+import { CalendarClock, CheckCircle2, MapPin, Clock, AlertTriangle, Phone } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
@@ -10,9 +10,10 @@ interface SaleDetailModalProps {
   onClose:               () => void
   onReschedule?:         () => void
   onConfirmFulfillment?: () => void
+  customerPhone?:        string | null
 }
 
-export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirmFulfillment }: SaleDetailModalProps) {
+export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirmFulfillment, customerPhone }: SaleDetailModalProps) {
   if (!sale) return null
 
   const isScheduledOrder = sale.order_type === 'delivery' || sale.order_type === 'pickup'
@@ -35,6 +36,15 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
           <div>
             <p className="text-xs text-muted-foreground">Customer</p>
             <p className="font-medium">{sale.customer_name}</p>
+            {customerPhone && (
+              <a
+                href={`tel:${customerPhone}`}
+                className="flex items-center gap-1 text-xs text-primary hover:underline mt-0.5"
+              >
+                <Phone className="h-3 w-3" />
+                {customerPhone}
+              </a>
+            )}
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Date</p>

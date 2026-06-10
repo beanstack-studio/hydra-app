@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format, parse, addHours } from 'date-fns'
+import { format, parse, addMinutes } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
@@ -38,7 +38,7 @@ export function RescheduleModal({ sale, isOpen, onClose, onReschedule }: Resched
 
   const nowPH    = toZonedTime(new Date(), PH_TZ)
   const todayStr = format(nowPH, 'yyyy-MM-dd')
-  const cutoffPH = addHours(nowPH, 1)
+  const cutoffPH = addMinutes(nowPH, 30)
   const cutoffMins = cutoffPH.getHours() * 60 + cutoffPH.getMinutes()
 
   const {
@@ -154,11 +154,11 @@ export function RescheduleModal({ sale, isOpen, onClose, onReschedule }: Resched
         </div>
 
         {selectedDate === todayStr && availableSlots.length === 0 && (
-          <p className="text-xs text-destructive">No times available today — must be at least 1 hour from now.</p>
+          <p className="text-xs text-destructive">No times available today — must be at least 30 minutes from now.</p>
         )}
 
         <p className="text-xs text-muted-foreground">
-          Times within 1 hour of now are unavailable for same-day reschedule.
+          Times within 30 minutes of now are unavailable for same-day reschedule.
         </p>
 
         <div className="flex gap-2 pt-1">
