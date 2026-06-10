@@ -155,10 +155,11 @@ export function DataTable<T>({
 
     const onMove = (ev: PointerEvent) => {
       if (!resizeStateRef.current) return
-      const delta = ev.clientX - resizeStateRef.current.startX
-      const next = Math.max(MIN_COL_WIDTH, resizeStateRef.current.startWidth + delta)
+      const { key, startX, startWidth } = resizeStateRef.current
+      const delta = ev.clientX - startX
+      const next = Math.max(MIN_COL_WIDTH, startWidth + delta)
       resizeStateRef.current.currentWidth = next
-      setDragWidths((prev) => ({ ...prev, [resizeStateRef.current!.key]: next }))
+      setDragWidths((prev) => ({ ...prev, [key]: next }))
     }
 
     const onUp = () => {
