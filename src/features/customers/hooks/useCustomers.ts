@@ -75,10 +75,24 @@ export function useCustomers(): UseCustomersReturn {
   }, [stationId, fetchData])
 
   const updateCustomer = useCallback(async (id: string, input: Partial<CustomerInput>) => {
-    const { error: e } = await supabase.from('customers').update(input).eq('id', id)
+    const { error: e } = await supabase
+      .from('customers')
+      .update(input)
+      .eq('id', id)
+      .eq('station_id', stationId)
     if (e) throw new Error(e.message)
+    // Sync address change to pending unfulfilled delivery sales
+    if (input.address) {
+      await supabase
+        .from('sales')
+        .update({ delivery_address: input.address })
+        .eq('customer_id', id)
+        .eq('station_id', stationId)
+        .eq('order_type', 'delivery')
+        .is('fulfilled_at', null)
+    }
     await fetchData()
-  }, [fetchData])
+  }, [fetchData, stationId])
 
   const deleteCustomer = useCallback(async (id: string) => {
     const { error: e } = await supabase.from('customers').delete().eq('id', id)
