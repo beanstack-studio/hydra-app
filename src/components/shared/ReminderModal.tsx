@@ -110,9 +110,6 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
             <Clock className="h-3.5 w-3.5 mr-1" />
             Snooze 5m
           </Button>
-          <Button variant="outline" size="sm" className="flex-1" onClick={handleDismiss}>
-            Dismiss
-          </Button>
           {current.sale_id && (
             <Button
               size="sm"
