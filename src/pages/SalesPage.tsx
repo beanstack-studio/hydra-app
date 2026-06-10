@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -78,6 +78,13 @@ export default function SalesPage() {
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: customers } = useCustomers()
   const { data: settings, isLoading: settingsLoading } = useSettings()
+
+  // Keep selectedSale in sync when useSales re-fetches (e.g. after address or reschedule update)
+  useEffect(() => {
+    if (!selectedSale) return
+    const updated = sales.find((s) => s.id === selectedSale.id)
+    if (updated && updated !== selectedSale) setSelectedSale(updated)
+  }, [sales, selectedSale])
 
   const handleAddSale = async (input: SaleInsert) => addSale(input)
 
