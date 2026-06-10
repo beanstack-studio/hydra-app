@@ -221,6 +221,7 @@ export default function SalesPage() {
         onReschedule={handleRescheduleClick}
         onConfirmFulfillment={handleConfirmFulfillment}
         customerPhone={customers.find((c) => c.id === selectedSale?.customer_id)?.phone ?? null}
+        customerAddress={customers.find((c) => c.id === selectedSale?.customer_id)?.address ?? null}
       />
 
       {/* Reschedule modal */}

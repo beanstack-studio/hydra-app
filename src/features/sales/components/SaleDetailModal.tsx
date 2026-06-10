@@ -5,19 +5,24 @@ import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
 import type { Sale } from '../types'
 
 interface SaleDetailModalProps {
-  sale:                  Sale | null
-  isOpen:                boolean
-  onClose:               () => void
-  onReschedule?:         () => void
-  onConfirmFulfillment?: () => void
-  customerPhone?:        string | null
+  sale:                    Sale | null
+  isOpen:                  boolean
+  onClose:                 () => void
+  onReschedule?:           () => void
+  onConfirmFulfillment?:   () => void
+  customerPhone?:          string | null
+  customerAddress?:        string | null
 }
 
-export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirmFulfillment, customerPhone }: SaleDetailModalProps) {
+export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirmFulfillment, customerPhone, customerAddress }: SaleDetailModalProps) {
   if (!sale) return null
 
   const isScheduledOrder = sale.order_type === 'delivery' || sale.order_type === 'pickup'
   const isFulfilled      = !!sale.fulfilled_at
+  // For unfulfilled deliveries, prefer the live customer address over the stored snapshot
+  const displayAddress   = !isFulfilled && sale.order_type === 'delivery'
+    ? (customerAddress ?? sale.delivery_address)
+    : sale.delivery_address
   const orderLabel       = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
   const isPaidFully      = sale.balance_due <= 0
 
@@ -82,15 +87,15 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
           <div className="border-t border-border pt-3 space-y-1.5">
             <p className="text-xs font-medium text-foreground">{orderLabel} Details</p>
 
-            {(sale.delivery_address || sale.scheduled_at) && (
+            {(displayAddress || sale.scheduled_at) && (
               <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
-                {sale.delivery_address && (
+                {displayAddress && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5 shrink-0 mt-px" />
-                    {sale.delivery_address}
+                    {displayAddress}
                   </span>
                 )}
-                {sale.delivery_address && sale.scheduled_at && (
+                {displayAddress && sale.scheduled_at && (
                   <span className="text-muted-foreground/50">·</span>
                 )}
                 {sale.scheduled_at && (
