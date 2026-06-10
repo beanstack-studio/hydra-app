@@ -40,7 +40,7 @@ interface DataTableProps<T> {
   tableId?: string
 }
 
-const MIN_COL_WIDTH = 50
+const MIN_COL_WIDTH = 80
 
 export function DataTable<T>({
   columns,
@@ -234,6 +234,7 @@ export function DataTable<T>({
                   }}
                   className={cn(
                     'px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap relative',
+                    hasWidths && 'overflow-hidden',
                     col.sortable && 'cursor-pointer select-none hover:text-foreground transition-colors duration-150',
                     col.className,
                     dragColKey === col.key && 'opacity-40',
@@ -295,7 +296,7 @@ export function DataTable<T>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {orderedVisibleCols.map((col) => (
-                  <td key={col.key} className={cn('px-4 py-3 text-foreground', col.className)}>
+                  <td key={col.key} className={cn('px-4 py-3 text-foreground', hasWidths && 'overflow-hidden', col.className)}>
                     {col.render(row)}
                   </td>
                 ))}
