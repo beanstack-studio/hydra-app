@@ -140,13 +140,16 @@ export function useSales(): UseSalesReturn {
       .from('sales')
       .update({ scheduled_at: scheduledAt })
       .eq('id', saleId)
+      .eq('station_id', stationId)
     if (e) throw new Error(e.message)
+    const reminderAt = new Date(new Date(scheduledAt).getTime() - 15 * 60 * 1000).toISOString()
     await supabase
       .from('reminders')
-      .update({ scheduled_at: scheduledAt, is_dismissed: false })
+      .update({ scheduled_at: reminderAt, is_dismissed: false })
       .eq('sale_id', saleId)
+      .eq('station_id', stationId)
     await fetchData()
-  }, [fetchData])
+  }, [fetchData, stationId])
 
   const deleteSale = useCallback(async (saleId: string) => {
     // Delete related records first to avoid FK constraint errors
