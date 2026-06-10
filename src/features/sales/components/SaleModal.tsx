@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { getDay } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { getDay, addMinutes, parse } from 'date-fns'
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { Package, Plus, Minus, X, ShoppingCart } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
@@ -223,21 +223,34 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
   const { availableTimeSlots, isClosedDay } = useMemo(() => {
     const needsSchedule = orderType === 'delivery' || orderType === 'pickup'
     const openHours = stationSettings?.open_hours
+
+    let rawSlots: string[]
     if (!needsSchedule || !scheduledDate || !openHours) {
-      return { availableTimeSlots: generateTimeSlots(), isClosedDay: false }
+      rawSlots = generateTimeSlots()
+    } else {
+      const dayIndex = getDay(new Date(scheduledDate + 'T00:00:00'))
+      const dayKey = DAY_INDEX_TO_KEY[dayIndex]
+      const schedule = openHours[dayKey]
+      if (!schedule.open) {
+        return { availableTimeSlots: [], isClosedDay: true }
+      }
+      rawSlots = generateTimeSlotsInRange(schedule.open_time, schedule.close_time)
     }
-    const dayIndex = getDay(new Date(scheduledDate + 'T00:00:00'))
-    const dayKey = DAY_INDEX_TO_KEY[dayIndex]
-    const schedule = openHours[dayKey]
-    if (!schedule.open) {
-      return { availableTimeSlots: [], isClosedDay: true }
+
+    // Filter out times already past (or within 30 min) when scheduling for today (PHT)
+    if (scheduledDate === todayPH) {
+      const nowPH = toZonedTime(new Date(), PH_TZ)
+      const cutoff = addMinutes(nowPH, 30)
+      const cutoffMins = cutoff.getHours() * 60 + cutoff.getMinutes()
+      rawSlots = rawSlots.filter((s) => {
+        const d = parse(s, 'h:mm a', new Date())
+        return d.getHours() * 60 + d.getMinutes() > cutoffMins
+      })
     }
-    return {
-      availableTimeSlots: generateTimeSlotsInRange(schedule.open_time, schedule.close_time),
-      isClosedDay: false,
-    }
+
+    return { availableTimeSlots: rawSlots, isClosedDay: false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderType, scheduledDate, stationSettings?.open_hours])
+  }, [orderType, scheduledDate, stationSettings?.open_hours, todayPH])
 
   const selectedZone = activeZones.find((z) => z.id === zoneId) ?? null
   const cartTotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0)
@@ -364,6 +377,14 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
       }))
     }
   }, [orderType, activeProducts, isDeliveryAddon])
+
+  // Clear scheduled time when it's no longer in available slots (e.g. user picks today, current time is past)
+  const scheduledTime = watchedFields.scheduled_time ?? ''
+  useEffect(() => {
+    if (availableTimeSlots.length > 0 && scheduledTime && !availableTimeSlots.includes(scheduledTime)) {
+      setValue('scheduled_time', availableTimeSlots[0])
+    }
+  }, [availableTimeSlots, scheduledTime, setValue])
 
   const hasCustomer = !!selectedCustomer || isNewCustomer
 
@@ -780,6 +801,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
                           <DatePickerInput
                             value={scheduledDate}
                             onChange={(v) => setValue('scheduled_date', v, { shouldValidate: true })}
+                            min={todayPH}
                           />
                         </div>
                         <div className="space-y-1">
