@@ -520,7 +520,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
       const savedSale = await onSubmit(insert)
 
       if ((values.order_type === 'delivery' || values.order_type === 'pickup') && scheduledAt && values.set_reminder) {
-        const reminderAt = new Date(new Date(scheduledAt).getTime() - 30 * 60 * 1000).toISOString()
+        const reminderAt = new Date(new Date(scheduledAt).getTime() - 15 * 60 * 1000).toISOString()
         await supabase.from('reminders').insert({
           station_id: stationId,
           sale_id: savedSale.id,
@@ -838,7 +838,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
                             <input type="checkbox" checked={field.value}
                               onChange={(e) => field.onChange(e.target.checked)}
                               className="h-4 w-4 rounded border-border accent-primary" />
-                            <span className="text-xs text-muted-foreground">Remind me 30 min before</span>
+                            <span className="text-xs text-muted-foreground">Remind me 15 min before</span>
                           </label>
                         )}
                       />
