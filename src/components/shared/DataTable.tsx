@@ -210,7 +210,7 @@ export function DataTable<T>({
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-border overflow-x-auto">
-        <table className={cn('w-full min-w-max text-sm', hasWidths && 'table-fixed')}>
+        <table className={cn('text-sm', hasWidths ? 'table-fixed w-full' : 'w-max min-w-full')}>
           {hasWidths && (
             <colgroup>
               {orderedVisibleCols.map((col) => (
