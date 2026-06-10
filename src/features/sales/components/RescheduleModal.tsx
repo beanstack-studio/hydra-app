@@ -2,14 +2,15 @@ import { useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { format, parse, addMinutes } from 'date-fns'
+import { format, parse, addMinutes, getDay } from 'date-fns'
 import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { PH_TZ, generateTimeSlots, formatDate, formatTime } from '@/lib/utils'
+import { PH_TZ, generateTimeSlots, generateTimeSlotsInRange, formatDate, formatTime } from '@/lib/utils'
+import type { StationSettings, DayKey } from '@/features/settings/types'
 import type { Sale } from '../types'
 
 const schema = z.object({
@@ -19,11 +20,14 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+const DAY_INDEX_TO_KEY: DayKey[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
 interface RescheduleModalProps {
-  sale:          Sale | null
-  isOpen:        boolean
-  onClose:       () => void
-  onReschedule:  (saleId: string, scheduledAt: string) => Promise<void>
+  sale:             Sale | null
+  isOpen:           boolean
+  onClose:          () => void
+  onReschedule:     (saleId: string, scheduledAt: string) => Promise<void>
+  stationSettings?: StationSettings | null
 }
 
 function timeToMins(t: string): number {
@@ -33,7 +37,7 @@ function timeToMins(t: string): number {
 
 const selectClass = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
-export function RescheduleModal({ sale, isOpen, onClose, onReschedule }: RescheduleModalProps) {
+export function RescheduleModal({ sale, isOpen, onClose, onReschedule, stationSettings }: RescheduleModalProps) {
   const { toast } = useToast()
 
   const nowPH    = toZonedTime(new Date(), PH_TZ)
@@ -77,11 +81,23 @@ export function RescheduleModal({ sale, isOpen, onClose, onReschedule }: Resched
     }
   }, [selectedDate, selectedTime, todayStr, cutoffMins, setValue])
 
-  const availableSlots = useMemo(() => {
-    const all = generateTimeSlots()
-    if (selectedDate === todayStr) return all.filter((s) => timeToMins(s) > cutoffMins)
-    return all
-  }, [selectedDate, todayStr, cutoffMins])
+  const { availableSlots, isClosedDay } = useMemo(() => {
+    const openHours = stationSettings?.open_hours
+    let slots: string[]
+    if (selectedDate && openHours) {
+      const dayIndex = getDay(new Date(selectedDate + 'T00:00:00'))
+      const dayKey = DAY_INDEX_TO_KEY[dayIndex]
+      const schedule = openHours[dayKey]
+      if (!schedule.open) return { availableSlots: [], isClosedDay: true }
+      slots = generateTimeSlotsInRange(schedule.open_time, schedule.close_time)
+    } else {
+      slots = generateTimeSlots()
+    }
+    if (selectedDate === todayStr) {
+      slots = slots.filter((s) => timeToMins(s) > cutoffMins)
+    }
+    return { availableSlots: slots, isClosedDay: false }
+  }, [selectedDate, todayStr, cutoffMins, stationSettings?.open_hours])
 
   const onSubmit = handleSubmit(async (values) => {
     if (!sale) return
@@ -132,28 +148,32 @@ export function RescheduleModal({ sale, isOpen, onClose, onReschedule }: Resched
 
           <div className="space-y-1.5">
             <Label>New Time</Label>
-            <Controller
-              name="time"
-              control={control}
-              render={({ field }) => (
-                <select
-                  value={field.value}
-                  onChange={field.onChange}
-                  className={selectClass}
-                  disabled={!selectedDate}
-                >
-                  <option value="">— Select —</option>
-                  {availableSlots.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              )}
-            />
+            {isClosedDay ? (
+              <p className="text-xs text-destructive py-1.5">Station closed this day</p>
+            ) : (
+              <Controller
+                name="time"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    value={field.value}
+                    onChange={field.onChange}
+                    className={selectClass}
+                    disabled={!selectedDate}
+                  >
+                    <option value="">— Select —</option>
+                    {availableSlots.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                )}
+              />
+            )}
             {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
           </div>
         </div>
 
-        {selectedDate === todayStr && availableSlots.length === 0 && (
+        {!isClosedDay && selectedDate === todayStr && availableSlots.length === 0 && (
           <p className="text-xs text-destructive">No times available today — must be at least 30 minutes from now.</p>
         )}
 

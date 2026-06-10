@@ -222,6 +222,7 @@ export default function SalesPage() {
         isOpen={!!reschedulingSale}
         onClose={() => setReschedulingSale(null)}
         onReschedule={rescheduleOrder}
+        stationSettings={settings?.stationSettings ?? null}
       />
 
       {/* Delete confirm dialog */}
