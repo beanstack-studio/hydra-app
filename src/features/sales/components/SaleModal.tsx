@@ -624,7 +624,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
 
           {/* ── Right: Order panel ─────────────────────────────────────── */}
           <div className={cn(
-            'w-full lg:w-80 xl:w-96 flex flex-col bg-background',
+            'w-full lg:w-80 xl:w-96 flex flex-col bg-background flex-1 min-h-0 lg:flex-none',
             activeTab !== 'cart' && 'hidden lg:flex'
           )}>
 
@@ -861,7 +861,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
 
             {/* Sticky footer */}
             {step === 1 && (
-              <div className="px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border shrink-0 space-y-3 bg-background">
+              <div className="px-4 py-3 border-t border-border shrink-0 space-y-3 bg-background">
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">Grand Total</span>
                   <span className="text-2xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
@@ -880,7 +880,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
             )}
 
             {step === 2 && (
-              <div className="px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border shrink-0 bg-background space-y-3">
+              <div className="px-4 py-3 border-t border-border shrink-0 bg-background space-y-3">
 
                 {/* Line 1: Total */}
                 <div className="flex items-baseline justify-between">
