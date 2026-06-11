@@ -117,7 +117,7 @@ export function AppShell() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto px-4 pt-2 pb-24 lg:p-6 lg:pb-6">
+        <main className="flex-1 overflow-y-auto px-4 pt-[0.75dvh] pb-24 lg:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
