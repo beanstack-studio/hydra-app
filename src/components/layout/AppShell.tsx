@@ -117,7 +117,7 @@ export function AppShell() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 pb-24 lg:p-6 lg:pb-6">
+        <main className="flex-1 overflow-y-auto p-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] lg:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
