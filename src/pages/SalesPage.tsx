@@ -65,7 +65,7 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
 export default function SalesPage() {
   const { toast } = useToast()
   const role = useAuthStore((s) => s.role)
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('sales', ['product', 'remarks'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues, setFilterValues } = useTablePrefs('sales', ['product', 'remarks'])
   const [isSaleModalOpen,   setIsSaleModalOpen]   = useState(false)
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
@@ -73,7 +73,6 @@ export default function SalesPage() {
   const [deletingSale,      setDeletingSale]      = useState<Sale | null>(null)
   const [isDeleting,        setIsDeleting]        = useState(false)
   const [search,            setSearch]            = useState('')
-  const [filters,           setFilters]           = useState<Record<string, string>>({})
 
   const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
   const { data: customers } = useCustomers()
@@ -92,8 +91,8 @@ export default function SalesPage() {
 
   const filteredSales = sales
     .filter((s) => {
-      if (filters.status     && filters.status     !== s.status)     return false
-      if (filters.order_type && filters.order_type !== s.order_type) return false
+      if (filterValues.status     && filterValues.status     !== s.status)     return false
+      if (filterValues.order_type && filterValues.order_type !== s.order_type) return false
       return true
     })
     .filter((s) =>
@@ -179,9 +178,9 @@ export default function SalesPage() {
         />
         <TableOptionsButton
           filterGroups={SALE_FILTER_GROUPS}
-          filterValue={filters}
-          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onFilterReset={() => setFilters({})}
+          filterValue={filterValues}
+          onFilterChange={(key, val) => setFilterValues({ ...filterValues, [key]: val })}
+          onFilterReset={() => setFilterValues({})}
           hiddenKeys={hiddenKeys}
           onToggleColumn={toggleColumn}
           exportColumns={SALES_EXPORT_COLUMNS}
@@ -210,6 +209,8 @@ export default function SalesPage() {
           hiddenKeys={hiddenKeys}
           columnWidths={columnWidths}
           onColumnResize={onColumnResize}
+          columnOrder={columnOrder}
+          onColumnReorder={onColumnReorder}
         />
       )}
 

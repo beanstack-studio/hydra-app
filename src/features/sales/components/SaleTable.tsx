@@ -51,6 +51,8 @@ interface SaleTableProps {
   hiddenKeys?: Set<string>
   columnWidths?: Record<string, number>
   onColumnResize?: (key: string, width: number) => void
+  columnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
 export function SaleTable({
@@ -61,6 +63,8 @@ export function SaleTable({
   hiddenKeys,
   columnWidths,
   onColumnResize,
+  columnOrder,
+  onColumnReorder,
 }: SaleTableProps) {
   const [sortKey, setSortKey] = useState<SaleSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -208,6 +212,8 @@ export function SaleTable({
       hiddenKeys={hiddenKeys}
       columnWidths={columnWidths}
       onColumnResize={onColumnResize}
+      externalColumnOrder={columnOrder}
+      onColumnReorder={onColumnReorder}
       emptyState={
         <EmptyState
           icon={<ShoppingCart className="h-8 w-8" />}

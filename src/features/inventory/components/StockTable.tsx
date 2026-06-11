@@ -27,9 +27,11 @@ interface StockTableProps {
   isLoading: boolean
   onAdjustClick: (item: InventoryItem) => void
   onQuickAdjust: (item: InventoryItem, delta: number) => void
+  columnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
-export function StockTable({ items, isLoading, onAdjustClick, onQuickAdjust }: StockTableProps) {
+export function StockTable({ items, isLoading, onAdjustClick, onQuickAdjust, columnOrder, onColumnReorder }: StockTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -125,6 +127,8 @@ export function StockTable({ items, isLoading, onAdjustClick, onQuickAdjust }: S
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
+        externalColumnOrder={columnOrder}
+        onColumnReorder={onColumnReorder}
         rowClassName={(item) => {
           if (item.status === 'out_of_stock') return 'bg-destructive/5'
           if (item.status === 'low_stock') return 'bg-yellow-50 dark:bg-yellow-950/20'

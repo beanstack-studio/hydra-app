@@ -66,7 +66,7 @@ const BILL_TYPE_LABELS: Record<string, string> = {
 export function BillTable() {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('bills', ['description'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder } = useTablePrefs('bills', ['description'])
   const { data, isLoading, error, month, year, setMonth, setYear, addBill, updateBill, deleteBill, payBill } = useBills()
 
   const currentYear = nowPH().getFullYear()
@@ -332,6 +332,8 @@ export function BillTable() {
         hiddenKeys={hiddenKeys}
         columnWidths={columnWidths}
         onColumnResize={onColumnResize}
+        externalColumnOrder={columnOrder}
+        onColumnReorder={onColumnReorder}
         emptyState={
           <EmptyState
             icon={<FileText className="h-8 w-8" />}

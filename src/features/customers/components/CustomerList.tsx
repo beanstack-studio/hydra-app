@@ -41,6 +41,8 @@ interface CustomerListProps {
   hiddenKeys?: Set<string>
   columnWidths?: Record<string, number>
   onColumnResize?: (key: string, width: number) => void
+  columnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
 export function CustomerList({
@@ -50,6 +52,8 @@ export function CustomerList({
   hiddenKeys,
   columnWidths,
   onColumnResize,
+  columnOrder,
+  onColumnReorder,
 }: CustomerListProps) {
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<CustomerSortKey>('name')
@@ -166,6 +170,8 @@ export function CustomerList({
       hiddenKeys={hiddenKeys}
       columnWidths={columnWidths}
       onColumnResize={onColumnResize}
+      externalColumnOrder={columnOrder}
+      onColumnReorder={onColumnReorder}
       emptyState={
         <EmptyState
           icon={<Users className="h-8 w-8" />}

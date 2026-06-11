@@ -44,14 +44,13 @@ import type { Customer } from '@/features/customers/types'
 export default function CustomersPage() {
   const plan = usePlan()
   const { toast } = useToast()
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('customers', ['messenger'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues, setFilterValues } = useTablePrefs('customers', ['messenger'])
   const navigate = useNavigate()
   const [isModalOpen,  setIsModalOpen]  = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filters,     setFilters]     = useState<Record<string, string>>({})
 
   const { data, isLoading, error, addCustomer, updateCustomer, deleteCustomer } = useCustomers()
 
@@ -59,7 +58,7 @@ export default function CustomersPage() {
 
   const filteredCustomers = data
     .filter((c) => {
-      if (filters.type && filters.type !== c.type) return false
+      if (filterValues.type && filterValues.type !== c.type) return false
       return true
     })
     .filter((c) =>
@@ -112,9 +111,9 @@ export default function CustomersPage() {
         />
         <TableOptionsButton
           filterGroups={CUSTOMER_FILTER_GROUPS}
-          filterValue={filters}
-          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onFilterReset={() => setFilters({})}
+          filterValue={filterValues}
+          onFilterChange={(key, val) => setFilterValues({ ...filterValues, [key]: val })}
+          onFilterReset={() => setFilterValues({})}
           hiddenKeys={hiddenKeys}
           onToggleColumn={toggleColumn}
           exportColumns={CUSTOMER_EXPORT_COLUMNS}
@@ -139,6 +138,8 @@ export default function CustomersPage() {
           hiddenKeys={hiddenKeys}
           columnWidths={columnWidths}
           onColumnResize={onColumnResize}
+          columnOrder={columnOrder}
+          onColumnReorder={onColumnReorder}
         />
       )}
 

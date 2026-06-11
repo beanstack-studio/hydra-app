@@ -38,6 +38,9 @@ interface DataTableProps<T> {
   onColumnResize?: (key: string, width: number) => void
   // Enables column drag-to-reorder with localStorage persistence
   tableId?: string
+  // Controlled column order from useTablePrefs (for cross-device sync)
+  externalColumnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
 const MIN_COL_WIDTH = 80
@@ -57,6 +60,8 @@ export function DataTable<T>({
   columnWidths,
   onColumnResize,
   tableId,
+  externalColumnOrder,
+  onColumnReorder,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0)
 
@@ -74,7 +79,8 @@ export function DataTable<T>({
     if (tableId) {
       try { localStorage.setItem(`table-order-${tableId}`, JSON.stringify(order)) } catch {}
     }
-  }, [tableId])
+    onColumnReorder?.(order)
+  }, [tableId, onColumnReorder])
 
   // ── Column drag state ─────────────────────────────────────────────────────
   const [dragColKey, setDragColKey]   = useState<string | null>(null)
@@ -183,11 +189,15 @@ export function DataTable<T>({
   const nonActionCols = visibleCols.filter((c) => c.key !== 'actions')
   const actionsCols   = visibleCols.filter((c) => c.key === 'actions')
 
-  const orderedVisibleCols: Column<T>[] = tableId && columnOrder.length > 0
+  const effectiveColumnOrder = externalColumnOrder && externalColumnOrder.length > 0
+    ? externalColumnOrder
+    : columnOrder
+
+  const orderedVisibleCols: Column<T>[] = tableId && effectiveColumnOrder.length > 0
     ? [
         ...[...nonActionCols].sort((a, b) => {
-          const ai = columnOrder.indexOf(a.key)
-          const bi = columnOrder.indexOf(b.key)
+          const ai = effectiveColumnOrder.indexOf(a.key)
+          const bi = effectiveColumnOrder.indexOf(b.key)
           if (ai === -1 && bi === -1) return 0
           if (ai === -1) return 1
           if (bi === -1) return -1

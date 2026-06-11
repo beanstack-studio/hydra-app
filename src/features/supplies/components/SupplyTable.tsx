@@ -50,6 +50,8 @@ interface SupplyTableProps {
   hiddenKeys?:   Set<string>
   columnWidths?: Record<string, number>
   onColumnResize?: (key: string, width: number) => void
+  columnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
 export function SupplyTable({
@@ -62,6 +64,8 @@ export function SupplyTable({
   hiddenKeys,
   columnWidths,
   onColumnResize,
+  columnOrder,
+  onColumnReorder,
 }: SupplyTableProps) {
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
@@ -221,6 +225,8 @@ export function SupplyTable({
         hiddenKeys={hiddenKeys}
         columnWidths={columnWidths}
         onColumnResize={onColumnResize}
+        externalColumnOrder={columnOrder}
+        onColumnReorder={onColumnReorder}
         rowClassName={(item) => {
           const status = computeStatus(item.qty, item.threshold)
           if (status === 'out_of_stock') return 'bg-destructive/5'

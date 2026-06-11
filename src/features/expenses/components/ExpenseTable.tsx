@@ -49,6 +49,8 @@ interface ExpenseTableProps {
   hiddenKeys?: Set<string>
   columnWidths?: Record<string, number>
   onColumnResize?: (key: string, width: number) => void
+  columnOrder?: string[]
+  onColumnReorder?: (order: string[]) => void
 }
 
 export function ExpenseTable({
@@ -60,6 +62,8 @@ export function ExpenseTable({
   hiddenKeys,
   columnWidths,
   onColumnResize,
+  columnOrder,
+  onColumnReorder,
 }: ExpenseTableProps) {
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [sortKey, setSortKey] = useState<ExpenseSortKey>('date')
@@ -223,6 +227,8 @@ export function ExpenseTable({
       hiddenKeys={hiddenKeys}
       columnWidths={columnWidths}
       onColumnResize={onColumnResize}
+      externalColumnOrder={columnOrder}
+      onColumnReorder={onColumnReorder}
       emptyState={
         <EmptyState
           icon={<Receipt className="h-8 w-8" />}

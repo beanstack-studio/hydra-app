@@ -105,7 +105,7 @@ export function ReminderModal({ reminders, onDismiss }: ReminderModalProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 px-4 pb-4">
+        <div className="flex flex-col sm:flex-row gap-2 px-4 pb-4">
           <Button variant="outline" size="sm" className="flex-1" onClick={handleSnooze}>
             <Clock className="h-3.5 w-3.5 mr-1" />
             Snooze 5m

@@ -70,13 +70,12 @@ const EXPENSE_EXPORT_COLUMNS: ExportColumnDef[] = [
 export default function ExpensesPage() {
   const { toast } = useToast()
   const role    = useAuthStore((s) => s.role)
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('expenses', ['remarks'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues: expenseFilters, setFilterValues: setExpenseFilters } = useTablePrefs('expenses', ['remarks'])
   const plan    = usePlan()
   const isOwner = role === 'owner'
   const isFree  = plan === 'free'
   const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
   const [expenseSearch,  setExpenseSearch]  = useState('')
-  const [expenseFilters, setExpenseFilters] = useState<Record<string, string>>({})
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null)
@@ -227,7 +226,7 @@ export default function ExpensesPage() {
               <TableOptionsButton
                 filterGroups={expenseFilterGroups}
                 filterValue={expenseFilters}
-                onFilterChange={(key, val) => setExpenseFilters((prev) => ({ ...prev, [key]: val }))}
+                onFilterChange={(key, val) => setExpenseFilters({ ...expenseFilters, [key]: val })}
                 onFilterReset={() => setExpenseFilters({})}
                 hiddenKeys={hiddenKeys}
                 onToggleColumn={toggleColumn}
@@ -253,6 +252,8 @@ export default function ExpensesPage() {
                 hiddenKeys={hiddenKeys}
                 columnWidths={columnWidths}
                 onColumnResize={onColumnResize}
+                columnOrder={columnOrder}
+                onColumnReorder={onColumnReorder}
               />
             )}
           </>

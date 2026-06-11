@@ -33,7 +33,7 @@ import type { Supply, SupplyInput } from '@/features/supplies/types'
 export default function InventoryPage() {
   const plan    = usePlan()
   const role    = useAuthStore((s) => s.role)
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize } = useTablePrefs('inventory', ['threshold', 'price_per_unit'])
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues, setFilterValues } = useTablePrefs('inventory', ['threshold', 'price_per_unit'])
   const isOwner = role === 'owner' || role === 'super_admin'
   const { toast } = useToast()
 
@@ -42,7 +42,6 @@ export default function InventoryPage() {
   const [supplyModalOpen, setSupplyModalOpen] = useState(false)
   const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
   const [search,          setSearch]          = useState('')
-  const [filters,         setFilters]         = useState<Record<string, string>>({})
 
   const products = settings?.products ?? []
 
@@ -78,12 +77,12 @@ export default function InventoryPage() {
 
   const filteredSupplies = supplies
     .filter((s) => {
-      if (filters.status) {
+      if (filterValues.status) {
         const status = computeStatus(s.qty, s.threshold)
-        if (filters.status !== status) return false
+        if (filterValues.status !== status) return false
       }
-      if (filters.store   && s.store !== filters.store)                       return false
-      if (filters.product && s.linked_product_id !== filters.product)         return false
+      if (filterValues.store   && s.store !== filterValues.store)                       return false
+      if (filterValues.product && s.linked_product_id !== filterValues.product)         return false
       return true
     })
     .filter((s) =>
@@ -135,9 +134,9 @@ export default function InventoryPage() {
         />
         <TableOptionsButton
           filterGroups={inventoryFilterGroups}
-          filterValue={filters}
-          onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
-          onFilterReset={() => setFilters({})}
+          filterValue={filterValues}
+          onFilterChange={(key, val) => setFilterValues({ ...filterValues, [key]: val })}
+          onFilterReset={() => setFilterValues({})}
           hiddenKeys={hiddenKeys}
           onToggleColumn={toggleColumn}
           exportColumns={INVENTORY_EXPORT_COLUMNS}
@@ -165,6 +164,8 @@ export default function InventoryPage() {
         hiddenKeys={hiddenKeys}
         columnWidths={columnWidths}
         onColumnResize={onColumnResize}
+        columnOrder={columnOrder}
+        onColumnReorder={onColumnReorder}
       />
 
 
