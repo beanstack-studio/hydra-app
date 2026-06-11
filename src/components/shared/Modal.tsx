@@ -16,7 +16,7 @@ const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
   sm: 'lg:max-w-lg',
   md: 'lg:max-w-2xl',
   lg: 'lg:max-w-4xl',
-  xl: 'lg:max-w-6xl lg:h-[85dvh]',
+  xl: 'h-[90dvh] lg:max-w-6xl lg:h-[85dvh]',
 }
 
 export function Modal({
@@ -71,7 +71,7 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className={noPadding ? 'flex-1 min-h-0 overflow-hidden' : 'overflow-y-auto flex-1 px-5 py-4'}>{children}</div>
+        <div className={noPadding ? 'flex-1 min-h-0 overflow-hidden' : 'overflow-y-auto flex-1 min-h-0 px-5 py-4'}>{children}</div>
       </div>
     </div>,
     document.body
