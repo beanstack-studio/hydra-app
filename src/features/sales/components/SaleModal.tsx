@@ -35,10 +35,7 @@ const saleSchema = z.object({
   scheduled_time: z.string(),
   delivery_address: z.string(),
   payment_mode: z.enum(['cash', 'gcash', 'maya']),
-  amount_received: z.preprocess(
-    (v) => (v === undefined || v === null || (typeof v === 'number' && isNaN(v as number)) ? 0 : v),
-    z.number().min(0)
-  ),
+  amount_received: z.number().min(0),
   sale_date: z.string().min(1, 'Sale date is required'),
   remarks: z.string(),
   set_reminder: z.boolean(),
@@ -161,7 +158,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
   const hasAddonProducts = activeProducts.some((p) => p.type === 'addon')
   const hasDeliveryAddonProducts = activeProducts.some((p) => p.type === 'addon' && p.name.toLowerCase().includes('delivery'))
   const activeZones = deliveryZones.filter((z) => z.is_active)
-  const containerEnabled = stationSettings?.container_fee_enabled ?? false
   const containerPrice = stationSettings?.container_fee_price ?? 0
 
   const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
@@ -212,7 +208,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
   const cEnabled = watchedFields.container_enabled ?? false
   const cQty = watchedFields.container_qty ?? 1
   const zoneId = watchedFields.delivery_zone_id ?? null
-  const paymentMode = watchedFields.payment_mode ?? 'cash'
   const orderType = watchedFields.order_type ?? 'walk-in'
   const discount = watchedFields.discount ?? 0
   const scheduledDate = watchedFields.scheduled_date ?? ''

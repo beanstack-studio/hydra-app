@@ -71,7 +71,6 @@ export function useExpenses(): UseExpensesReturn {
     let receipt_url: string | null = input.receipt_url ?? null
     if (file) receipt_url = await uploadReceipt(file)
 
-    let inventoryItemId = input.inventory_item_id ?? null
     let itemLabel = CATEGORY_ITEM_LABELS[input.category] ?? input.category
     const supplyQty = input.supply_qty ?? 0
 
@@ -93,7 +92,6 @@ export function useExpenses(): UseExpensesReturn {
           units_per_sale: 1,
           linked_product_id: null,
         }).select('id').single()
-        if (newSupply) inventoryItemId = (newSupply as { id: string }).id
         itemLabel = input.new_supply_name
       } else if (input.supply_id) {
         // Update existing supply — add qty, recalculate price, update store + date
@@ -106,7 +104,6 @@ export function useExpenses(): UseExpensesReturn {
             last_purchased_at: input.expense_date,
             ...(input.supply_store ? { store: input.supply_store } : {}),
           }).eq('id', input.supply_id)
-          inventoryItemId = input.supply_id
         }
         itemLabel = input.supply_name ?? itemLabel
       }

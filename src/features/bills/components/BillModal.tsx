@@ -35,11 +35,8 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const billSchema = z.object({
-  bill_type: z.string().refine(
-    (v): v is BillType => (['electricity', 'water', 'internet', 'rent', 'other'] as string[]).includes(v),
-    { message: 'Select a category' }
-  ),
-  amount:         z.number({ invalid_type_error: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
+  bill_type: z.string().min(1, 'Select a category'),
+  amount:    z.number({ message: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
   due_date:       z.string().nullable(),
   date_paid:      z.string().nullable(),
   payment_method: z.string().nullable(),
@@ -70,7 +67,7 @@ interface AttachRowProps {
   onSelect: (file: File) => void
   onClearNew: () => void
   onClearExisting: () => void
-  inputRef: React.RefObject<HTMLInputElement>
+  inputRef: React.RefObject<HTMLInputElement | null>
 }
 
 function AttachRow({
@@ -193,7 +190,7 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const input: BillInput = {
-        bill_type:      values.bill_type,
+        bill_type:      values.bill_type as BillType,
         amount:         values.amount,
         month,
         year,

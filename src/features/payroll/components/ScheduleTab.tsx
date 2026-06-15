@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarDays, User } from 'lucide-react'
+import { User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ScheduleModal } from './ScheduleModal'

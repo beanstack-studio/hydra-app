@@ -40,11 +40,7 @@ const NEW_ITEM_VALUE = '__new__'
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const expenseSchema = z.object({
-  category:          z.string().refine(
-    (v): v is ExpenseCategory =>
-      (['gasoline', 'supplies', 'maintenance', 'other', 'labor'] as string[]).includes(v),
-    { message: 'Select a category' }
-  ),
+  category:          z.string().min(1, 'Select a category'),
   expense_date:      z.string().min(1, 'Date is required'),
   amount:            z.number({ message: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
   payment_method:    z.enum(['cash', 'gcash', 'maya', 'credit_card', 'other']).nullable(),
@@ -181,7 +177,7 @@ export function ExpenseModal({ isOpen, onClose, expense, supplies, onAdd, onUpda
         : null
 
       const baseInput: ExpenseInput = {
-        category:        values.category,
+        category:        values.category as ExpenseCategory,
         amount:          values.amount,
         expense_date:    values.expense_date,
         payment_method:  values.payment_method,

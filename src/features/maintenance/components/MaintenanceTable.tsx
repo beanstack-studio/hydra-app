@@ -58,7 +58,7 @@ export function MaintenanceTable() {
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
   }
 
-  const thCls = (key: MaintenanceSortKey) => cn(
+  const thCls = (_key: MaintenanceSortKey) => cn(
     'px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-foreground transition-colors duration-150'
   )
 

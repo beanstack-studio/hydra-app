@@ -19,10 +19,7 @@ const staffSchema = z.object({
   full_name: z.string().min(1, 'Name is required'),
   phone:     z.string().optional(),
   email:     z.string().email('Enter a valid email').optional().or(z.literal('')),
-  pay_rate:  z.preprocess(
-    (v) => (v === '' || v === null || v === undefined) ? null : Number(v),
-    z.number().min(0).nullable()
-  ),
+  pay_rate:  z.number().min(0).nullable(),
 })
 
 type StaffSchema = z.infer<typeof staffSchema>
@@ -59,7 +56,7 @@ export function StaffProfileModal({
     formState: { errors, isSubmitting },
   } = useForm<StaffSchema>({
     resolver: zodResolver(staffSchema),
-    defaultValues: { pay_type: 'daily', pay_rate: null },
+    defaultValues: { pay_rate: null },
   })
 
   const watchedEmail   = watch('email')
@@ -210,7 +207,7 @@ export function StaffProfileModal({
               min="0"
               className="pl-7"
               placeholder="0.00"
-              {...register('pay_rate')}
+              {...register('pay_rate', { setValueAs: (v: string) => v === '' || v == null ? null : parseFloat(v) })}
             />
           </div>
           {rateLabel && (

@@ -21,11 +21,8 @@ const PAYMENT_MODES: { value: 'cash' | 'gcash' | 'maya'; label: string }[] = [
 
 const paymentSchema = z.object({
   paid_at: z.string().min(1, 'Payment date is required'),
-  amount:  z.number({ invalid_type_error: 'Enter a valid amount' }).min(0.01, 'Amount must be greater than 0'),
-  payment_mode: z.string().refine(
-    (v): v is 'cash' | 'gcash' | 'maya' => ['cash', 'gcash', 'maya'].includes(v),
-    { message: 'Select a payment mode' }
-  ),
+  amount:  z.number({ message: 'Enter a valid amount' }).min(0.01, 'Amount must be greater than 0'),
+  payment_mode: z.string().min(1, 'Select a payment mode'),
   remarks: z.string(),
 })
 

@@ -14,10 +14,7 @@ const adjustSchema = z.object({
   available_qty:  z.number({ error: 'Enter a valid number' }).min(0, 'Cannot be negative'),
   threshold:      z.number({ error: 'Enter a valid number' }).min(0, 'Cannot be negative'),
   log_as_expense: z.boolean(),
-  expense_amount: z.preprocess(
-    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && isNaN(v as number))) ? null : Number(v),
-    z.number().min(0).nullable()
-  ),
+  expense_amount: z.number().min(0).nullable(),
 })
 
 type AdjustSchema = z.infer<typeof adjustSchema>
@@ -133,7 +130,7 @@ export function StockAdjustModal({ item, isOpen, onClose, onAdjust }: StockAdjus
                     min="0"
                     className="pl-7"
                     placeholder="0.00"
-                    {...register('expense_amount')}
+                    {...register('expense_amount', { setValueAs: (v: string) => v === '' || v == null ? null : parseFloat(v) })}
                   />
                 </div>
                 {errors.expense_amount && <p className="text-xs text-destructive">{errors.expense_amount.message}</p>}

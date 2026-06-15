@@ -78,7 +78,7 @@ interface ItemFormModalProps {
 function ItemFormModal({
   isOpen, onClose,
   editingProduct, editingZone, defaultType,
-  onAddProduct, onUpdateProduct, onAddZone, onUpdateZone,
+  onAddProduct, onUpdateProduct, onAddZone: _onAddZone, onUpdateZone,
 }: ItemFormModalProps) {
   const { toast } = useToast()
   const stationId = useAuthStore((s) => s.stationId)
@@ -366,7 +366,7 @@ function ItemRow({ label, sub, onEdit, onDelete, inactive }: ItemRowProps) {
 
 export function ProductsTab({
   products,
-  deliveryZones,
+  deliveryZones: _deliveryZones,
   stationSettings,
   isLoading,
   onAddProduct,
@@ -418,13 +418,6 @@ export function ProductsTab({
     setEditingProduct(p)
     setEditingZone(null)
     setDefaultType(p.type as ItemType)
-    setItemModalOpen(true)
-  }
-
-  const openEditZone = (z: DeliveryZone) => {
-    setEditingZone(z)
-    setEditingProduct(null)
-    setDefaultType('addon')
     setItemModalOpen(true)
   }
 

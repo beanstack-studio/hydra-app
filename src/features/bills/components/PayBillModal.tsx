@@ -8,7 +8,7 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { formatCurrency, formatDate, nowPH, PH_TZ } from '@/lib/utils'
+import { formatCurrency, PH_TZ } from '@/lib/utils'
 import { formatInTimeZone } from 'date-fns-tz'
 import type { Bill } from '../types'
 
@@ -62,14 +62,11 @@ export function PayBillModal({ bill, isOpen, onClose, onPay }: PayBillModalProps
     control,
     handleSubmit,
     reset,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<PayBillSchema>({
     resolver: zodResolver(payBillSchema),
     defaultValues: { paid_at: todayPH, payment_method: '' },
   })
-
-  const paidAt = watch('paid_at')
 
   useEffect(() => {
     if (!isOpen) return
