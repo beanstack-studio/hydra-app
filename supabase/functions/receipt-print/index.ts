@@ -10,13 +10,7 @@ interface TextLine {
   format: number
 }
 
-interface ImageLine {
-  type: 1
-  path: string
-  align: number
-}
-
-type ReceiptLine = TextLine | ImageLine
+type ReceiptLine = TextLine
 
 interface CartItem {
   product_name: string
@@ -27,6 +21,7 @@ interface CartItem {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DIVIDER = '--------------------------------'
+const LINE_WIDTH = 32  // 58mm paper; change to 48 for 80mm
 
 // Allow unauthenticated requests — fetched by Bluetooth Print app, no auth headers
 const CORS = {
@@ -55,8 +50,8 @@ function formatPHDateTime(dateStr: string): string {
   const dp: Record<string, string> = {}
   for (const p of dateParts) dp[p.type] = p.value
 
-  // Replace narrow no-break space (U+202F) that Intl inserts before AM/PM —
-  // it corrupts to â€¯ when the receiver treats the UTF-8 bytes as Latin-1
+  // Replace narrow no-break space (U+202F) Intl inserts before AM/PM —
+  // corrupts to â€¯ when receiver treats UTF-8 bytes as Latin-1
   const time = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     hour: 'numeric',
@@ -66,8 +61,6 @@ function formatPHDateTime(dateStr: string): string {
 
   return `${dp.day}-${dp.month}-${dp.year} ${time}`
 }
-
-const LINE_WIDTH = 32  // 58mm paper; change to 48 for 80mm
 
 function padLine(left: string, right: string, width = LINE_WIDTH): string {
   const gap = width - left.length - right.length
@@ -82,16 +75,8 @@ function txt(content: string, bold = 0, align = 0, format = 0): TextLine {
   return { type: 0, content, bold, align, format }
 }
 
-function img(path: string, align = 1): ImageLine {
-  return { type: 1, path, align }
-}
-
 function blank(): TextLine {
-  return { type: 0, content: '', bold: 0, align: 0, format: 0 }
-}
-
-function divider(): TextLine {
-  return txt(DIVIDER)
+  return txt('', 0, 0, 0)
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -131,141 +116,117 @@ Deno.serve(async (req) => {
   }
 
   // ── Fetch station + settings in parallel ───────────────────────────────────
-  // stations.photo_url  = logo image
-  // station_settings.*  = business_address, business_phone (log all cols to debug)
   const [{ data: station }, { data: settings }] = await Promise.all([
-    supabase
-      .from('stations')
-      .select('name, photo_url')
-      .eq('id', sale.station_id)
-      .single(),
-    supabase
-      .from('station_settings')
-      .select('*')
-      .eq('station_id', sale.station_id)
-      .maybeSingle(),
+    supabase.from('stations').select('name, photo_url').eq('id', sale.station_id).single(),
+    supabase.from('station_settings').select('*').eq('station_id', sale.station_id).maybeSingle(),
   ])
 
-  // Log full rows so column names are visible in Supabase function logs
   console.log('station:', JSON.stringify(station))
   console.log('station_settings:', JSON.stringify(settings))
 
   // ── Resolve items ──────────────────────────────────────────────────────────
-  // Use items JSONB array when present; fall back to single-product columns
-  // (older sales recorded before multi-item support)
   const items: CartItem[] =
     Array.isArray(sale.items) && sale.items.length > 0
       ? (sale.items as CartItem[])
       : [{
           product_name: sale.product_name as string,
-          qty: sale.qty as number,
-          price: sale.price_per_piece as number,
+          qty:          sale.qty          as number,
+          price:        sale.price_per_piece as number,
         }]
 
-  // ── Order number — last 6 chars of UUID, uppercase ─────────────────────────
-  const orderNum = `#${(txnId as string).slice(-6).toUpperCase()}`
-
-  // ── Date/time shown on receipt (paid_at preferred, falls back to sale_date) ─
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const orderNum       = `#${(txnId as string).slice(-6).toUpperCase()}`
   const receiptDateTime = formatPHDateTime(
     (sale.paid_at as string | null) ?? (sale.sale_date as string)
   )
 
-  // Logo from stations.photo_url (set in Business Settings → profile photo)
-  const logoUrl        = (station?.photo_url as string | null | undefined) ?? null
   const stationName    = (station?.name ?? 'Water Station') as string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const s              = settings as Record<string, any> | null
   const stationAddress = (s?.business_address as string | null | undefined) ?? null
   const stationPhone   = (s?.business_phone   as string | null | undefined) ?? null
+  const stationEmail   = (s?.business_email   as string | null | undefined) ?? null
 
-  // ── Build receipt ──────────────────────────────────────────────────────────
-  const receipt: ReceiptLine[] = []
+  // ── Build entries (exact order — do not reorder) ───────────────────────────
+  const entries: ReceiptLine[] = []
 
-  // 1. Logo — from stations.photo_url
-  if (logoUrl?.trim()) receipt.push(img(logoUrl, 1))
+  // 1. Station name
+  entries.push(txt(stationName, 1, 1, 2))
 
-  // 2. Empty line
-  receipt.push(blank())
+  // 2. Address
+  if (stationAddress?.trim()) entries.push(txt(stationAddress, 0, 1, 0))
 
-  // 3. Station name
-  receipt.push(txt(stationName, 1, 1, 2))   // bold | centered | double-width
+  // 3. Phone
+  if (stationPhone?.trim()) entries.push(txt(stationPhone, 0, 1, 0))
 
-  // 4. Address
-  if (stationAddress?.trim()) receipt.push(txt(stationAddress, 0, 1, 0))
+  // 4. Email
+  if (stationEmail?.trim()) entries.push(txt(stationEmail, 0, 1, 0))
 
-  // 5. Phone
-  if (stationPhone?.trim()) receipt.push(txt(stationPhone, 0, 1, 0))
+  // 5. Empty line
+  entries.push(blank())
 
-  // 7. Empty line
-  receipt.push(blank())
+  // 6. Order number
+  entries.push(txt(`ORDER ${orderNum}`, 0, 1, 0))
 
-  // 8. Order number
-  receipt.push(txt(`ORDER ${orderNum}`, 0, 1, 0))
+  // 7. Paid date/time PHT
+  entries.push(txt(receiptDateTime, 0, 1, 0))
 
-  // 9. Date/time paid
-  receipt.push(txt(receiptDateTime, 0, 1, 0))
+  // 8. Divider
+  entries.push(txt(DIVIDER, 0, 0, 0))
 
-  // 10. Divider
-  receipt.push(divider())
-
-  // 11. Items
+  // 9+. Items
   for (const item of items) {
     const subtotal = item.qty * item.price
-    const qtyLine  = `${item.qty} x ${formatCurrency(item.price)}`
-    receipt.push(txt(truncate(item.product_name), 1, 0, 0))
-    receipt.push(txt(padLine(qtyLine, formatCurrency(subtotal)), 0, 0, 0))
+    entries.push(txt(truncate(item.product_name), 1, 0, 0))
+    entries.push(txt(padLine(`  ${item.qty} x ${formatCurrency(item.price)}`, formatCurrency(subtotal)), 0, 0, 0))
   }
 
-  // 12. Container fee
+  // Container fee
   if (sale.container_enabled && (sale.container_qty as number) > 0) {
     const subtotal = (sale.container_qty as number) * (sale.container_price as number)
-    const qtyLine  = `${sale.container_qty} x ${formatCurrency(sale.container_price as number)}`
-    receipt.push(txt('Container', 1, 0, 0))
-    receipt.push(txt(padLine(qtyLine, formatCurrency(subtotal)), 0, 0, 0))
+    entries.push(txt(padLine('  Container fee', formatCurrency(subtotal)), 0, 0, 0))
   }
 
-  // 13. Delivery zone fee
+  // Delivery fee
   if (sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0) {
-    const zoneName = truncate(`Delivery (${sale.delivery_zone_name})`)
-    receipt.push(txt(padLine(zoneName, formatCurrency(sale.delivery_zone_price as number)), 0, 0, 0))
+    entries.push(txt(padLine('  Delivery fee', formatCurrency(sale.delivery_zone_price as number)), 0, 0, 0))
   }
 
-  // 14. Divider
-  receipt.push(divider())
+  // Divider
+  entries.push(txt(DIVIDER, 0, 0, 0))
 
-  // 15. Total
-  receipt.push(txt(padLine('TOTAL:', formatCurrency(sale.total_amount as number)), 1, 0, 0))
+  // TOTAL
+  entries.push(txt(padLine('TOTAL:', formatCurrency(sale.total_amount as number)), 1, 0, 0))
 
-  // 16. Payment method
-  receipt.push(txt(padLine('Payment:', (sale.payment_mode as string).toUpperCase()), 0, 0, 0))
+  // Payment
+  entries.push(txt(padLine('Payment:', (sale.payment_mode as string).toUpperCase()), 0, 0, 0))
 
-  // 17. Delivery / Pickup details
+  // Delivery / Pickup details
   if (sale.order_type === 'delivery' || sale.order_type === 'pickup') {
     const label = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
     if (sale.delivery_address) {
-      receipt.push(txt(`${label} address: ${sale.delivery_address}`, 0, 0, 0))
+      entries.push(txt(`${label} address: ${sale.delivery_address}`, 0, 0, 0))
     }
     if (sale.scheduled_at) {
-      receipt.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`, 0, 0, 0))
+      entries.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`, 0, 0, 0))
     }
   }
 
-  // 18. Remarks
+  // Remarks
   if (sale.remarks) {
-    receipt.push(txt(`Remarks: ${sale.remarks}`, 0, 0, 0))
+    entries.push(txt(`Remarks: ${sale.remarks}`, 0, 0, 0))
   }
 
-  // 19. Empty line
-  receipt.push(blank())
+  // Empty line
+  entries.push(blank())
 
-  // 20. Thank you
-  receipt.push(txt('Thank you for your order!', 0, 1, 0))
+  // Thank you
+  entries.push(txt('Thank you for your order!', 0, 1, 0))
 
-  // 21. Empty line (paper feed)
-  receipt.push(blank())
+  // Empty line (paper feed)
+  entries.push(blank())
 
-  // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT format — an object with
-  // numeric string keys, not a plain array
-  const receiptObj = Object.fromEntries(receipt.map((v, i) => [i, v]))
-  return new Response(JSON.stringify(receiptObj), { headers: JSON_HEADERS })
+  // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT — numeric string keys
+  const body = Object.fromEntries(entries.map((v, i) => [i, v]))
+  return new Response(JSON.stringify(body), { headers: JSON_HEADERS })
 })
