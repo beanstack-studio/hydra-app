@@ -28,6 +28,7 @@ interface CartItem {
 
 const DIVIDER = '--------------------------------'
 
+// Allow unauthenticated requests — fetched by Bluetooth Print app, no auth headers
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
