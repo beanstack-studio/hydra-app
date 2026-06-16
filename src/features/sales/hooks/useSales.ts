@@ -93,9 +93,14 @@ export function useSales(): UseSalesReturn {
   }, [fetchData, stationId])
 
   const addSale = useCallback(async (input: SaleInsert): Promise<Sale> => {
+    const insertData = {
+      ...input,
+      // Stamp paid_at when the sale is recorded as fully settled at creation
+      ...(input.status === 'paid' ? { paid_at: new Date().toISOString() } : {}),
+    }
     const { data: row, error: e } = await supabase
       .from('sales')
-      .insert(input)
+      .insert(insertData)
       .select()
       .single()
     if (e) throw new Error(e.message)
@@ -123,7 +128,13 @@ export function useSales(): UseSalesReturn {
 
     const { error: updateErr } = await supabase
       .from('sales')
-      .update({ amount_received: newAmountReceived, status: newStatus, payment_mode: paymentMode })
+      .update({
+        amount_received: newAmountReceived,
+        status: newStatus,
+        payment_mode: paymentMode,
+        // Stamp paid_at on first full settlement only
+        ...(newStatus === 'paid' && !sale.paid_at ? { paid_at: paidAt } : {}),
+      })
       .eq('id', saleId)
     if (updateErr) throw new Error(updateErr.message)
 

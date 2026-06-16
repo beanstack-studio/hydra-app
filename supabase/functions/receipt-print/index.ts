@@ -1,12 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-interface ReceiptLine {
-  type: number
-  content?: string
-  bold?: number
-  align?: number
-  format?: number
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface TextLine {
+  type: 0
+  content: string
+  bold: number
+  align: number
+  format: number
 }
+
+interface ImageLine {
+  type: 1
+  path: string
+  align: number
+}
+
+type ReceiptLine = TextLine | ImageLine
 
 interface CartItem {
   product_name: string
@@ -14,48 +24,65 @@ interface CartItem {
   price: number
 }
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const DIVIDER = '--------------------------------'
 
-const CORS_HEADERS = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatCurrency(amount: number): string {
-  const abs = Math.abs(amount)
-  const [whole, dec] = abs.toFixed(2).split('.')
-  const formatted = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  return `P${formatted}.${dec}`
+  const [whole, dec] = Math.abs(amount).toFixed(2).split('.')
+  return `P${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${dec}`
 }
 
-function formatPHDate(dateStr: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
+function formatPHDateTime(dateStr: string): string {
+  const date = new Date(dateStr)
+
+  const dateParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  }).formatToParts(new Date(dateStr))
-  const p: Record<string, string> = {}
-  for (const part of parts) p[part.type] = part.value
-  return `${p.day}-${p.month}-${p.year}`
-}
+  }).formatToParts(date)
+  const dp: Record<string, string> = {}
+  for (const p of dateParts) dp[p.type] = p.value
 
-function formatPHTime(dateStr: string): string {
-  return new Intl.DateTimeFormat('en-US', {
+  const time = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  }).format(new Date(dateStr))
+  }).format(date)
+
+  return `${dp.day}-${dp.month}-${dp.year} ${time}`
 }
 
-function txt(content: string, bold = 0, align = 0, format = 0): ReceiptLine {
+function txt(content: string, bold = 0, align = 0, format = 0): TextLine {
   return { type: 0, content, bold, align, format }
 }
 
+function img(path: string, align = 1): ImageLine {
+  return { type: 1, path, align }
+}
+
+function blank(): TextLine {
+  return txt('')
+}
+
+function divider(): TextLine {
+  return txt(DIVIDER)
+}
+
+// ── Handler ──────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: CORS })
   }
 
   const url = new URL(req.url)
@@ -64,15 +91,16 @@ Deno.serve(async (req) => {
   if (!txnId) {
     return new Response(JSON.stringify({ error: 'txn_id required' }), {
       status: 400,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    Deno.env.get('SERVICE_ROLE_KEY')!,
   )
 
+  // ── Fetch sale ─────────────────────────────────────────────────────────────
   const { data: sale, error: saleError } = await supabase
     .from('sales')
     .select('*')
@@ -82,90 +110,115 @@ Deno.serve(async (req) => {
   if (saleError || !sale) {
     return new Response(JSON.stringify({ error: 'Sale not found' }), {
       status: 404,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 
-  const [{ data: station }, { data: customer }] = await Promise.all([
+  // ── Fetch station name + settings in parallel ──────────────────────────────
+  const [{ data: station }, { data: settings }] = await Promise.all([
     supabase.from('stations').select('name').eq('id', sale.station_id).single(),
-    sale.customer_id
-      ? supabase.from('customers').select('phone').eq('id', sale.customer_id).single()
-      : Promise.resolve({ data: null }),
+    supabase
+      .from('station_settings')
+      .select('business_address, business_phone')
+      .eq('station_id', sale.station_id)
+      .maybeSingle(),
   ])
 
-  const stationName: string = station?.name ?? 'Water Station'
-  const customerPhone: string | null = customer?.phone ?? null
-
-  // Resolve items: use the items JSONB array if present, else fall back to the
-  // top-level single-product columns (for older sales recorded before multi-item)
+  // ── Resolve items ──────────────────────────────────────────────────────────
+  // Use items JSONB array when present; fall back to single-product columns
+  // (older sales recorded before multi-item support)
   const items: CartItem[] =
     Array.isArray(sale.items) && sale.items.length > 0
       ? (sale.items as CartItem[])
-      : [{ product_name: sale.product_name as string, qty: sale.qty as number, price: sale.price_per_piece as number }]
+      : [{
+          product_name: sale.product_name as string,
+          qty: sale.qty as number,
+          price: sale.price_per_piece as number,
+        }]
 
+  // ── Order number — last 6 chars of UUID, uppercase ─────────────────────────
+  const orderNum = `#${(txnId as string).slice(-6).toUpperCase()}`
+
+  // ── Date/time shown on receipt (paid_at preferred, falls back to sale_date) ─
+  const receiptDateTime = formatPHDateTime(
+    (sale.paid_at as string | null) ?? (sale.sale_date as string)
+  )
+
+  const logoUrl = Deno.env.get('VITE_LOGO_URL') ?? null
+  const stationName: string = station?.name ?? 'Water Station'
+  const stationAddress: string | null = settings?.business_address ?? null
+  const stationPhone: string | null = settings?.business_phone ?? null
+
+  // ── Build receipt ──────────────────────────────────────────────────────────
   const receipt: ReceiptLine[] = []
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-  receipt.push(txt(stationName, 1, 1, 2))  // bold | centered | double-width
-  receipt.push(txt(`${formatPHDate(sale.sale_date)}  ${formatPHTime(sale.sale_date)}`, 0, 1))
-  receipt.push(txt(DIVIDER))
+  // Logo
+  if (logoUrl) receipt.push(img(logoUrl, 1))
 
-  // ── Customer ─────────────────────────────────────────────────────────────────
-  receipt.push(txt(`Customer: ${sale.customer_name}`))
-  if (customerPhone) {
-    receipt.push(txt(`Phone:    ${customerPhone}`))
+  // Station header
+  receipt.push(txt(stationName, 1, 1, 2))            // bold | centered | double-width
+
+  if (stationAddress || stationPhone) {
+    const headerDetail = [stationAddress, stationPhone].filter(Boolean).join('  |  ')
+    receipt.push(txt(headerDetail, 0, 1, 0))          // centered
   }
-  receipt.push(txt(DIVIDER))
 
-  // ── Items ────────────────────────────────────────────────────────────────────
+  receipt.push(blank())
+
+  // Order number + date/time
+  receipt.push(txt(`ORDER ${orderNum}`, 0, 1, 0))    // centered
+  receipt.push(txt(receiptDateTime, 0, 1, 0))         // centered
+
+  receipt.push(divider())
+
+  // Items
   for (const item of items) {
     const subtotal = item.qty * item.price
     receipt.push(txt(item.product_name, 1))
     receipt.push(txt(`  ${item.qty} x ${formatCurrency(item.price)}  =  ${formatCurrency(subtotal)}`))
   }
 
+  // Container fee
   if (sale.container_enabled && (sale.container_qty as number) > 0) {
     const subtotal = (sale.container_qty as number) * (sale.container_price as number)
     receipt.push(txt('Container', 1))
     receipt.push(txt(`  ${sale.container_qty} x ${formatCurrency(sale.container_price as number)}  =  ${formatCurrency(subtotal)}`))
   }
 
+  // Delivery zone fee
   if (sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0) {
     receipt.push(txt(`Delivery fee (${sale.delivery_zone_name})`, 1))
     receipt.push(txt(`  ${formatCurrency(sale.delivery_zone_price as number)}`))
   }
 
-  receipt.push(txt(DIVIDER))
+  receipt.push(divider())
 
-  // ── Total & payment ──────────────────────────────────────────────────────────
+  // Total + payment method
   receipt.push(txt(`TOTAL: ${formatCurrency(sale.total_amount as number)}`, 1))
   receipt.push(txt(`Payment: ${(sale.payment_mode as string).toUpperCase()}`))
 
-  // ── Delivery / Pickup details ────────────────────────────────────────────────
+  // Delivery / Pickup details
   if (sale.order_type === 'delivery' || sale.order_type === 'pickup') {
-    receipt.push(txt(DIVIDER))
     const label = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
-    receipt.push(txt(`${label} Details`, 1))
     if (sale.delivery_address) {
-      receipt.push(txt(`Address: ${sale.delivery_address}`))
+      receipt.push(txt(`${label} address: ${sale.delivery_address}`))
     }
     if (sale.scheduled_at) {
-      receipt.push(txt(`Time:    ${formatPHDate(sale.scheduled_at as string)} ${formatPHTime(sale.scheduled_at as string)}`))
+      receipt.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`))
     }
   }
 
-  // ── Remarks ──────────────────────────────────────────────────────────────────
+  // Remarks
   if (sale.remarks) {
-    receipt.push(txt(DIVIDER))
     receipt.push(txt(`Remarks: ${sale.remarks}`))
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────────────
-  receipt.push(txt(DIVIDER))
+  // Footer
+  receipt.push(blank())
   receipt.push(txt('Thank you for your order!', 0, 1))
-  receipt.push(txt('', 0, 1))  // trailing newline / feed
+  receipt.push(blank())  // paper feed
 
   return new Response(JSON.stringify(receipt), {
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 })

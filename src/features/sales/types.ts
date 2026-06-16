@@ -39,6 +39,7 @@ export interface Sale {
   status: SaleStatus
   items: CartItem[] | null
   fulfilled_at: string | null
+  paid_at: string | null
   created_at: string
 }
 
@@ -67,6 +68,7 @@ export interface SaleInsert {
   scheduled_at: string | null
   delivery_address: string | null
   remarks: string | null
+  paid_at?: string | null
   items?: CartItem[]
 }
 
