@@ -1,27 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface TextLine {
-  type: 0
-  content: string
-  bold: number
-  align: number
-  format: number
-}
-
-type ReceiptLine = TextLine
-
-interface CartItem {
-  product_name: string
-  qty: number
-  price: number
-}
-
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const DIVIDER = '--------------------------------'
-const LINE_WIDTH = 32  // 58mm paper; change to 48 for 80mm
 
 // Allow unauthenticated requests — fetched by Bluetooth Print app, no auth headers
 const CORS = {
@@ -62,21 +41,8 @@ function formatPHDateTime(dateStr: string): string {
   return `${dp.day}-${dp.month}-${dp.year} ${time}`
 }
 
-function padLine(left: string, right: string, width = LINE_WIDTH): string {
-  const gap = width - left.length - right.length
-  return left + (gap > 0 ? ' '.repeat(gap) : ' ') + right
-}
-
-function truncate(s: string, max = LINE_WIDTH): string {
+function truncate(s: string, max = 32): string {
   return s.length > max ? s.slice(0, max - 3) + '...' : s
-}
-
-function txt(content: string, bold = 0, align = 0, format = 0): TextLine {
-  return { type: 0, content, bold, align, format }
-}
-
-function blank(): TextLine {
-  return txt('', 0, 0, 0)
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -124,107 +90,137 @@ Deno.serve(async (req) => {
   console.log('station:', JSON.stringify(station))
   console.log('station_settings:', JSON.stringify(settings))
 
-  // ── Resolve items ──────────────────────────────────────────────────────────
-  const items: CartItem[] =
-    Array.isArray(sale.items) && sale.items.length > 0
-      ? (sale.items as CartItem[])
-      : [{
-          product_name: sale.product_name as string,
-          qty:          sale.qty          as number,
-          price:        sale.price_per_piece as number,
-        }]
+  // ── Map variables ──────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s = settings as Record<string, any> | null
 
-  // ── Derived values ─────────────────────────────────────────────────────────
-  const orderNum       = `#${(txnId as string).slice(-6).toUpperCase()}`
-  const receiptDateTime = formatPHDateTime(
+  const stationName   = (station?.name ?? 'Water Station') as string
+  const logoUrl       = (station?.photo_url as string | null | undefined) ?? null
+  const address       = (s?.business_address as string | null | undefined) ?? null
+  const phone         = (s?.business_phone   as string | null | undefined) ?? null
+  const email         = (s?.business_email   as string | null | undefined) ?? null
+
+  const orderId       = (txnId as string).slice(-6).toUpperCase()
+  const paidAt        = formatPHDateTime(
     (sale.paid_at as string | null) ?? (sale.sale_date as string)
   )
 
-  const stationName    = (station?.name ?? 'Water Station') as string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const s              = settings as Record<string, any> | null
-  const stationAddress = (s?.business_address as string | null | undefined) ?? null
-  const stationPhone   = (s?.business_phone   as string | null | undefined) ?? null
-  const stationEmail   = (s?.business_email   as string | null | undefined) ?? null
+  interface Item { name: string; qty: number; unit: number; subtotal: number }
+  const rawItems: Array<{ product_name: string; qty: number; price: number }> =
+    Array.isArray(sale.items) && sale.items.length > 0
+      ? sale.items
+      : [{ product_name: sale.product_name as string, qty: sale.qty as number, price: sale.price_per_piece as number }]
 
-  // ── Build entries (exact order — do not reorder) ───────────────────────────
-  const entries: ReceiptLine[] = []
+  const items: Item[] = rawItems.map((i) => ({
+    name:    truncate(i.product_name),
+    qty:     i.qty,
+    unit:    i.price,
+    subtotal: i.qty * i.price,
+  }))
 
-  // 1. Station name
-  entries.push(txt(stationName, 1, 1, 2))
+  const containerFee: number =
+    sale.container_enabled && (sale.container_qty as number) > 0
+      ? (sale.container_qty as number) * (sale.container_price as number)
+      : 0
 
-  // 2. Address
-  if (stationAddress?.trim()) entries.push(txt(stationAddress, 0, 1, 0))
+  const deliveryFee: number =
+    sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0
+      ? (sale.delivery_zone_price as number)
+      : 0
 
-  // 3. Phone
-  if (stationPhone?.trim()) entries.push(txt(stationPhone, 0, 1, 0))
+  const total         = sale.total_amount as number
+  const paymentMethod = (sale.payment_mode as string).toUpperCase()
 
-  // 4. Email
-  if (stationEmail?.trim()) entries.push(txt(stationEmail, 0, 1, 0))
+  const isScheduled   = sale.order_type === 'delivery' || sale.order_type === 'pickup'
+  const orderLabel    = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
 
-  // 5. Empty line
-  entries.push(blank())
+  const deliveryAddress: string | null = isScheduled && sale.delivery_address
+    ? `${orderLabel} address: ${sale.delivery_address as string}`
+    : null
 
-  // 6. Order number
-  entries.push(txt(`ORDER ${orderNum}`, 0, 1, 0))
+  const scheduledTime: string | null = isScheduled && sale.scheduled_at
+    ? `${orderLabel} time: ${formatPHDateTime(sale.scheduled_at as string)}`
+    : null
 
-  // 7. Paid date/time PHT
-  entries.push(txt(receiptDateTime, 0, 1, 0))
+  const remarks: string | null = sale.remarks
+    ? `Remarks: ${sale.remarks as string}`
+    : null
 
-  // 8. Divider
-  entries.push(txt(DIVIDER, 0, 0, 0))
+  // ── Build entries ──────────────────────────────────────────────────────────
 
-  // 9+. Items
+  const W = 32
+  const pad = (l: string, r: string) => {
+    const gap = W - l.length - r.length
+    return l + (gap > 0 ? ' '.repeat(gap) : ' ') + r
+  }
+
+  const entries: object[] = []
+
+  // 1. Logo
+  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=150&h=150&fit=contain`, align:1 })
+
+  // 2. Station name
+  entries.push({ type:0, content: stationName, bold:1, align:1, format:2 })
+
+  // 3. Address
+  if (address) entries.push({ type:0, content: address, bold:0, align:1, format:0 })
+
+  // 4. Phone
+  if (phone) entries.push({ type:0, content: phone, bold:0, align:1, format:0 })
+
+  // 5. Email
+  if (email) entries.push({ type:0, content: email, bold:0, align:1, format:0 })
+
+  // 6. Empty line
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
+
+  // 7. Order number
+  entries.push({ type:0, content:`ORDER #${orderId}`, bold:0, align:1, format:0 })
+
+  // 8. Paid date/time
+  entries.push({ type:0, content: paidAt, bold:0, align:1, format:0 })
+
+  // 9. Divider
+  entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
+
+  // 10. Items
   for (const item of items) {
-    const subtotal = item.qty * item.price
-    entries.push(txt(truncate(item.product_name), 1, 0, 0))
-    entries.push(txt(padLine(`  ${item.qty} x ${formatCurrency(item.price)}`, formatCurrency(subtotal)), 0, 0, 0))
+    entries.push({ type:0, content: item.name, bold:1, align:0, format:0 })
+    entries.push({ type:0, content: pad(`  ${item.qty} x ${formatCurrency(item.unit)}`, formatCurrency(item.subtotal)), bold:0, align:0, format:0 })
   }
 
-  // Container fee
-  if (sale.container_enabled && (sale.container_qty as number) > 0) {
-    const subtotal = (sale.container_qty as number) * (sale.container_price as number)
-    entries.push(txt(padLine('  Container fee', formatCurrency(subtotal)), 0, 0, 0))
-  }
+  // 11. Container fee
+  if (containerFee) entries.push({ type:0, content: pad('  Container fee', formatCurrency(containerFee)), bold:0, align:0, format:0 })
 
-  // Delivery fee
-  if (sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0) {
-    entries.push(txt(padLine('  Delivery fee', formatCurrency(sale.delivery_zone_price as number)), 0, 0, 0))
-  }
+  // 12. Delivery fee
+  if (deliveryFee) entries.push({ type:0, content: pad('  Delivery fee', formatCurrency(deliveryFee)), bold:0, align:0, format:0 })
 
-  // Divider
-  entries.push(txt(DIVIDER, 0, 0, 0))
+  // 13. Divider
+  entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // TOTAL
-  entries.push(txt(padLine('TOTAL:', formatCurrency(sale.total_amount as number)), 1, 0, 0))
+  // 14. Total
+  entries.push({ type:0, content: pad('TOTAL:', formatCurrency(total)), bold:1, align:0, format:0 })
 
-  // Payment
-  entries.push(txt(padLine('Payment:', (sale.payment_mode as string).toUpperCase()), 0, 0, 0))
+  // 15. Payment
+  entries.push({ type:0, content: pad('Payment:', paymentMethod), bold:0, align:0, format:0 })
 
-  // Delivery / Pickup details
-  if (sale.order_type === 'delivery' || sale.order_type === 'pickup') {
-    const label = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
-    if (sale.delivery_address) {
-      entries.push(txt(`${label} address: ${sale.delivery_address}`, 0, 0, 0))
-    }
-    if (sale.scheduled_at) {
-      entries.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`, 0, 0, 0))
-    }
-  }
+  // 16. Delivery address
+  if (deliveryAddress) entries.push({ type:0, content: deliveryAddress, bold:0, align:0, format:0 })
 
-  // Remarks
-  if (sale.remarks) {
-    entries.push(txt(`Remarks: ${sale.remarks}`, 0, 0, 0))
-  }
+  // 17. Scheduled time
+  if (scheduledTime) entries.push({ type:0, content: scheduledTime, bold:0, align:0, format:0 })
 
-  // Empty line
-  entries.push(blank())
+  // 18. Remarks
+  if (remarks) entries.push({ type:0, content: remarks, bold:0, align:0, format:0 })
 
-  // Thank you
-  entries.push(txt('Thank you for your order!', 0, 1, 0))
+  // 19. Empty line
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // Empty line (paper feed)
-  entries.push(blank())
+  // 20. Thank you
+  entries.push({ type:0, content:'Thank you for your order!', bold:0, align:1, format:0 })
+
+  // 21. Empty line
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
   // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT — numeric string keys
   const body = Object.fromEntries(entries.map((v, i) => [i, v]))
