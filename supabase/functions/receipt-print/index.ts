@@ -53,12 +53,14 @@ function formatPHDateTime(dateStr: string): string {
   const dp: Record<string, string> = {}
   for (const p of dateParts) dp[p.type] = p.value
 
+  // Replace narrow no-break space (U+202F) that Intl inserts before AM/PM —
+  // it corrupts to â€¯ when the receiver treats the UTF-8 bytes as Latin-1
   const time = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  }).format(date)
+  }).format(date).replace(/\u202F/g, ' ')
 
   return `${dp.day}-${dp.month}-${dp.year} ${time}`
 }
@@ -219,7 +221,10 @@ Deno.serve(async (req) => {
   receipt.push(txt('Thank you for your order!', 0, 1))
   receipt.push(blank())  // paper feed
 
-  return new Response(JSON.stringify(receipt), {
+  // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT format — an object with
+  // numeric string keys, not a plain array
+  const receiptObj = Object.fromEntries(receipt.map((v, i) => [i, v]))
+  return new Response(JSON.stringify(receiptObj), {
     headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 })
