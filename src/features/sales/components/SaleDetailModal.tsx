@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, MapPin, Clock, AlertTriangle, Phone } from 'lucide-react'
+import { CalendarClock, CheckCircle2, MapPin, Clock, AlertTriangle, Phone, Printer } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, formatTime, cn } from '@/lib/utils'
@@ -157,6 +157,23 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
                 </Button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Section 6: Print receipt — only when fully paid */}
+        {isPaidFully && (
+          <div className="border-t border-border pt-3">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+                window.location.href = `bprint://${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}`
+              }}
+            >
+              <Printer className="h-4 w-4" />
+              Print Receipt
+            </Button>
           </div>
         )}
 
