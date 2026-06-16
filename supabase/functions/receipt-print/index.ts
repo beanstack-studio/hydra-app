@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
   const entries: object[] = []
 
   // 1. Logo
-  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=150&h=150&fit=contain`, align:1 })
+  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=70&h=70&fit=contain`, align:1 })
 
   // 2. Station name
   entries.push({ type:0, content: stationName, bold:1, align:1, format:2 })
