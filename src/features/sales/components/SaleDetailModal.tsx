@@ -167,8 +167,14 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
               variant="outline"
               className="w-full gap-2"
               onClick={() => {
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-                window.location.href = `bprint://${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}`
+                // Build the receipt URL from the Supabase base URL (strip any trailing slash)
+                const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+                const url = `bprint://${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}`
+                // Use an anchor setAttribute rather than window.location.href to avoid
+                // the browser URL parser normalising bprint://https:// → bprint://https//
+                const a = document.createElement('a')
+                a.setAttribute('href', url)
+                a.click()
               }}
             >
               <Printer className="h-4 w-4" />
