@@ -38,7 +38,7 @@ const CORS = {
 
 function formatCurrency(amount: number): string {
   const [whole, dec] = Math.abs(amount).toFixed(2).split('.')
-  return `P${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${dec}`
+  return `₱${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${dec}`
 }
 
 function formatPHDateTime(dateStr: string): string {
@@ -74,7 +74,7 @@ function img(path: string, align = 1): ImageLine {
 }
 
 function blank(): TextLine {
-  return txt('')
+  return { type: 0, content: '', bold: 0, align: 0, format: 0 }
 }
 
 function divider(): TextLine {
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     supabase.from('stations').select('name').eq('id', sale.station_id).single(),
     supabase
       .from('station_settings')
-      .select('business_address, business_phone')
+      .select('business_address, business_phone, business_email')
       .eq('station_id', sale.station_id)
       .maybeSingle(),
   ])
@@ -147,79 +147,98 @@ Deno.serve(async (req) => {
     (sale.paid_at as string | null) ?? (sale.sale_date as string)
   )
 
-  const logoUrl = Deno.env.get('VITE_LOGO_URL') ?? null
-  const stationName: string = station?.name ?? 'Water Station'
-  const stationAddress: string | null = settings?.business_address ?? null
-  const stationPhone: string | null = settings?.business_phone ?? null
+  const logoUrl          = Deno.env.get('VITE_LOGO_URL') ?? null
+  const stationName      = (station?.name ?? 'Water Station') as string
+  const stationAddress   = (settings?.business_address ?? null) as string | null
+  const stationPhone     = (settings?.business_phone   ?? null) as string | null
+  const stationEmail     = (settings?.business_email   ?? null) as string | null
 
   // ── Build receipt ──────────────────────────────────────────────────────────
   const receipt: ReceiptLine[] = []
 
-  // Logo
+  // 1. Logo
   if (logoUrl) receipt.push(img(logoUrl, 1))
 
-  // Station header
-  receipt.push(txt(stationName, 1, 1, 2))            // bold | centered | double-width
-
-  if (stationAddress || stationPhone) {
-    const headerDetail = [stationAddress, stationPhone].filter(Boolean).join('  |  ')
-    receipt.push(txt(headerDetail, 0, 1, 0))          // centered
-  }
-
+  // 2. Empty line
   receipt.push(blank())
 
-  // Order number + date/time
-  receipt.push(txt(`ORDER ${orderNum}`, 0, 1, 0))    // centered
-  receipt.push(txt(receiptDateTime, 0, 1, 0))         // centered
+  // 3. Station name
+  receipt.push(txt(stationName, 1, 1, 2))   // bold | centered | double-width
 
+  // 4. Address
+  if (stationAddress) receipt.push(txt(stationAddress, 0, 1, 0))
+
+  // 5. Phone
+  if (stationPhone) receipt.push(txt(stationPhone, 0, 1, 0))
+
+  // 6. Email
+  if (stationEmail) receipt.push(txt(stationEmail, 0, 1, 0))
+
+  // 7. Empty line
+  receipt.push(blank())
+
+  // 8. Order number
+  receipt.push(txt(`ORDER ${orderNum}`, 0, 1, 0))
+
+  // 9. Date/time paid
+  receipt.push(txt(receiptDateTime, 0, 1, 0))
+
+  // 10. Divider
   receipt.push(divider())
 
-  // Items
+  // 11. Items
   for (const item of items) {
     const subtotal = item.qty * item.price
-    receipt.push(txt(item.product_name, 1))
-    receipt.push(txt(`  ${item.qty} x ${formatCurrency(item.price)}  =  ${formatCurrency(subtotal)}`))
+    receipt.push(txt(item.product_name, 1, 0, 0))
+    receipt.push(txt(`  ${item.qty} x ${formatCurrency(item.price)}  =  ${formatCurrency(subtotal)}`, 0, 0, 0))
   }
 
-  // Container fee
+  // 12. Container fee
   if (sale.container_enabled && (sale.container_qty as number) > 0) {
     const subtotal = (sale.container_qty as number) * (sale.container_price as number)
-    receipt.push(txt('Container', 1))
-    receipt.push(txt(`  ${sale.container_qty} x ${formatCurrency(sale.container_price as number)}  =  ${formatCurrency(subtotal)}`))
+    receipt.push(txt('Container', 1, 0, 0))
+    receipt.push(txt(`  ${sale.container_qty} x ${formatCurrency(sale.container_price as number)}  =  ${formatCurrency(subtotal)}`, 0, 0, 0))
   }
 
-  // Delivery zone fee
+  // 13. Delivery zone fee
   if (sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0) {
-    receipt.push(txt(`Delivery fee (${sale.delivery_zone_name})`, 1))
-    receipt.push(txt(`  ${formatCurrency(sale.delivery_zone_price as number)}`))
+    receipt.push(txt(`Delivery fee (${sale.delivery_zone_name})`, 1, 0, 0))
+    receipt.push(txt(`  ${formatCurrency(sale.delivery_zone_price as number)}`, 0, 0, 0))
   }
 
+  // 14. Divider
   receipt.push(divider())
 
-  // Total + payment method
-  receipt.push(txt(`TOTAL: ${formatCurrency(sale.total_amount as number)}`, 1))
-  receipt.push(txt(`Payment: ${(sale.payment_mode as string).toUpperCase()}`))
+  // 15. Total
+  receipt.push(txt(`TOTAL: ${formatCurrency(sale.total_amount as number)}`, 1, 0, 0))
 
-  // Delivery / Pickup details
+  // 16. Payment method
+  receipt.push(txt(`Payment: ${(sale.payment_mode as string).toUpperCase()}`, 0, 0, 0))
+
+  // 17. Delivery / Pickup details
   if (sale.order_type === 'delivery' || sale.order_type === 'pickup') {
     const label = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
     if (sale.delivery_address) {
-      receipt.push(txt(`${label} address: ${sale.delivery_address}`))
+      receipt.push(txt(`${label} address: ${sale.delivery_address}`, 0, 0, 0))
     }
     if (sale.scheduled_at) {
-      receipt.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`))
+      receipt.push(txt(`${label} time: ${formatPHDateTime(sale.scheduled_at as string)}`, 0, 0, 0))
     }
   }
 
-  // Remarks
+  // 18. Remarks
   if (sale.remarks) {
-    receipt.push(txt(`Remarks: ${sale.remarks}`))
+    receipt.push(txt(`Remarks: ${sale.remarks}`, 0, 0, 0))
   }
 
-  // Footer
+  // 19. Empty line
   receipt.push(blank())
-  receipt.push(txt('Thank you for your order!', 0, 1))
-  receipt.push(blank())  // paper feed
+
+  // 20. Thank you
+  receipt.push(txt('Thank you for your order!', 0, 1, 0))
+
+  // 21. Empty line (paper feed)
+  receipt.push(blank())
 
   // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT format — an object with
   // numeric string keys, not a plain array
