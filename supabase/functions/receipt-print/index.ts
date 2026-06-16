@@ -34,6 +34,8 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const JSON_HEADERS = { ...CORS, 'Content-Type': 'application/json; charset=utf-8' }
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number): string {
@@ -105,7 +107,7 @@ Deno.serve(async (req) => {
   if (!txnId) {
     return new Response(JSON.stringify({ error: 'txn_id required' }), {
       status: 400,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: JSON_HEADERS,
     })
   }
 
@@ -124,19 +126,29 @@ Deno.serve(async (req) => {
   if (saleError || !sale) {
     return new Response(JSON.stringify({ error: 'Sale not found' }), {
       status: 404,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: JSON_HEADERS,
     })
   }
 
-  // ── Fetch station name + settings in parallel ──────────────────────────────
+  // ── Fetch station + settings in parallel ───────────────────────────────────
+  // stations.photo_url  = logo image
+  // station_settings.*  = business_address, business_phone (log all cols to debug)
   const [{ data: station }, { data: settings }] = await Promise.all([
-    supabase.from('stations').select('name').eq('id', sale.station_id).single(),
+    supabase
+      .from('stations')
+      .select('name, photo_url')
+      .eq('id', sale.station_id)
+      .single(),
     supabase
       .from('station_settings')
-      .select('business_address, business_phone, business_email')
+      .select('*')
       .eq('station_id', sale.station_id)
       .maybeSingle(),
   ])
+
+  // Log full rows so column names are visible in Supabase function logs
+  console.log('station:', JSON.stringify(station))
+  console.log('station_settings:', JSON.stringify(settings))
 
   // ── Resolve items ──────────────────────────────────────────────────────────
   // Use items JSONB array when present; fall back to single-product columns
@@ -158,17 +170,19 @@ Deno.serve(async (req) => {
     (sale.paid_at as string | null) ?? (sale.sale_date as string)
   )
 
-  const logoUrl          = Deno.env.get('VITE_LOGO_URL') ?? null
-  const stationName      = (station?.name ?? 'Water Station') as string
-  const stationAddress   = (settings?.business_address ?? null) as string | null
-  const stationPhone     = (settings?.business_phone   ?? null) as string | null
-  const stationEmail     = (settings?.business_email   ?? null) as string | null
+  // Logo from stations.photo_url (set in Business Settings → profile photo)
+  const logoUrl        = (station?.photo_url as string | null | undefined) ?? null
+  const stationName    = (station?.name ?? 'Water Station') as string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s              = settings as Record<string, any> | null
+  const stationAddress = (s?.business_address as string | null | undefined) ?? null
+  const stationPhone   = (s?.business_phone   as string | null | undefined) ?? null
 
   // ── Build receipt ──────────────────────────────────────────────────────────
   const receipt: ReceiptLine[] = []
 
-  // 1. Logo
-  if (logoUrl) receipt.push(img(logoUrl, 1))
+  // 1. Logo — from stations.photo_url
+  if (logoUrl?.trim()) receipt.push(img(logoUrl, 1))
 
   // 2. Empty line
   receipt.push(blank())
@@ -177,13 +191,10 @@ Deno.serve(async (req) => {
   receipt.push(txt(stationName, 1, 1, 2))   // bold | centered | double-width
 
   // 4. Address
-  if (stationAddress) receipt.push(txt(stationAddress, 0, 1, 0))
+  if (stationAddress?.trim()) receipt.push(txt(stationAddress, 0, 1, 0))
 
   // 5. Phone
   if (stationPhone?.trim()) receipt.push(txt(stationPhone, 0, 1, 0))
-
-  // 6. Email
-  if (stationEmail?.trim()) receipt.push(txt(stationEmail, 0, 1, 0))
 
   // 7. Empty line
   receipt.push(blank())
@@ -200,7 +211,7 @@ Deno.serve(async (req) => {
   // 11. Items
   for (const item of items) {
     const subtotal = item.qty * item.price
-    const qtyLine = `${item.qty} x ${formatCurrency(item.price)}`
+    const qtyLine  = `${item.qty} x ${formatCurrency(item.price)}`
     receipt.push(txt(truncate(item.product_name), 1, 0, 0))
     receipt.push(txt(padLine(qtyLine, formatCurrency(subtotal)), 0, 0, 0))
   }
@@ -208,7 +219,7 @@ Deno.serve(async (req) => {
   // 12. Container fee
   if (sale.container_enabled && (sale.container_qty as number) > 0) {
     const subtotal = (sale.container_qty as number) * (sale.container_price as number)
-    const qtyLine = `${sale.container_qty} x ${formatCurrency(sale.container_price as number)}`
+    const qtyLine  = `${sale.container_qty} x ${formatCurrency(sale.container_price as number)}`
     receipt.push(txt('Container', 1, 0, 0))
     receipt.push(txt(padLine(qtyLine, formatCurrency(subtotal)), 0, 0, 0))
   }
@@ -256,7 +267,5 @@ Deno.serve(async (req) => {
   // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT format — an object with
   // numeric string keys, not a plain array
   const receiptObj = Object.fromEntries(receipt.map((v, i) => [i, v]))
-  return new Response(JSON.stringify(receiptObj), {
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
+  return new Response(JSON.stringify(receiptObj), { headers: JSON_HEADERS })
 })
