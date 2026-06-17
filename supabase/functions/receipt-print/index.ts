@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
   // 21. Empty line
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  const obj = Object.fromEntries(entries.map((v, i) => [String(i), v]))
+  const obj = Object.fromEntries(entries.map((v, i) => [String(i).padStart(2, '0'), v]))
   return new Response(JSON.stringify(obj), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
