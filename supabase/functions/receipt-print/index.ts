@@ -47,33 +47,6 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
-// Calculates exact print grid width, counting '₱' as 2 slots on hardware fonts
-function getVisualLength(str: string): number {
-  let length = 0
-  for (let i = 0; i < str.length; i++) {
-    length += str[i] === '₱' ? 2 : 1
-  }
-  return length
-}
-
-/**
- * Dynamically fills the empty void between text and price with dot leaders (...)
- * Locks the total combined character footprint to exactly 32 grid positions.
- */
-function justifyWithDots(leftText: string, rightText: string, maxLength = 32): string {
-  const leftVisualLen = getVisualLength(leftText)
-  const rightVisualLen = getVisualLength(rightText)
-  const dotsNeeded = maxLength - (leftVisualLen + rightVisualLen)
-  
-  if (dotsNeeded <= 0) {
-    // Truncate left text safely if overlapping
-    const allowedLeftLength = maxLength - rightVisualLen - 2
-    return leftText.slice(0, allowedLeftLength) + '..' + rightText
-  }
-  
-  return leftText + '.'.repeat(dotsNeeded) + rightText
-}
-
 // — Handler
 
 Deno.serve(async (req) => {
@@ -176,7 +149,7 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo (Using original verified sizing footprint parameters)
+  // 1. Logo (Using standard layout image block parameters)
   if (logoUrl) {
     entries.push({
       type: 1,
@@ -198,33 +171,45 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Header Details
+  // Metadata block header
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Loop and display dynamically dotted item line entries (e.g. 1 x Refill - Flat......₱30)
+  // 11. Two-Line Item Display Strategy:
+  // First line: Qty and Name left-aligned (align: 0)
+  // Second line: Price right-aligned (align: 2)
   for (const item of items) {
-    const leftText = `${item.qty} x ${item.name}`
-    const rightText = formatCurrency(item.subtotal)
     entries.push({
       type: 0,
-      content: justifyWithDots(leftText, rightText),
+      content: `${item.qty} x ${item.name}`,
       bold: 0,
       align: 0,
       format: 0,
     })
-  }
-
-  // 12. Dynamic dotted line for container fee block
-  if (containerFee) {
-    const feeLeft = '1 x Container Fee'
-    const feeRight = formatCurrency(containerFee)
     entries.push({
       type: 0,
-      content: justifyWithDots(feeLeft, feeRight),
+      content: formatCurrency(item.subtotal),
+      bold: 0,
+      align: 2,
+      format: 0,
+    })
+  }
+
+  // 12. Container fee block matching the item row split structure
+  if (containerFee) {
+    entries.push({
+      type: 0,
+      content: '1 x Container Fee',
       bold: 0,
       align: 0,
+      format: 0,
+    })
+    entries.push({
+      type: 0,
+      content: formatCurrency(containerFee),
+      bold: 0,
+      align: 2,
       format: 0,
     })
   }
@@ -244,7 +229,7 @@ Deno.serve(async (req) => {
   // Blank line added before payment method row block
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 15. Payment method Row (Left aligned natively, no trailing blank line)
+  // 15. Payment method Row (Left aligned natively)
   entries.push({
     type: 0,
     content: `Payment method: ${paymentMethod}`,
