@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
   // 11. Items — name on its own line, amount right-aligned via padStart (align:0 = normal text)
   for (const item of items) {
     entries.push({ type:0, content: item.name, bold:0, align:0, format:0 })
-    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`.padStart(32), bold:0, align:0, format:0 })
+    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`.padStart(32), bold:0, align:2, format:0 })
   }
 
   // 12. Container fee (right-aligned via padStart)
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
   entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`.padStart(32), bold:0, align:0, format:0 })
 
   // 15. Payment mode (right-aligned via padStart)
-  entries.push({ type:0, content: `Payment: ${paymentMethod}`.padStart(32), bold:0, align:0, format:0 })
+  entries.push({ type:0, content: `Payment: ${paymentMethod}`.padStart(32), bold:0, align:2, format:0 })
 
   // 16. Blank line after payment
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
