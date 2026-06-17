@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
     supabase.from('station_settings').select('*').eq('station_id', sale.station_id).maybeSingle(),
   ])
 
+  // Log full rows to confirm field names in Supabase dashboard
   console.log('station:', JSON.stringify(station))
   console.log('station_settings:', JSON.stringify(settings))
 
@@ -94,14 +95,24 @@ Deno.serve(async (req) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const s = settings as Record<string, any> | null
 
-  const stationName   = (station?.name ?? 'Water Station') as string
-  const logoUrl       = (station?.photo_url as string | null | undefined) ?? null
-  const address       = (s?.business_address as string | null | undefined) ?? null
-  const phone         = (s?.business_phone   as string | null | undefined) ?? null
-  const email         = (s?.business_email   as string | null | undefined) ?? null
+  const stationName = (station?.name ?? 'Water Station') as string
+  const logoUrl     = (station?.photo_url as string | null | undefined) ?? null
+  const address     = (s?.business_address as string | null | undefined) ?? null
 
-  const orderId       = (txnId as string).slice(-6).toUpperCase()
-  const paidAt        = formatPHDateTime(
+  // Try all known field name variants for phone — logs will reveal actual name
+  const phone = ((
+    s?.business_phone ??
+    s?.phone ??
+    s?.contact_phone ??
+    s?.phone_number ??
+    s?.contact_number ??
+    s?.mobile
+  ) as string | null | undefined) ?? null
+
+  const email = (s?.business_email as string | null | undefined) ?? null
+
+  const orderId = (txnId as string).slice(-6).toUpperCase()
+  const paidAt  = formatPHDateTime(
     (sale.paid_at as string | null) ?? (sale.sale_date as string)
   )
 
@@ -112,9 +123,9 @@ Deno.serve(async (req) => {
       : [{ product_name: sale.product_name as string, qty: sale.qty as number, price: sale.price_per_piece as number }]
 
   const items: Item[] = rawItems.map((i) => ({
-    name:    truncate(i.product_name),
-    qty:     i.qty,
-    unit:    i.price,
+    name:     truncate(i.product_name),
+    qty:      i.qty,
+    unit:     i.price,
     subtotal: i.qty * i.price,
   }))
 
@@ -123,20 +134,22 @@ Deno.serve(async (req) => {
       ? (sale.container_qty as number) * (sale.container_price as number)
       : 0
 
-
   const total         = sale.total_amount as number
   const paymentMethod = (sale.payment_mode as string).toUpperCase()
 
-  const isScheduled   = sale.order_type === 'delivery' || sale.order_type === 'pickup'
-  const orderLabel    = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
+  const isScheduled = sale.order_type === 'delivery' || sale.order_type === 'pickup'
+  const orderLabel  = sale.order_type === 'delivery' ? 'Delivery' : 'Pickup'
 
-  const deliveryAddress: string | null = isScheduled && sale.delivery_address
-    ? `${orderLabel} address: ${sale.delivery_address as string}`
+  // Raw values for building the detail block
+  const rawAddress: string | null = isScheduled && sale.order_type === 'delivery' && sale.delivery_address
+    ? (sale.delivery_address as string)
     : null
 
-  const scheduledTime: string | null = isScheduled && sale.scheduled_at
-    ? `${orderLabel} time: ${formatPHDateTime(sale.scheduled_at as string)}`
+  const rawScheduledTime: string | null = isScheduled && sale.scheduled_at
+    ? formatPHDateTime(sale.scheduled_at as string)
     : null
+
+  const showDetailBlock = isScheduled && (rawAddress !== null || rawScheduledTime !== null)
 
   const remarks: string | null = sale.remarks
     ? `Remarks: ${sale.remarks as string}`
@@ -147,7 +160,7 @@ Deno.serve(async (req) => {
   const entries: object[] = []
 
   // 1. Logo
-  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=100&h=100&fit=contain`, align:1 })
+  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=50&h=50&fit=contain`, align:1 })
 
   // 2. Station name
   entries.push({ type:0, content: stationName, bold:1, align:1, format:2 })
@@ -155,7 +168,7 @@ Deno.serve(async (req) => {
   // 3. Address
   if (address) entries.push({ type:0, content: address, bold:0, align:1, format:0 })
 
-  // 4. Phone
+  // 4. Phone (centered; tries all known field name variants)
   if (phone) entries.push({ type:0, content: phone, bold:0, align:1, format:0 })
 
   // 5. Email
@@ -174,47 +187,51 @@ Deno.serve(async (req) => {
   // 10. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 11. Items — name on its own line (bold), amount right-aligned on next line
+  // 11. Items — name on its own line (bold), amount on next line (left-aligned)
   for (const item of items) {
     entries.push({ type:0, content: item.name, bold:1, align:0, format:0 })
-    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:2, format:0 })
+    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:0, format:0 })
   }
 
-  // 12. Container fee (right-aligned)
-  if (containerFee) entries.push({ type:0, content: `Container fee  =  ${formatCurrency(containerFee)}`, bold:0, align:2, format:0 })
+  // 12. Container fee (left-aligned)
+  if (containerFee) entries.push({ type:0, content: `Container fee  =  ${formatCurrency(containerFee)}`, bold:0, align:0, format:0 })
 
   // 13. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 14. Total (right-aligned)
-  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:1, align:2, format:0 })
+  // 14. Total (left-aligned)
+  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:1, align:0, format:0 })
 
-  // 15. Payment mode (right-aligned)
-  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:2, format:0 })
+  // 15. Payment mode (left-aligned)
+  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:0, format:0 })
 
   // 16. Blank line after payment
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // 17. Delivery address
-  if (deliveryAddress) entries.push({ type:0, content: deliveryAddress, bold:0, align:0, format:0 })
+  // 17–18. Delivery / Pickup detail block
+  if (showDetailBlock) {
+    entries.push({ type:0, content: `${orderLabel} details:`, bold:0, align:0, format:0 })
 
-  // 18. Scheduled time
-  if (scheduledTime) entries.push({ type:0, content: scheduledTime, bold:0, align:0, format:0 })
+    if (sale.order_type === 'delivery') {
+      const parts = [rawAddress, rawScheduledTime].filter((v): v is string => v !== null)
+      entries.push({ type:0, content: `  ${parts.join(', ')}`, bold:0, align:0, format:0 })
+    } else {
+      // Pickup — scheduled time only
+      if (rawScheduledTime) entries.push({ type:0, content: `  ${rawScheduledTime}`, bold:0, align:0, format:0 })
+    }
+  }
 
-  // 19. Blank line after delivery/pickup time (only when present)
-  if (scheduledTime) entries.push({ type:0, content:'', bold:0, align:0, format:0 })
-
-  // 20. Remarks
+  // 19. Remarks
   if (remarks) entries.push({ type:0, content: remarks, bold:0, align:0, format:0 })
 
-  // 21–22. Two blank lines before thank you
+  // 20–21. Two blank lines before thank you
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // 23. Thank you
+  // 22. Thank you
   entries.push({ type:0, content:'Thank you for your order!', bold:0, align:1, format:0 })
 
-  // 24. Trailing blank line
+  // 23. Trailing blank line
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
   const obj = Object.fromEntries(entries.map((v, i) => [String(i).padStart(2, '0'), v]))
