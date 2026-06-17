@@ -169,7 +169,10 @@ Deno.serve(async (req) => {
   const entries: object[] = []
 
   // 1. Logo
-  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=40&h=40&fit=contain`, align:1 })
+  // w=100&h=100 keeps the source image crisp (no upscale blur).
+  // pad=30 adds 30px whitespace on each side so the logo prints at ~40% canvas width —
+  // roughly 1.5× the height of double-size station name text on a 58mm roll.
+  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=100&h=100&fit=contain&pad=30&bg=ffffff`, align:1 })
 
   // 2. Station name
   entries.push({ type:0, content: stationName, bold:1, align:1, format:2 })
@@ -199,23 +202,23 @@ Deno.serve(async (req) => {
   // 10. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 11. Items — name on its own line, amount right-aligned
+  // 11. Items — name on its own line, amount right-aligned via padStart (align:0 = normal text)
   for (const item of items) {
     entries.push({ type:0, content: item.name, bold:0, align:0, format:0 })
-    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:2, format:0 })
+    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`.padStart(32), bold:0, align:0, format:0 })
   }
 
-  // 12. Container fee (left-aligned)
-  if (containerFee) entries.push({ type:0, content: `Container fee  =  ${formatCurrency(containerFee)}`, bold:0, align:0, format:0 })
+  // 12. Container fee (right-aligned via padStart)
+  if (containerFee) entries.push({ type:0, content: `Container fee  =  ${formatCurrency(containerFee)}`.padStart(32), bold:0, align:0, format:0 })
 
   // 13. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 14. Total (right-aligned)
-  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:0, align:2, format:0 })
+  // 14. Total (right-aligned via padStart)
+  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`.padStart(32), bold:0, align:0, format:0 })
 
-  // 15. Payment mode (right-aligned)
-  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:2, format:0 })
+  // 15. Payment mode (right-aligned via padStart)
+  entries.push({ type:0, content: `Payment: ${paymentMethod}`.padStart(32), bold:0, align:0, format:0 })
 
   // 16. Blank line after payment
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
