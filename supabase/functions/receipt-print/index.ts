@@ -48,25 +48,33 @@ function formatPhoneDigits(digits: string): string {
 }
 
 /**
- * Creates a strict 3-column layout totaling exactly 32 characters:
- * - Qty: 2 characters (Left-aligned)
- * - Space: 1 character
- * - Item Name: 23 characters (Left-aligned, padded, or truncated)
- * - Price: 6 characters (Right-aligned)
+ * Creates a strict 3-column layout totaling exactly 32 characters.
+ * Uses '\u00A0' (non-breaking space) to prevent the printer app from collapsing whitespace.
  */
 function formatThreeColumns(qtyNum: number, itemName: string, priceStr: string): string {
-  const qtyCol = `${qtyNum}x`.padEnd(2).slice(0, 2)
-  const priceCol = priceStr.padStart(6).slice(-6)
+  const qtyCol = `${qtyNum}x`.padEnd(2, '\u00A0').slice(0, 2)
+  const priceCol = priceStr.padStart(6, '\u00A0').slice(-6)
   
   const itemWidth = 23
   let itemCol = itemName.trim()
   if (itemCol.length > itemWidth) {
     itemCol = itemCol.slice(0, itemWidth - 3) + '...'
   } else {
-    itemCol = itemCol.padEnd(itemWidth)
+    itemCol = itemCol.padEnd(itemWidth, '\u00A0')
   }
 
-  return `${qtyCol} ${itemCol}${priceCol}`
+  return `${qtyCol}\u00A0${itemCol}${priceCol}`
+}
+
+/**
+ * Justifies two strings (left and right text) to opposite sides of a 32-character line.
+ */
+function justifyLine(leftText: string, rightText: string, maxLength = 32): string {
+  const spaceNeeded = maxLength - (leftText.length + rightText.length)
+  if (spaceNeeded <= 0) {
+    return leftText + '\u00A0' + rightText
+  }
+  return leftText + '\u00A0'.repeat(spaceNeeded) + rightText
 }
 
 // — Handler
@@ -171,13 +179,11 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo (Downsized safely, fall back directly to source if image processing agent fails)
+  // 1. Logo (Scaled down to 60x60 width height using working URL configurations)
   if (logoUrl) {
     entries.push({
       type: 1,
-      path: logoUrl.includes('supabase.co') 
-        ? `https://weserv.nl{encodeURIComponent(logoUrl)}&w=50&h=50&fit=contain&bg=ffffff`
-        : logoUrl,
+      path: `https://weserv.nl{encodeURIComponent(logoUrl)}&w=60&h=60&fit=contain&pad=15&bg=ffffff`,
       align: 1,
     })
   }
@@ -195,7 +201,7 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Meta order metadata info
+  // Metadata information block
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
@@ -234,16 +240,14 @@ Deno.serve(async (req) => {
     format: 0,
   })
 
-  // 15. Payment Row (Clean, native right alignment)
+  // 15. Payment method Row (Left aligned, no trailing blank line)
   entries.push({
     type: 0,
-    content: `Payment: ${paymentMethod}`,
+    content: justifyLine('Payment method:', paymentMethod),
     bold: 0,
-    align: 2,
+    align: 0,
     format: 0,
   })
-
-  entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
   // 17. Logistics block
   if (showDetailBlock) {
