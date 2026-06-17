@@ -1,8 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // — Constants
-
-// Allow unauthenticated requests - fetched by Bluetooth Print app, no auth headers
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,14 +10,14 @@ const JSON_HEADERS = { ...CORS, 'Content-Type': 'application/json; charset=utf-8
 
 // — Helpers
 
+// Strips out decimals (.00) for clean receipt line styling
 function formatCurrency(amount: number): string {
-  const [whole, dec] = Math.abs(amount).toFixed(2).split('.')
-  return `₱${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${dec}`
+  const whole = Math.floor(Math.abs(amount))
+  return `₱${whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
 }
 
 function formatPHDateTime(dateStr: string): string {
   const date = new Date(dateStr)
-
   const dateParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     day: '2-digit',
@@ -29,8 +27,6 @@ function formatPHDateTime(dateStr: string): string {
   const dp: Record<string, string> = {}
   for (const p of dateParts) dp[p.type] = p.value
 
-  // Replace narrow no-break space (U+202F) Intl inserts before AM/PM –
-  // corrupts to â€¯ when receiver treats UTF-8 bytes as Latin-1
   const time = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila',
     hour: 'numeric',
@@ -45,7 +41,6 @@ function truncate(s: string, max = 32): string {
   return s.length > max ? s.slice(0, max - 3) + '...' : s
 }
 
-// Format clean phone digits for receipt display
 function formatPhoneDigits(digits: string): string {
   if (digits.startsWith('09') && digits.length === 11) {
     return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 11)}`
@@ -56,15 +51,21 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
-// Dynamically calculates text padding to perfectly justify lines on a 32-character grid
-function justifyLine(leftText: string, rightText: string, maxLength = 32): string {
-  const spaceNeeded = maxLength - (leftText.length + rightText.length)
-  if (spaceNeeded <= 0) {
-    // If string overflows 32 characters, safely truncate the left-hand text to prevent breaking alignment layout
-    const allowedLeftLength = maxLength - rightText.length - 1
-    return leftText.slice(0, allowedLeftLength) + " " + rightText
+// Fixed 3-Column Grid alignment helper function (Total width = 32)
+function formatThreeColumns(qtyNum: number, itemName: string, priceStr: string): string {
+  const qtyCol  = `${qtyNum}x`.padEnd(2).slice(0, 2)     // Width: 2
+  const priceCol = priceStr.padStart(5).slice(-5)       // Width: 5
+  
+  // 32 total - 2 (qty) - 1 (space) - 5 (price) = 24 left for item text
+  const itemColWidth = 24 
+  let itemCol = itemName.trim()
+  if (itemCol.length > itemColWidth) {
+    itemCol = itemCol.slice(0, itemColWidth - 3) + '...'
+  } else {
+    itemCol = itemCol.padEnd(itemColWidth)
   }
-  return leftText + " ".repeat(spaceNeeded) + rightText
+
+  return `${qtyCol} ${itemCol}${priceCol}`
 }
 
 // — Handler
@@ -103,7 +104,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  // — Fetch station + settings + contacts in parallel
+  // — Fetch station data
   const [
     { data: station },
     { data: settings },
@@ -114,7 +115,6 @@ Deno.serve(async (req) => {
     supabase.from('station_contacts').select('type, value').eq('station_id', sale.station_id).order('created_at'),
   ])
 
-  // — Map variables
   const s = settings as Record<string, any> | null
   const contactRows = (contacts ?? []) as Array<{ type: string; value: string }>
 
@@ -167,95 +167,82 @@ Deno.serve(async (req) => {
   const showDetailBlock = isScheduled && (rawAddress !== null || rawScheduledTime !== null)
   const remarks: string | null = sale.remarks ? `Remarks: ${sale.remarks as string}` : null
 
-  // — Build entries
+  // — Build entries array
   const entries: object[] = []
 
-  // 1. Logo (scaled down to width=60, height=60, pad=15)
+  // 1. Scaled down micro-logo
   if (logoUrl) {
     entries.push({
       type: 1,
-      path: `https://weserv.nl{encodeURIComponent(logoUrl)}&w=60&h=60&fit=contain&pad=15&bg=ffffff`,
+      path: `https://weserv.nl{encodeURIComponent(logoUrl)}&w=45&h=45&fit=contain&pad=5&bg=ffffff`,
       align: 1,
     })
   }
 
-  // 2. Station name
+  // 2. Station Identity Header
   entries.push({ type: 0, content: stationName, bold: 1, align: 1, format: 2 })
-
-  // 3. Address
   if (address) entries.push({ type: 0, content: address, bold: 0, align: 1, format: 0 })
-
-  // 4. Phone
   if (phone) entries.push({ type: 0, content: phone, bold: 0, align: 1, format: 0 })
-
-  // 5. Messenger
   if (messengerContact) entries.push({ type: 0, content: messengerContact.value, bold: 0, align: 1, format: 0 })
-
-  // 6. Email
   if (email) entries.push({ type: 0, content: email, bold: 0, align: 1, format: 0 })
 
-  // Two blank lines before ORDER #
+  // Spacing
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 8. Order number
+  // Meta metadata info
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
-
-  // 9. Paid date/time
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
-
-  // 10. Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Items - Combined name, qty and price aligned inline
+  // 11. Loop and display 3-column aligned items
   for (const item of items) {
-    const leftText  = `${item.qty} x ${item.name}`
-    const rightText = formatCurrency(item.subtotal)
+    const formattedLine = formatThreeColumns(item.qty, item.name, formatCurrency(item.subtotal))
     entries.push({
       type: 0,
-      content: justifyLine(leftText, rightText),
+      content: formattedLine,
       bold: 0,
       align: 0,
       format: 0,
     })
   }
 
-  // 12. Container fee (justified alignment matching item rows)
+  // 12. Justified container fee layout configuration
   if (containerFee) {
+    const formattedFeeLine = formatThreeColumns(1, 'Container Fee', formatCurrency(containerFee))
     entries.push({
       type: 0,
-      content: justifyLine('Container fee', formatCurrency(containerFee)),
+      content: formattedFeeLine,
       bold: 0,
       align: 0,
       format: 0,
     })
   }
 
-  // 13. Divider
+  // Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 14. Total (justified alignment matching item rows)
+  // 14. Total Row - Fixed alignment via native printer setting
   entries.push({
     type: 0,
-    content: justifyLine('TOTAL', formatCurrency(total)),
+    content: `TOTAL: ${formatCurrency(total)}`,
     bold: 0,
-    align: 0,
+    align: 2,
     format: 0,
   })
 
-  // 15. Payment mode (justified alignment matching item rows)
+  // 15. Payment Row - Fixed alignment via native printer setting
   entries.push({
     type: 0,
-    content: justifyLine('Payment', paymentMethod),
+    content: `Payment: ${paymentMethod}`,
     bold: 0,
-    align: 0,
+    align: 2,
     format: 0,
   })
 
-  // 16. Blank line after payment
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 17-18. Delivery / Pickup detail block
+  // 17. Logistics Information Block
   if (showDetailBlock) {
     entries.push({ type: 0, content: `${orderLabel} details:`, bold: 0, align: 0, format: 0 })
 
@@ -267,17 +254,13 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 19. Remarks
   if (remarks) entries.push({ type: 0, content: remarks, bold: 0, align: 0, format: 0 })
 
-  // 20-21. Two blank lines before thank you
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 22. Thank you
+  // Footer Message
   entries.push({ type: 0, content: 'Thank you for your order!', bold: 0, align: 1, format: 0 })
-
-  // 23. Trailing blank line
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
   const obj = Object.fromEntries(entries.map((v, i) => [String(i).padStart(2, '0'), v]))
