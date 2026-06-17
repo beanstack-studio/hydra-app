@@ -119,15 +119,31 @@ export function BusinessSettings({
   })
 
   const handleSaveContact = async (input: ContactDetailInput) => {
-    await onAddContact(input)
-    setIsAddingContact(false)
-    toast({ title: 'Contact added' })
+    try {
+      await onAddContact(input)
+      setIsAddingContact(false)
+      toast({ title: 'Contact added' })
+    } catch (e) {
+      toast({
+        title: 'Failed to save contact',
+        description: e instanceof Error ? e.message : 'Something went wrong',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleUpdateContact = async (id: string, input: ContactDetailInput) => {
-    await onUpdateContact(id, input)
-    setEditingContactId(null)
-    toast({ title: 'Contact updated' })
+    try {
+      await onUpdateContact(id, input)
+      setEditingContactId(null)
+      toast({ title: 'Contact updated' })
+    } catch (e) {
+      toast({
+        title: 'Failed to update contact',
+        description: e instanceof Error ? e.message : 'Something went wrong',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleDeleteContact = async () => {

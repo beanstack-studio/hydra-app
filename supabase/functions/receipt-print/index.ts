@@ -45,6 +45,15 @@ function truncate(s: string, max = 32): string {
   return s.length > max ? s.slice(0, max - 3) + '...' : s
 }
 
+// Format clean phone digits for receipt display
+function formatPhoneDigits(digits: string): string {
+  if (digits.startsWith('09') && digits.length === 11)
+    return `${digits.slice(0,4)} ${digits.slice(4,7)} ${digits.slice(7,11)}`
+  if (digits.startsWith('0') && !digits.startsWith('09') && digits.length <= 10)
+    return `${digits.slice(0,3)} ${digits.slice(3,6)} ${digits.slice(6,10)}`
+  return digits
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -81,36 +90,35 @@ Deno.serve(async (req) => {
     })
   }
 
-  // ── Fetch station + settings in parallel ───────────────────────────────────
-  const [{ data: station }, { data: settings }] = await Promise.all([
+  // ── Fetch station + settings + contacts in parallel ───────────────────────
+  const [{ data: station }, { data: settings }, { data: contacts }] = await Promise.all([
     supabase.from('stations').select('name, photo_url').eq('id', sale.station_id).single(),
     supabase.from('station_settings').select('*').eq('station_id', sale.station_id).maybeSingle(),
+    supabase.from('station_contacts').select('type, value').eq('station_id', sale.station_id).order('created_at'),
   ])
 
-  // Log full rows to confirm field names in Supabase dashboard
   console.log('station:', JSON.stringify(station))
   console.log('station_settings:', JSON.stringify(settings))
-  console.log('station_settings keys:', JSON.stringify(settings ? Object.keys(settings) : []))
+  console.log('station_contacts:', JSON.stringify(contacts))
 
   // ── Map variables ──────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const s = settings as Record<string, any> | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contactRows = (contacts ?? []) as Array<{ type: string; value: string }>
 
   const stationName = (station?.name ?? 'Water Station') as string
   const logoUrl     = (station?.photo_url as string | null | undefined) ?? null
   const address     = (s?.business_address as string | null | undefined) ?? null
 
-  // Try all known field name variants for phone — logs will reveal actual name
-  const phone = ((
-    s?.business_phone ??
-    s?.phone ??
-    s?.contact_phone ??
-    s?.phone_number ??
-    s?.contact_number ??
-    s?.mobile
-  ) as string | null | undefined) ?? null
+  // Phone: first mobile or landline entry from station_contacts (stored as clean digits)
+  const phoneContact = contactRows.find((c) => c.type === 'mobile' || c.type === 'landline')
+  const phone: string | null = phoneContact ? formatPhoneDigits(phoneContact.value) : null
 
-  const email = (s?.business_email as string | null | undefined) ?? null
+  // Messenger / email for receipt header
+  const messengerContact = contactRows.find((c) => c.type === 'messenger')
+  const emailContact     = contactRows.find((c) => c.type === 'email')
+  const email = emailContact?.value ?? (s?.business_email as string | null | undefined) ?? null
 
   const orderId = (txnId as string).slice(-6).toUpperCase()
   const paidAt  = formatPHDateTime(
@@ -172,10 +180,13 @@ Deno.serve(async (req) => {
   // 4. Phone (centered; tries all known field name variants)
   if (phone) entries.push({ type:0, content: phone, bold:0, align:1, format:0 })
 
-  // 5. Email
+  // 5. Messenger
+  if (messengerContact) entries.push({ type:0, content: messengerContact.value, bold:0, align:1, format:0 })
+
+  // 6. Email
   if (email) entries.push({ type:0, content: email, bold:0, align:1, format:0 })
 
-  // 6–7. Two blank lines before ORDER #
+  // Two blank lines before ORDER #
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
