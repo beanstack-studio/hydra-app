@@ -1,5 +1,3 @@
-//import { createClient } from 'https://esm.sh'
-//import { createClient } from 'https://skypack.dev'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 // — Constants
@@ -151,7 +149,7 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo 
+  // 1. Logo (Using standard format parameters to render consistently)
   if (logoUrl) {
     entries.push({
       type: 1,
@@ -173,29 +171,44 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Meta order identifier details block
+  // Order Details Metadata
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Print items using Native Application Left-Right text splitting (Type: 4)
+  // 11. Multi-component rendering strategy for items: 
+  // Prints Left Item Name first, then maps native Right-Align for the Price directly underneath
   for (const item of items) {
     entries.push({
-      type: 4,
-      leftText: `${item.qty} x ${item.name}`,
-      rightText: formatCurrency(item.subtotal),
+      type: 0,
+      content: `${item.qty} x ${item.name}`,
       bold: 0,
+      align: 0,
+      format: 0,
+    })
+    entries.push({
+      type: 0,
+      content: formatCurrency(item.subtotal),
+      bold: 0,
+      align: 2,
       format: 0,
     })
   }
 
-  // 12. Container fee using native left-right row splitting structure (Type: 4)
+  // 12. Container fee block utilizing same split architecture
   if (containerFee) {
     entries.push({
-      type: 4,
-      leftText: '1 x Container Fee',
-      rightText: formatCurrency(containerFee),
+      type: 0,
+      content: '1 x Container Fee',
       bold: 0,
+      align: 0,
+      format: 0,
+    })
+    entries.push({
+      type: 0,
+      content: formatCurrency(containerFee),
+      bold: 0,
+      align: 2,
       format: 0,
     })
   }
@@ -203,24 +216,24 @@ Deno.serve(async (req) => {
   // Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 14. TOTAL Row (Left/Right split block format)
+  // 14. TOTAL Row (Right aligned natively)
   entries.push({
-    type: 4,
-    leftText: 'TOTAL:',
-    rightText: formatCurrency(total),
-    bold: 1,
+    type: 0,
+    content: `TOTAL: ${formatCurrency(total)}`,
+    bold: 0,
+    align: 2,
     format: 0,
   })
 
-  // Blank line added before payment method row
+  // Blank line added before payment method
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 15. Payment method Row (Left/Right split block format)
+  // 15. Payment method Row (Left aligned natively, no trailing blank line)
   entries.push({
-    type: 4,
-    leftText: 'Payment method:',
-    rightText: paymentMethod,
+    type: 0,
+    content: `Payment method: ${paymentMethod}`,
     bold: 0,
+    align: 0,
     format: 0,
   })
 
