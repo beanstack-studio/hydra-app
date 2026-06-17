@@ -24,7 +24,6 @@ export interface Sale {
   container_enabled: boolean
   container_qty: number
   container_price: number
-  delivery_zone_id: string | null
   delivery_zone_name: string | null
   delivery_zone_price: number
   total_amount: number
@@ -56,7 +55,6 @@ export interface SaleInsert {
   container_enabled: boolean
   container_qty: number
   container_price: number
-  delivery_zone_id: string | null
   delivery_zone_name: string | null
   delivery_zone_price: number
   total_amount: number

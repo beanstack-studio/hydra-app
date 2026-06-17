@@ -222,7 +222,5 @@ Deno.serve(async (req) => {
   // 21. Empty line
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // Thermer/Bluetooth Print expects JSON_FORCE_OBJECT — numeric string keys
-  const body = Object.fromEntries(entries.map((v, i) => [i, v]))
-  return new Response(JSON.stringify(body), { headers: JSON_HEADERS })
+  return new Response(JSON.stringify(entries), { headers: JSON_HEADERS })
 })

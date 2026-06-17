@@ -29,7 +29,6 @@ const saleSchema = z.object({
   customer_phone: z.string(),
   container_enabled: z.boolean(),
   container_qty: z.number().min(1),
-  delivery_zone_id: z.string().nullable(),
   order_type: z.enum(['walk-in', 'delivery', 'pickup']),
   scheduled_date: z.string(),
   scheduled_time: z.string(),
@@ -191,7 +190,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
       customer_phone: '',
       container_enabled: false,
       container_qty: 1,
-      delivery_zone_id: null,
       order_type: 'walk-in',
       scheduled_date: todayPH,
       scheduled_time: defaultTime,
@@ -207,7 +205,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
   const watchedFields = useWatch({ control })
   const cEnabled = watchedFields.container_enabled ?? false
   const cQty = watchedFields.container_qty ?? 1
-  const zoneId = watchedFields.delivery_zone_id ?? null
   const orderType = watchedFields.order_type ?? 'walk-in'
   const discount = watchedFields.discount ?? 0
   const scheduledDate = watchedFields.scheduled_date ?? ''
@@ -247,9 +244,8 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderType, scheduledDate, stationSettings?.open_hours, todayPH])
 
-  const selectedZone = activeZones.find((z) => z.id === zoneId) ?? null
   const cartTotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0)
-  const grandTotal = cartTotal + (cEnabled ? cQty * containerPrice : 0) + (selectedZone?.price ?? 0) - discount
+  const grandTotal = cartTotal + (cEnabled ? cQty * containerPrice : 0) - discount
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0)
   const amountReceivedRaw = watchedFields.amount_received
   const amountReceived = (amountReceivedRaw == null || !Number.isFinite(amountReceivedRaw)) ? 0 : amountReceivedRaw
@@ -467,7 +463,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
         }
       }
 
-      const zone = activeZones.find((z) => z.id === values.delivery_zone_id)
       const firstItem = cartItems[0]
 
       let scheduledAt: string | null = null
@@ -479,7 +474,7 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
 
       const customerName = toTitleCase(customerQuery.trim() || 'Walk-in')
       const discountValue = values.discount ?? 0
-      const finalTotal = cartTotal + (values.container_enabled ? values.container_qty * containerPrice : 0) + (zone?.price ?? 0) - discountValue
+      const finalTotal = cartTotal + (values.container_enabled ? values.container_qty * containerPrice : 0) - discountValue
       const amountReceived = Math.min(values.amount_received, finalTotal)
       const finalBalance = Math.max(0, finalTotal - amountReceived)
       const saleStatus: SaleStatus = finalBalance === 0 ? 'paid' : amountReceived > 0 ? 'partial' : 'unpaid'
@@ -497,9 +492,8 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
         container_enabled: values.container_enabled,
         container_qty: values.container_enabled ? values.container_qty : 0,
         container_price: values.container_enabled ? containerPrice : 0,
-        delivery_zone_id: zone?.id ?? null,
-        delivery_zone_name: zone?.name ?? null,
-        delivery_zone_price: zone?.price ?? 0,
+        delivery_zone_name: null,
+        delivery_zone_price: 0,
         total_amount: finalTotal,
         payment_mode: values.payment_mode,
         amount_received: amountReceived,
