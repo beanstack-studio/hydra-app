@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
   // Messenger / email for receipt header
   const messengerContact = contactRows.find((c) => c.type === 'messenger')
   const emailContact     = contactRows.find((c) => c.type === 'email')
-  const email = emailContact?.value ?? (s?.business_email as string | null | undefined) ?? null
+  const email = emailContact?.value ?? null
 
   const orderId = (txnId as string).slice(-6).toUpperCase()
   const paidAt  = formatPHDateTime(

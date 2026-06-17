@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -58,7 +57,7 @@ export function ContactEditRow({ defaultValues, onSave, onCancel }: ContactEditR
     handleSubmit,
     control,
     watch,
-    reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ContactSchema>({
     resolver: zodResolver(contactSchema),
@@ -68,16 +67,13 @@ export function ContactEditRow({ defaultValues, onSave, onCancel }: ContactEditR
   const contactType = watch('type')
   const isPhone = contactType === 'mobile' || contactType === 'landline'
 
-  // Reset value when type changes (but NOT on initial mount — would wipe pre-filled edit values)
-  const isFirstRender = useRef(true)
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return }
-    reset((prev) => ({ ...prev, value: '' }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contactType])
+  // Value is cleared via onClick when the user actively switches type (no useEffect needed —
+  // avoids StrictMode double-fire which would wipe pre-filled edit values)
 
   const onSubmit = handleSubmit(async (values) => {
-    const storedValue = isPhone ? cleanPhone(values.value) : values.value.trim()
+    console.log('[ContactEditRow] submit fired:', values)
+    const isPhoneType = values.type === 'mobile' || values.type === 'landline'
+    const storedValue = isPhoneType ? cleanPhone(values.value) : values.value.trim()
     await onSave({ type: values.type, value: storedValue, label: null })
   })
 
@@ -93,7 +89,12 @@ export function ContactEditRow({ defaultValues, onSave, onCancel }: ContactEditR
               <button
                 key={ct.value}
                 type="button"
-                onClick={() => field.onChange(ct.value)}
+                onClick={() => {
+                  if (ct.value !== field.value) {
+                    setValue('value', '', { shouldValidate: false })
+                  }
+                  field.onChange(ct.value)
+                }}
                 className={cn(
                   'rounded-full px-3 py-1 text-xs font-medium border transition-all duration-150',
                   field.value === ct.value
@@ -146,7 +147,10 @@ export function ContactEditRow({ defaultValues, onSave, onCancel }: ContactEditR
           size="icon"
           className="h-10 w-10 shrink-0"
           disabled={isSubmitting}
-          onClick={() => void onSubmit()}
+          onClick={() => {
+            console.log('[ContactEditRow] save clicked, current errors:', errors)
+            void onSubmit()
+          }}
           aria-label="Save contact"
         >
           <Check className="h-4 w-4" />

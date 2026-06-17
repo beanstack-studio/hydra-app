@@ -124,6 +124,7 @@ export function BusinessSettings({
       setIsAddingContact(false)
       toast({ title: 'Contact added' })
     } catch (e) {
+      console.error('[handleSaveContact] error:', e)
       toast({
         title: 'Failed to save contact',
         description: e instanceof Error ? e.message : 'Something went wrong',
@@ -138,6 +139,7 @@ export function BusinessSettings({
       setEditingContactId(null)
       toast({ title: 'Contact updated' })
     } catch (e) {
+      console.error('[handleUpdateContact] error:', e)
       toast({
         title: 'Failed to update contact',
         description: e instanceof Error ? e.message : 'Something went wrong',
