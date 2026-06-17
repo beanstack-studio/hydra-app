@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
   // 15. Payment method Row (Left aligned, no trailing blank line)
   entries.push({
     type: 0,
-    content: justifyLine('Payment method:', paymentMethod),
+    content: 'Payment method:', paymentMethod,
     bold: 0,
     align: 0,
     format: 0,
