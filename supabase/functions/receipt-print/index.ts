@@ -144,16 +144,10 @@ Deno.serve(async (req) => {
 
   // ── Build entries ──────────────────────────────────────────────────────────
 
-  const W = 32
-  const pad = (l: string, r: string) => {
-    const gap = W - l.length - r.length
-    return l + (gap > 0 ? ' '.repeat(gap) : ' ') + r
-  }
-
   const entries: object[] = []
 
   // 1. Logo
-  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=70&h=70&fit=contain`, align:1 })
+  if (logoUrl) entries.push({ type:1, path: `https://images.weserv.nl/?url=${encodeURIComponent(logoUrl)}&w=100&h=100&fit=contain`, align:1 })
 
   // 2. Station name
   entries.push({ type:0, content: stationName, bold:1, align:1, format:2 })
@@ -167,53 +161,60 @@ Deno.serve(async (req) => {
   // 5. Email
   if (email) entries.push({ type:0, content: email, bold:0, align:1, format:0 })
 
-  // 6. Empty line
+  // 6–7. Two blank lines before ORDER #
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // 7. Order number
+  // 8. Order number
   entries.push({ type:0, content:`ORDER #${orderId}`, bold:0, align:1, format:0 })
 
-  // 8. Paid date/time
+  // 9. Paid date/time
   entries.push({ type:0, content: paidAt, bold:0, align:1, format:0 })
 
-  // 9. Divider
+  // 10. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 10. Items
+  // 11. Items — name on its own line (bold), amount right-aligned on next line
   for (const item of items) {
     entries.push({ type:0, content: item.name, bold:1, align:0, format:0 })
-    entries.push({ type:0, content: pad(`  ${item.qty} x ${formatCurrency(item.unit)}`, formatCurrency(item.subtotal)), bold:0, align:0, format:0 })
+    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:2, format:0 })
   }
 
-  // 11. Container fee
-  if (containerFee) entries.push({ type:0, content: pad('  Container fee', formatCurrency(containerFee)), bold:0, align:0, format:0 })
-
+  // 12. Container fee (right-aligned)
+  if (containerFee) entries.push({ type:0, content: `Container fee  =  ${formatCurrency(containerFee)}`, bold:0, align:2, format:0 })
 
   // 13. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 14. Total
-  entries.push({ type:0, content: pad('TOTAL:', formatCurrency(total)), bold:1, align:0, format:0 })
+  // 14. Total (right-aligned)
+  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:1, align:2, format:0 })
 
-  // 15. Payment
-  entries.push({ type:0, content: pad('Payment:', paymentMethod), bold:0, align:0, format:0 })
+  // 15. Payment mode (right-aligned)
+  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:2, format:0 })
 
-  // 16. Delivery address
-  if (deliveryAddress) entries.push({ type:0, content: deliveryAddress, bold:0, align:0, format:0 })
-
-  // 17. Scheduled time
-  if (scheduledTime) entries.push({ type:0, content: scheduledTime, bold:0, align:0, format:0 })
-
-  // 18. Remarks
-  if (remarks) entries.push({ type:0, content: remarks, bold:0, align:0, format:0 })
-
-  // 19. Empty line
+  // 16. Blank line after payment
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  // 20. Thank you
+  // 17. Delivery address
+  if (deliveryAddress) entries.push({ type:0, content: deliveryAddress, bold:0, align:0, format:0 })
+
+  // 18. Scheduled time
+  if (scheduledTime) entries.push({ type:0, content: scheduledTime, bold:0, align:0, format:0 })
+
+  // 19. Blank line after delivery/pickup time (only when present)
+  if (scheduledTime) entries.push({ type:0, content:'', bold:0, align:0, format:0 })
+
+  // 20. Remarks
+  if (remarks) entries.push({ type:0, content: remarks, bold:0, align:0, format:0 })
+
+  // 21–22. Two blank lines before thank you
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
+  entries.push({ type:0, content:'', bold:0, align:0, format:0 })
+
+  // 23. Thank you
   entries.push({ type:0, content:'Thank you for your order!', bold:0, align:1, format:0 })
 
-  // 21. Empty line
+  // 24. Trailing blank line
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
   const obj = Object.fromEntries(entries.map((v, i) => [String(i).padStart(2, '0'), v]))
