@@ -24,8 +24,7 @@ export interface Sale {
   container_enabled: boolean
   container_qty: number
   container_price: number
-  delivery_zone_name: string | null
-  delivery_zone_price: number
+
   total_amount: number
   payment_mode: PaymentMode
   amount_received: number
@@ -55,8 +54,7 @@ export interface SaleInsert {
   container_enabled: boolean
   container_qty: number
   container_price: number
-  delivery_zone_name: string | null
-  delivery_zone_price: number
+
   total_amount: number
   payment_mode: PaymentMode
   amount_received: number

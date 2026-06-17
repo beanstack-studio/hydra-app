@@ -492,8 +492,6 @@ export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSet
         container_enabled: values.container_enabled,
         container_qty: values.container_enabled ? values.container_qty : 0,
         container_price: values.container_enabled ? containerPrice : 0,
-        delivery_zone_name: null,
-        delivery_zone_price: 0,
         total_amount: finalTotal,
         payment_mode: values.payment_mode,
         amount_received: amountReceived,

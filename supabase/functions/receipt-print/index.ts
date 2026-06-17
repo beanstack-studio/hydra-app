@@ -123,10 +123,6 @@ Deno.serve(async (req) => {
       ? (sale.container_qty as number) * (sale.container_price as number)
       : 0
 
-  const deliveryFee: number =
-    sale.delivery_zone_name && (sale.delivery_zone_price as number) > 0
-      ? (sale.delivery_zone_price as number)
-      : 0
 
   const total         = sale.total_amount as number
   const paymentMethod = (sale.payment_mode as string).toUpperCase()
@@ -192,8 +188,6 @@ Deno.serve(async (req) => {
   // 11. Container fee
   if (containerFee) entries.push({ type:0, content: pad('  Container fee', formatCurrency(containerFee)), bold:0, align:0, format:0 })
 
-  // 12. Delivery fee
-  if (deliveryFee) entries.push({ type:0, content: pad('  Delivery fee', formatCurrency(deliveryFee)), bold:0, align:0, format:0 })
 
   // 13. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
