@@ -1,4 +1,7 @@
-import { createClient } from 'https://esm.sh'
+//import { createClient } from 'https://esm.sh'
+//import { createClient } from 'https://skypack.dev'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
 
 // — Constants
 const CORS = {
