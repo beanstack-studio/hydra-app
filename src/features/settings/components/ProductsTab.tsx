@@ -16,7 +16,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { uploadProductImage } from '@/lib/storage'
 import type {
   Product, ProductInput,
-  DeliveryZone, DeliveryZoneInput,
   StationSettings, StationSettingsInput,
 } from '../types'
 
@@ -43,15 +42,11 @@ type ContainerSchema = z.infer<typeof containerSchema>
 
 interface ProductsTabProps {
   products: Product[]
-  deliveryZones: DeliveryZone[]
   stationSettings: StationSettings | null
   isLoading: boolean
   onAddProduct: (input: ProductInput) => Promise<void>
   onUpdateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
   onDeleteProduct: (id: string) => Promise<void>
-  onAddZone: (input: DeliveryZoneInput) => Promise<void>
-  onUpdateZone: (id: string, input: Partial<DeliveryZoneInput>) => Promise<void>
-  onDeleteZone: (id: string) => Promise<void>
   onUpdateStationSettings: (input: Partial<StationSettingsInput>) => Promise<void>
 }
 
@@ -67,22 +62,19 @@ interface ItemFormModalProps {
   isOpen: boolean
   onClose: () => void
   editingProduct: Product | null
-  editingZone: DeliveryZone | null
   defaultType: ItemType
   onAddProduct: (input: ProductInput) => Promise<void>
   onUpdateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
-  onAddZone: (input: DeliveryZoneInput) => Promise<void>
-  onUpdateZone: (id: string, input: Partial<DeliveryZoneInput>) => Promise<void>
 }
 
 function ItemFormModal({
   isOpen, onClose,
-  editingProduct, editingZone, defaultType,
-  onAddProduct, onUpdateProduct, onAddZone: _onAddZone, onUpdateZone,
+  editingProduct, defaultType,
+  onAddProduct, onUpdateProduct,
 }: ItemFormModalProps) {
   const { toast } = useToast()
   const stationId = useAuthStore((s) => s.stationId)
-  const isEdit = !!(editingProduct || editingZone)
+  const isEdit = !!editingProduct
 
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
@@ -116,12 +108,10 @@ function ItemFormModal({
         price: editingProduct.price,
         is_active: editingProduct.is_active,
       })
-    } else if (editingZone) {
-      reset({ type: 'addon', name: editingZone.name, price: editingZone.price, is_active: editingZone.is_active })
     } else {
       reset({ type: defaultType, name: '', price: 0, is_active: true })
     }
-  }, [isOpen, editingProduct, editingZone, defaultType, reset])
+  }, [isOpen, editingProduct, defaultType, reset])
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -130,25 +120,19 @@ function ItemFormModal({
         imageUrl = await uploadProductImage(stationId, imageFile)
       }
 
-      if (editingZone) {
-        // Legacy: editing an existing delivery zone entry
-        await onUpdateZone(editingZone.id, { name: values.name, price: values.price, is_active: values.is_active })
-        toast({ title: 'Add-on updated' })
+      const productInput: ProductInput = {
+        name: values.name,
+        type: values.type,
+        price: values.price,
+        is_active: values.is_active,
+        image_url: imageUrl,
+      }
+      if (editingProduct) {
+        await onUpdateProduct(editingProduct.id, productInput)
+        toast({ title: `${TYPE_LABELS[values.type]} updated` })
       } else {
-        const productInput: ProductInput = {
-          name: values.name,
-          type: values.type,
-          price: values.price,
-          is_active: values.is_active,
-          image_url: imageUrl,
-        }
-        if (editingProduct) {
-          await onUpdateProduct(editingProduct.id, productInput)
-          toast({ title: `${TYPE_LABELS[values.type]} updated` })
-        } else {
-          await onAddProduct(productInput)
-          toast({ title: `${TYPE_LABELS[values.type]} added` })
-        }
+        await onAddProduct(productInput)
+        toast({ title: `${TYPE_LABELS[values.type]} added` })
       }
       onClose()
     } catch (e) {
@@ -366,15 +350,11 @@ function ItemRow({ label, sub, onEdit, onDelete, inactive }: ItemRowProps) {
 
 export function ProductsTab({
   products,
-  deliveryZones: _deliveryZones,
   stationSettings,
   isLoading,
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
-  onAddZone,
-  onUpdateZone,
-  onDeleteZone,
   onUpdateStationSettings,
 }: ProductsTabProps) {
   const { toast } = useToast()
@@ -383,13 +363,10 @@ export function ProductsTab({
   const [itemModalOpen, setItemModalOpen] = useState(false)
   const [defaultType, setDefaultType] = useState<ItemType>('water')
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null)
   const [containerModalOpen, setContainerModalOpen] = useState(false)
 
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [isDeletingProduct, setIsDeletingProduct] = useState(false)
-  const [deletingZone, setDeletingZone] = useState<DeliveryZone | null>(null)
-  const [isDeletingZone, setIsDeletingZone] = useState(false)
 
   type SortState = { key: 'name' | 'price'; dir: 'asc' | 'desc' }
   const [waterSort, setWaterSort] = useState<SortState>({ key: 'price', dir: 'asc' })
@@ -409,14 +386,12 @@ export function ProductsTab({
 
   const openAdd = (type: ItemType) => {
     setEditingProduct(null)
-    setEditingZone(null)
     setDefaultType(type)
     setItemModalOpen(true)
   }
 
   const openEditProduct = (p: Product) => {
     setEditingProduct(p)
-    setEditingZone(null)
     setDefaultType(p.type as ItemType)
     setItemModalOpen(true)
   }
@@ -432,20 +407,6 @@ export function ProductsTab({
       toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
     } finally {
       setIsDeletingProduct(false)
-    }
-  }
-
-  const handleDeleteZone = async () => {
-    if (!deletingZone) return
-    setIsDeletingZone(true)
-    try {
-      await onDeleteZone(deletingZone.id)
-      toast({ title: 'Add-on deleted' })
-      setDeletingZone(null)
-    } catch (e) {
-      toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
-    } finally {
-      setIsDeletingZone(false)
     }
   }
 
@@ -632,14 +593,11 @@ export function ProductsTab({
 
       <ItemFormModal
         isOpen={itemModalOpen}
-        onClose={() => { setItemModalOpen(false); setEditingProduct(null); setEditingZone(null) }}
+        onClose={() => { setItemModalOpen(false); setEditingProduct(null) }}
         editingProduct={editingProduct}
-        editingZone={editingZone}
         defaultType={defaultType}
         onAddProduct={onAddProduct}
         onUpdateProduct={onUpdateProduct}
-        onAddZone={onAddZone}
-        onUpdateZone={onUpdateZone}
       />
 
       <ContainerFeeModal
@@ -659,21 +617,6 @@ export function ProductsTab({
             <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingProduct(null)}>Cancel</Button>
             <Button type="button" variant="destructive" className="flex-1" disabled={isDeletingProduct} onClick={handleDeleteProduct}>
               {isDeletingProduct ? 'Deleting…' : 'Delete'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Delete zone confirm */}
-      <Modal isOpen={!!deletingZone} onClose={() => setDeletingZone(null)} title="Delete Delivery Zone" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Delete zone <span className="font-semibold text-foreground">{deletingZone?.name}</span>? This cannot be undone.
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingZone(null)}>Cancel</Button>
-            <Button type="button" variant="destructive" className="flex-1" disabled={isDeletingZone} onClick={handleDeleteZone}>
-              {isDeletingZone ? 'Deleting…' : 'Delete'}
             </Button>
           </div>
         </div>

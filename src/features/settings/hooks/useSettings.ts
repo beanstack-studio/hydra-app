@@ -5,8 +5,6 @@ import { useAuthStore } from '@/stores/authStore'
 import type {
   Product,
   ProductInput,
-  DeliveryZone,
-  DeliveryZoneInput,
   SettingsData,
   StationSettings,
   StationSettingsInput,
@@ -21,9 +19,6 @@ export interface UseSettingsReturn {
   addProduct: (input: ProductInput) => Promise<void>
   updateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
   deleteProduct: (id: string) => Promise<void>
-  addDeliveryZone: (input: DeliveryZoneInput) => Promise<void>
-  updateDeliveryZone: (id: string, input: Partial<DeliveryZoneInput>) => Promise<void>
-  deleteDeliveryZone: (id: string) => Promise<void>
   updateStationSettings: (input: Partial<StationSettingsInput>) => Promise<void>
   updateStationName: (name: string) => Promise<void>
   uploadStationPhoto: (file: File) => Promise<void>
@@ -59,18 +54,13 @@ export function useSettings(): UseSettingsReturn {
     setError(null)
     try {
       // Use allSettled so one missing table doesn't fail everything
-      const [productsRes, zonesRes, settingsRes, contactsRes] = await Promise.allSettled([
+      const [productsRes, settingsRes, contactsRes] = await Promise.allSettled([
         supabase
           .from('products')
           .select('*')
           .eq('station_id', stationId)
           .order('type')
           .order('name'),
-        supabase
-          .from('delivery_zones')
-          .select('*')
-          .eq('station_id', stationId)
-          .order('sort_order'),
         supabase
           .from('station_settings')
           .select('*')
@@ -85,7 +75,6 @@ export function useSettings(): UseSettingsReturn {
 
       setData({
         products: safeData(productsRes, []) as Product[],
-        deliveryZones: safeData(zonesRes, []) as DeliveryZone[],
         stationSettings: safeData(settingsRes, null) as StationSettings | null,
         contacts: safeData(contactsRes, []) as ContactDetail[],
       })
@@ -103,7 +92,6 @@ export function useSettings(): UseSettingsReturn {
     const channel = supabase
       .channel(`settings:${stationId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `station_id=eq.${stationId}` }, () => { void fetchData() })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_zones', filter: `station_id=eq.${stationId}` }, () => { void fetchData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'station_settings', filter: `station_id=eq.${stationId}` }, () => { void fetchData() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'station_contacts', filter: `station_id=eq.${stationId}` }, () => { void fetchData() })
       .subscribe()
@@ -161,31 +149,6 @@ export function useSettings(): UseSettingsReturn {
     await fetchData()
   }, [fetchData])
 
-  const addDeliveryZone = useCallback(async (input: DeliveryZoneInput) => {
-    if (!stationId) return
-    const { count } = await supabase
-      .from('delivery_zones')
-      .select('*', { count: 'exact', head: true })
-      .eq('station_id', stationId)
-    const { error: e } = await supabase.from('delivery_zones').insert({
-      ...input, station_id: stationId, sort_order: (count ?? 0) + 1,
-    })
-    if (e) throw new Error(e.message)
-    await fetchData()
-  }, [stationId, fetchData])
-
-  const updateDeliveryZone = useCallback(async (id: string, input: Partial<DeliveryZoneInput>) => {
-    const { error: e } = await supabase.from('delivery_zones').update(input).eq('id', id)
-    if (e) throw new Error(e.message)
-    await fetchData()
-  }, [fetchData])
-
-  const deleteDeliveryZone = useCallback(async (id: string) => {
-    const { error: e } = await supabase.from('delivery_zones').delete().eq('id', id)
-    if (e) throw new Error(e.message)
-    await fetchData()
-  }, [fetchData])
-
   const updateStationSettings = useCallback(async (input: Partial<StationSettingsInput>) => {
     if (!stationId) return
     const { error: e } = await supabase
@@ -232,7 +195,6 @@ export function useSettings(): UseSettingsReturn {
   return {
     data, isLoading, error,
     addProduct, updateProduct, deleteProduct,
-    addDeliveryZone, updateDeliveryZone, deleteDeliveryZone,
     updateStationSettings, updateStationName, uploadStationPhoto,
     addContact, updateContact, deleteContact,
   }

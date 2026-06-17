@@ -85,7 +85,6 @@ export default function SettingsPage() {
   const {
     data, isLoading, error,
     addProduct, updateProduct, deleteProduct,
-    addDeliveryZone, updateDeliveryZone, deleteDeliveryZone,
     updateStationSettings, updateStationName, uploadStationPhoto,
     addContact, updateContact, deleteContact,
   } = useSettings()
@@ -120,15 +119,11 @@ export default function SettingsPage() {
         return (
           <ProductsTab
             products={data?.products ?? []}
-            deliveryZones={data?.deliveryZones ?? []}
             stationSettings={data?.stationSettings ?? null}
             isLoading={isLoading}
             onAddProduct={addProduct}
             onUpdateProduct={updateProduct}
             onDeleteProduct={deleteProduct}
-            onAddZone={addDeliveryZone}
-            onUpdateZone={updateDeliveryZone}
-            onDeleteZone={deleteDeliveryZone}
             onUpdateStationSettings={updateStationSettings}
           />
         )

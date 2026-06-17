@@ -15,18 +15,6 @@ export interface Product {
 
 export type ProductInput = Pick<Product, 'name' | 'type' | 'price' | 'is_active' | 'image_url'>
 
-export interface DeliveryZone {
-  id: string
-  station_id: string
-  name: string
-  price: number
-  is_active: boolean
-  sort_order: number
-  created_at: string
-}
-
-export type DeliveryZoneInput = Pick<DeliveryZone, 'name' | 'price' | 'is_active'>
-
 export type PayType = 'hourly' | 'daily'
 
 export type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
@@ -78,7 +66,6 @@ export type ContactDetailInput = Pick<ContactDetail, 'type' | 'value' | 'label'>
 
 export interface SettingsData {
   products: Product[]
-  deliveryZones: DeliveryZone[]
   stationSettings: StationSettings | null
   contacts: ContactDetail[]
 }

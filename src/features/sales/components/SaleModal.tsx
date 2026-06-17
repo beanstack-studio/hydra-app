@@ -16,7 +16,7 @@ import { formatCurrency, generateTimeSlots, generateTimeSlotsInRange, cn, PH_TZ,
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import type { Product, DeliveryZone, StationSettings, DayKey } from '@/features/settings/types'
+import type { Product, StationSettings, DayKey } from '@/features/settings/types'
 import type { Customer } from '@/features/customers/types'
 import type { Sale, CartItem, SaleInsert, SaleStatus, CustomerType, OrderType, PaymentMode } from '../types'
 
@@ -142,21 +142,19 @@ interface SaleModalProps {
   isOpen: boolean
   onClose: () => void
   products: Product[]
-  deliveryZones: DeliveryZone[]
   stationSettings: StationSettings | null
   onSubmit: (input: SaleInsert) => Promise<Sale>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function SaleModal({ isOpen, onClose, products, deliveryZones, stationSettings, onSubmit }: SaleModalProps) {
+export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit }: SaleModalProps) {
   const { toast } = useToast()
   const stationId = useAuthStore((s) => s.stationId)
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
   const hasAddonProducts = activeProducts.some((p) => p.type === 'addon')
   const hasDeliveryAddonProducts = activeProducts.some((p) => p.type === 'addon' && p.name.toLowerCase().includes('delivery'))
-  const activeZones = deliveryZones.filter((z) => z.is_active)
   const containerPrice = stationSettings?.container_fee_price ?? 0
 
   const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')

@@ -269,7 +269,6 @@ export default function SalesPage() {
         isOpen={isSaleModalOpen}
         onClose={() => setIsSaleModalOpen(false)}
         products={settings?.products ?? []}
-        deliveryZones={settings?.deliveryZones ?? []}
         stationSettings={settings?.stationSettings ?? null}
         onSubmit={handleAddSale}
       />
