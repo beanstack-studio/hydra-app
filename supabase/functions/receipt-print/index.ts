@@ -2,7 +2,6 @@
 //import { createClient } from 'https://skypack.dev'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-
 // — Constants
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,24 +59,21 @@ function getVisualLength(str: string): number {
 }
 
 /**
- * Creates a clean 3-column layout totaling exactly 32 character slots:
- * - Qty Column: "1x  " (4 character slots total, giving clear separation)
- * - Price Column: Right-aligned within 6 character slots
- * - Item Column: Left-aligned, filling the remaining 22 slots
+ * Dynamically creates a justified text line spanning 32 character slots on a hardware printer grid.
+ * Pushes the left side left and the right side completely right.
  */
-function formatThreeColumns(qtyNum: number, itemName: string, priceStr: string): string {
-  const qtyCol = `${qtyNum}x  ` 
-  const visualPriceLen = getVisualLength(priceStr)
-  const priceCol = ' '.repeat(Math.max(0, 6 - visualPriceLen)) + priceStr
+function justifyLine(leftText: string, rightText: string, maxLength = 32): string {
+  const leftVisualLen = getVisualLength(leftText)
+  const rightVisualLen = getVisualLength(rightText)
+  const spaceNeeded = maxLength - (leftVisualLen + rightVisualLen)
   
-  const itemWidth = 22
-  let itemCol = itemName.trim()
-  if (itemCol.length > itemWidth) {
-    itemCol = itemCol.slice(0, itemWidth - 3) + '...'
+  if (spaceNeeded <= 0) {
+    // Truncate left text safely if overlapping
+    const allowedLeftLength = maxLength - rightVisualLen - 1
+    return leftText.slice(0, allowedLeftLength) + ' ' + rightText
   }
-  itemCol = itemCol.padEnd(itemWidth, ' ')
-
-  return `${qtyCol}${itemCol}${priceCol}`
+  
+  return leftText + ' '.repeat(spaceNeeded) + rightText
 }
 
 // — Handler
@@ -182,7 +178,7 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo (Restored to the exact parameters that worked in your very first print)
+  // 1. Logo Rendering Using Native Framework Path Parsing
   if (logoUrl) {
     entries.push({
       type: 1,
@@ -204,27 +200,29 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Order Info Header
+  // Order Info Metadata Header Block
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Print 3-column items using standard spaces
+  // 11. Print Justified Item Lines ("1 x Refill - Flat              ₱30")
   for (const item of items) {
+    const leftPart = `${item.qty} x ${item.name}`
+    const rightPart = formatCurrency(item.subtotal)
     entries.push({
       type: 0,
-      content: formatThreeColumns(item.qty, item.name, formatCurrency(item.subtotal)),
+      content: justifyLine(leftPart, rightPart),
       bold: 0,
       align: 0,
       format: 0,
     })
   }
 
-  // 12. Container fee row
+  // 12. Container fee row matching item rows structure
   if (containerFee) {
     entries.push({
       type: 0,
-      content: formatThreeColumns(1, 'Container Fee', formatCurrency(containerFee)),
+      content: justifyLine('1 x Container Fee', formatCurrency(containerFee)),
       bold: 0,
       align: 0,
       format: 0,
@@ -234,7 +232,7 @@ Deno.serve(async (req) => {
   // Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 14. TOTAL Row (Right aligned natively)
+  // 14. TOTAL Row (Natively right aligned)
   entries.push({
     type: 0,
     content: `TOTAL: ${formatCurrency(total)}`,
@@ -246,7 +244,7 @@ Deno.serve(async (req) => {
   // Blank line added before payment method
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 15. Payment method Row (Left aligned natively, no blank line follows)
+  // 15. Payment method Row (Natively left aligned)
   entries.push({
     type: 0,
     content: `Payment method: ${paymentMethod}`,
