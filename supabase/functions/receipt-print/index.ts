@@ -216,5 +216,11 @@ Deno.serve(async (req) => {
   // 21. Empty line
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
 
-  return new Response(JSON.stringify(entries), { headers: JSON_HEADERS })
+  const obj = Object.fromEntries(entries.map((v, i) => [String(i), v]))
+  return new Response(JSON.stringify(obj), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+    },
+  })
 })
