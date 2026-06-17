@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
   for (const item of items) {
     entries.push({
       type: 0,
-      content: `${item.qty} x ${item.name}`,
+      content: `${item.qty} x ${item.name} @${item.unit}`,
       bold: 0,
       align: 0,
       format: 0,
