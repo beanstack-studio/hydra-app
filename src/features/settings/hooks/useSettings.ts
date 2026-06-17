@@ -174,7 +174,7 @@ export function useSettings(): UseSettingsReturn {
   }, [stationId, authStation, setStation])
 
   const addContact = useCallback(async (input: ContactDetailInput) => {
-    if (!stationId) return
+    if (!stationId) throw new Error('Not authenticated')
     const { error: e } = await supabase.from('station_contacts').insert({ ...input, station_id: stationId })
     if (e) throw new Error(e.message)
     await fetchData()

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -68,8 +68,10 @@ export function ContactEditRow({ defaultValues, onSave, onCancel }: ContactEditR
   const contactType = watch('type')
   const isPhone = contactType === 'mobile' || contactType === 'landline'
 
-  // Reset value when type changes so stale phone/email doesn't carry over
+  // Reset value when type changes (but NOT on initial mount — would wipe pre-filled edit values)
+  const isFirstRender = useRef(true)
   useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
     reset((prev) => ({ ...prev, value: '' }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactType])
