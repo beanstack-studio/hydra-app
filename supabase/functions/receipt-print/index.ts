@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
   // Log full rows to confirm field names in Supabase dashboard
   console.log('station:', JSON.stringify(station))
   console.log('station_settings:', JSON.stringify(settings))
+  console.log('station_settings keys:', JSON.stringify(settings ? Object.keys(settings) : []))
 
   // ── Map variables ──────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,10 +188,10 @@ Deno.serve(async (req) => {
   // 10. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 11. Items — name on its own line (bold), amount on next line (left-aligned)
+  // 11. Items — name on its own line, amount right-aligned
   for (const item of items) {
-    entries.push({ type:0, content: item.name, bold:1, align:0, format:0 })
-    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:0, format:0 })
+    entries.push({ type:0, content: item.name, bold:0, align:0, format:0 })
+    entries.push({ type:0, content: `${item.qty} x ${formatCurrency(item.unit)}  =  ${formatCurrency(item.subtotal)}`, bold:0, align:2, format:0 })
   }
 
   // 12. Container fee (left-aligned)
@@ -199,11 +200,11 @@ Deno.serve(async (req) => {
   // 13. Divider
   entries.push({ type:0, content:'--------------------------------', bold:0, align:0, format:0 })
 
-  // 14. Total (left-aligned)
-  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:1, align:0, format:0 })
+  // 14. Total (right-aligned)
+  entries.push({ type:0, content: `TOTAL: ${formatCurrency(total)}`, bold:0, align:2, format:0 })
 
-  // 15. Payment mode (left-aligned)
-  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:0, format:0 })
+  // 15. Payment mode (right-aligned)
+  entries.push({ type:0, content: `Payment: ${paymentMethod}`, bold:0, align:2, format:0 })
 
   // 16. Blank line after payment
   entries.push({ type:0, content:'', bold:0, align:0, format:0 })
