@@ -49,33 +49,6 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
-// Calculates exact print grid width, counting '₱' as 2 slots on hardware fonts
-function getVisualLength(str: string): number {
-  let length = 0
-  for (let i = 0; i < str.length; i++) {
-    length += str[i] === '₱' ? 2 : 1
-  }
-  return length
-}
-
-/**
- * Dynamically creates a justified text line spanning 32 character slots on a hardware printer grid.
- * Pushes the left side left and the right side completely right.
- */
-function justifyLine(leftText: string, rightText: string, maxLength = 32): string {
-  const leftVisualLen = getVisualLength(leftText)
-  const rightVisualLen = getVisualLength(rightText)
-  const spaceNeeded = maxLength - (leftVisualLen + rightVisualLen)
-  
-  if (spaceNeeded <= 0) {
-    // Truncate left text safely if overlapping
-    const allowedLeftLength = maxLength - rightVisualLen - 1
-    return leftText.slice(0, allowedLeftLength) + ' ' + rightText
-  }
-  
-  return leftText + ' '.repeat(spaceNeeded) + rightText
-}
-
 // — Handler
 
 Deno.serve(async (req) => {
@@ -178,7 +151,7 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo Rendering Using Native Framework Path Parsing
+  // 1. Logo 
   if (logoUrl) {
     entries.push({
       type: 1,
@@ -200,31 +173,29 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Order Info Metadata Header Block
+  // Meta order identifier details block
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Print Justified Item Lines ("1 x Refill - Flat              ₱30")
+  // 11. Print items using Native Application Left-Right text splitting (Type: 4)
   for (const item of items) {
-    const leftPart = `${item.qty} x ${item.name}`
-    const rightPart = formatCurrency(item.subtotal)
     entries.push({
-      type: 0,
-      content: justifyLine(leftPart, rightPart),
+      type: 4,
+      leftText: `${item.qty} x ${item.name}`,
+      rightText: formatCurrency(item.subtotal),
       bold: 0,
-      align: 0,
       format: 0,
     })
   }
 
-  // 12. Container fee row matching item rows structure
+  // 12. Container fee using native left-right row splitting structure (Type: 4)
   if (containerFee) {
     entries.push({
-      type: 0,
-      content: justifyLine('1 x Container Fee', formatCurrency(containerFee)),
+      type: 4,
+      leftText: '1 x Container Fee',
+      rightText: formatCurrency(containerFee),
       bold: 0,
-      align: 0,
       format: 0,
     })
   }
@@ -232,24 +203,24 @@ Deno.serve(async (req) => {
   // Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 14. TOTAL Row (Natively right aligned)
+  // 14. TOTAL Row (Left/Right split block format)
   entries.push({
-    type: 0,
-    content: `TOTAL: ${formatCurrency(total)}`,
-    bold: 0,
-    align: 2,
+    type: 4,
+    leftText: 'TOTAL:',
+    rightText: formatCurrency(total),
+    bold: 1,
     format: 0,
   })
 
-  // Blank line added before payment method
+  // Blank line added before payment method row
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // 15. Payment method Row (Natively left aligned)
+  // 15. Payment method Row (Left/Right split block format)
   entries.push({
-    type: 0,
-    content: `Payment method: ${paymentMethod}`,
+    type: 4,
+    leftText: 'Payment method:',
+    rightText: paymentMethod,
     bold: 0,
-    align: 0,
     format: 0,
   })
 
