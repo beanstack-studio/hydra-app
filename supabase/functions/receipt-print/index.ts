@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh'
 
 // — Constants
 const CORS = {
@@ -47,34 +47,34 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
-/**
- * Creates a strict 3-column layout totaling exactly 32 characters.
- * Uses '\u00A0' (non-breaking space) to prevent the printer app from collapsing whitespace.
- */
-function formatThreeColumns(qtyNum: number, itemName: string, priceStr: string): string {
-  const qtyCol = `${qtyNum}x`.padEnd(2, '\u00A0').slice(0, 2)
-  const priceCol = priceStr.padStart(6, '\u00A0').slice(-6)
-  
-  const itemWidth = 23
-  let itemCol = itemName.trim()
-  if (itemCol.length > itemWidth) {
-    itemCol = itemCol.slice(0, itemWidth - 3) + '...'
-  } else {
-    itemCol = itemCol.padEnd(itemWidth, '\u00A0')
+// Calculates exact print grid width, counting '₱' as 2 slots on hardware fonts
+function getVisualLength(str: string): number {
+  let length = 0
+  for (let i = 0; i < str.length; i++) {
+    length += str[i] === '₱' ? 2 : 1
   }
-
-  return `${qtyCol}\u00A0${itemCol}${priceCol}`
+  return length
 }
 
 /**
- * Justifies two strings (left and right text) to opposite sides of a 32-character line.
+ * Creates a clean 3-column layout totaling exactly 32 character slots:
+ * - Qty Column: "1x  " (4 character slots total, giving clear separation)
+ * - Price Column: Right-aligned within 6 character slots
+ * - Item Column: Left-aligned, filling the remaining 22 slots
  */
-function justifyLine(leftText: string, rightText: string, maxLength = 32): string {
-  const spaceNeeded = maxLength - (leftText.length + rightText.length)
-  if (spaceNeeded <= 0) {
-    return leftText + '\u00A0' + rightText
+function formatThreeColumns(qtyNum: number, itemName: string, priceStr: string): string {
+  const qtyCol = `${qtyNum}x  ` 
+  const visualPriceLen = getVisualLength(priceStr)
+  const priceCol = ' '.repeat(Math.max(0, 6 - visualPriceLen)) + priceStr
+  
+  const itemWidth = 22
+  let itemCol = itemName.trim()
+  if (itemCol.length > itemWidth) {
+    itemCol = itemCol.slice(0, itemWidth - 3) + '...'
   }
-  return leftText + '\u00A0'.repeat(spaceNeeded) + rightText
+  itemCol = itemCol.padEnd(itemWidth, ' ')
+
+  return `${qtyCol}${itemCol}${priceCol}`
 }
 
 // — Handler
@@ -179,11 +179,11 @@ Deno.serve(async (req) => {
   // — Build entries
   const entries: object[] = []
 
-  // 1. Logo (Scaled down to 60x60 width height using working URL configurations)
+  // 1. Logo (Restored to the exact parameters that worked in your very first print)
   if (logoUrl) {
     entries.push({
       type: 1,
-      path: `https://weserv.nl{encodeURIComponent(logoUrl)}&w=60&h=60&fit=contain&pad=15&bg=ffffff`,
+      path: `https://weserv.nl{encodeURIComponent(logoUrl)}&w=100&h=100&fit=contain&pad=30&bg=ffffff`,
       align: 1,
     })
   }
@@ -201,12 +201,12 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  // Metadata information block
+  // Order Info Header
   entries.push({ type: 0, content: `ORDER #${orderId}`, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Print 3-column aligned items
+  // 11. Print 3-column items using standard spaces
   for (const item of items) {
     entries.push({
       type: 0,
@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  // 12. Container fee block
+  // 12. Container fee row
   if (containerFee) {
     entries.push({
       type: 0,
@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
   // Divider
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 14. Total Row (Clean, native right alignment)
+  // 14. TOTAL Row (Right aligned natively)
   entries.push({
     type: 0,
     content: `TOTAL: ${formatCurrency(total)}`,
@@ -240,10 +240,13 @@ Deno.serve(async (req) => {
     format: 0,
   })
 
-  // 15. Payment method Row (Left aligned, no trailing blank line)
+  // Blank line added before payment method
+  entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
+
+  // 15. Payment method Row (Left aligned natively, no blank line follows)
   entries.push({
     type: 0,
-    content: 'Payment method:', paymentMethod,
+    content: `Payment method: ${paymentMethod}`,
     bold: 0,
     align: 0,
     format: 0,
