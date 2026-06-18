@@ -76,11 +76,12 @@ export function useSupplies(): UseSuppliesReturn {
     // Return early if nothing to save — avoids 403 from unconfigured RLS policy
     if (validLinks.length === 0) return
 
-    // Delete existing links; if RLS blocks it, skip insert too
+    // Delete existing links; filter by station_id to satisfy RLS policy
     const { error: deleteErr } = await supabase
       .from('supply_product_links')
       .delete()
       .eq('supply_id', supplyId)
+      .eq('station_id', stationId)
     if (deleteErr) return
 
     const { error: insertErr } = await supabase.from('supply_product_links').insert(

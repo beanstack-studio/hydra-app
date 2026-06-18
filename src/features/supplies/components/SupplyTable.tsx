@@ -115,11 +115,19 @@ export function SupplyTable({
       header: 'Used For',
       sortable: true,
       render: (item: Supply) => {
-        const linkedName = item.linked_product_id ? productNames[item.linked_product_id] : null
+        const junctionNames =
+          item.supply_product_links && item.supply_product_links.length > 0
+            ? item.supply_product_links.map((l) => productNames[l.product_id]).filter(Boolean)
+            : item.linked_product_id
+            ? [productNames[item.linked_product_id]].filter(Boolean)
+            : []
+        if (junctionNames.length === 0) return <span className="text-sm text-muted-foreground">—</span>
         return (
-          <span className="text-sm text-muted-foreground">
-            {linkedName ?? '—'}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            {junctionNames.map((name, i) => (
+              <span key={i} className="text-sm text-muted-foreground">{name}</span>
+            ))}
+          </div>
         )
       },
     },

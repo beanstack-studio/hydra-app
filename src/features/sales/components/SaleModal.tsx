@@ -255,10 +255,31 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
     .sort((a, b) => typeFilter === 'all' ? (typeRank[a.type] ?? 1) - (typeRank[b.type] ?? 1) : 0)
 
   // Cart operations
-  // Delivery add-ons (name contains "delivery", case-insensitive) are capped at 1 per cart.
-  // Other add-ons (e.g. Container Fee) can have any qty.
+  // Delivery add-ons: multiple different delivery zones can coexist; each is qty=1.
+  // Non-deliverable ice products: ice products with "15kg" / "1/2 sack" / "half sack" in name.
   const isDeliveryAddon = useCallback((p: Product) =>
     p.type === 'addon' && p.name.toLowerCase().includes('delivery'), [])
+
+  const isNonDeliverable = useCallback((p: Product) => {
+    const n = p.name.toLowerCase()
+    return p.type === 'ice' && (
+      n.includes('15kg') || n.includes('15 kg') ||
+      n.includes('1/2 sack') || n.includes('half sack') || n.includes('halfsack')
+    )
+  }, [])
+
+  // Delivery is disabled when ALL non-addon cart items are non-deliverable ice products
+  const cartHasOnlyNonDeliverable = useMemo(() => {
+    const nonAddonItems = cartItems.filter((i) => {
+      const p = activeProducts.find((ap) => ap.id === i.product_id)
+      return p && p.type !== 'addon'
+    })
+    if (nonAddonItems.length === 0) return false
+    return nonAddonItems.every((i) => {
+      const p = activeProducts.find((ap) => ap.id === i.product_id)
+      return p ? isNonDeliverable(p) : false
+    })
+  }, [cartItems, activeProducts, isNonDeliverable])
 
   const addToCart = useCallback((product: Product) => {
     const isDelivery = isDeliveryAddon(product)
@@ -268,13 +289,10 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
         if (isDelivery) return prev  // delivery add-on: qty capped at 1, do nothing
         return prev.map((i) => i.product_id === product.id ? { ...i, qty: i.qty + 1 } : i)
       }
-      // Swap out any existing delivery add-on when adding a new one
-      const filtered = isDelivery
-        ? prev.filter((i) => !isDeliveryAddon(activeProducts.find((ap) => ap.id === i.product_id) ?? ({ type: '', name: '' } as unknown as Product)))
-        : prev
-      return [...filtered, { product_id: product.id, product_name: product.name, price: product.price, qty: 1 }]
+      // Allow multiple different delivery addons — no more swapping
+      return [...prev, { product_id: product.id, product_name: product.name, price: product.price, qty: 1 }]
     })
-  }, [activeProducts, isDeliveryAddon])
+  }, [isDeliveryAddon])
 
   const updateCartQty = useCallback((productId: string, qty: number) => {
     const product = activeProducts.find((p) => p.id === productId)
@@ -366,6 +384,13 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
       }))
     }
   }, [orderType, activeProducts, isDeliveryAddon])
+
+  // Auto-switch away from delivery if cart becomes non-deliverable-only
+  useEffect(() => {
+    if (cartHasOnlyNonDeliverable && orderType === 'delivery') {
+      setValue('order_type', 'walk-in')
+    }
+  }, [cartHasOnlyNonDeliverable, orderType, setValue])
 
   // Clear scheduled time when it's no longer in available slots (e.g. user picks today, current time is past)
   const scheduledTime = watchedFields.scheduled_time ?? ''
@@ -589,7 +614,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                   <p className="text-sm">No products. Add them in Settings.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 xl:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {filteredProducts.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -768,13 +793,17 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                     control={control}
                     render={({ field }) => (
                       <div className="flex gap-1.5">
-                        {ORDER_TYPES.map((t) => (
-                          <button key={t.value} type="button"
-                            onClick={() => field.onChange(t.value)}
-                            className={cn(pillBase, field.value === t.value ? pillActive : pillInactive)}>
-                            {t.label}
-                          </button>
-                        ))}
+                        {ORDER_TYPES.map((t) => {
+                          const deliveryBlocked = t.value === 'delivery' && cartHasOnlyNonDeliverable
+                          return (
+                            <button key={t.value} type="button"
+                              onClick={() => { if (!deliveryBlocked) field.onChange(t.value) }}
+                              disabled={deliveryBlocked}
+                              className={cn(pillBase, field.value === t.value ? pillActive : pillInactive, deliveryBlocked && 'opacity-40 cursor-not-allowed')}>
+                              {t.label}
+                            </button>
+                          )
+                        })}
                       </div>
                     )}
                   />

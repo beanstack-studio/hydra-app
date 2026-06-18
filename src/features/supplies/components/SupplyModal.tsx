@@ -103,7 +103,7 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
     }
   })
 
-  const sellableProducts = products.filter((p) => p.type === 'water' || p.type === 'ice')
+  const sellableProducts = products.filter((p) => p.type === 'water' || p.type === 'ice' || p.type === 'addon')
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={supply ? 'Edit Item' : 'Add Item'} size="sm">
