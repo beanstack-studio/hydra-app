@@ -255,7 +255,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
     .sort((a, b) => typeFilter === 'all' ? (typeRank[a.type] ?? 1) - (typeRank[b.type] ?? 1) : 0)
 
   // Cart operations
-  // Delivery add-ons: multiple different delivery zones can coexist; each is qty=1.
+  // Delivery add-ons behave like regular products — qty freely adjustable.
   // Non-deliverable ice products: ice products with "15kg" / "1/2 sack" / "half sack" in name.
   const isDeliveryAddon = useCallback((p: Product) =>
     p.type === 'addon' && p.name.toLowerCase().includes('delivery'), [])
@@ -282,24 +282,19 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
   }, [cartItems, activeProducts, isNonDeliverable])
 
   const addToCart = useCallback((product: Product) => {
-    const isDelivery = isDeliveryAddon(product)
     setCartItems((prev) => {
       const existing = prev.find((i) => i.product_id === product.id)
       if (existing) {
-        if (isDelivery) return prev  // delivery add-on: qty capped at 1, do nothing
         return prev.map((i) => i.product_id === product.id ? { ...i, qty: i.qty + 1 } : i)
       }
-      // Allow multiple different delivery addons — no more swapping
       return [...prev, { product_id: product.id, product_name: product.name, price: product.price, qty: 1 }]
     })
-  }, [isDeliveryAddon])
+  }, [])
 
   const updateCartQty = useCallback((productId: string, qty: number) => {
-    const product = activeProducts.find((p) => p.id === productId)
-    if (product && isDeliveryAddon(product) && qty > 1) return  // delivery addons capped at 1
     if (qty <= 0) setCartItems((prev) => prev.filter((i) => i.product_id !== productId))
     else setCartItems((prev) => prev.map((i) => i.product_id === productId ? { ...i, qty } : i))
-  }, [activeProducts, isDeliveryAddon])
+  }, [])
 
   const removeFromCart = useCallback((productId: string) => {
     setCartItems((prev) => prev.filter((i) => i.product_id !== productId))
@@ -623,7 +618,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                       onAdd={() => addToCart(product)}
                       onDecrement={() => updateCartQty(product.id, (cartItems.find((i) => i.product_id === product.id)?.qty ?? 1) - 1)}
                       isDisabled={isDeliveryAddon(product) && (orderType === 'walk-in' || orderType === 'pickup')}
-                      isAddon={isDeliveryAddon(product)}
+                      isAddon={false}
                     />
                   ))}
                 </div>
@@ -748,29 +743,23 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                     </div>
                   ) : (
                     cartItems.map((item) => {
-                      const itemProduct = activeProducts.find((p) => p.id === item.product_id)
-                      const isAddonItem = itemProduct ? isDeliveryAddon(itemProduct) : false
                       return (
                         <div key={item.product_id} className="flex items-center gap-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.product_name}</p>
                             <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} ea</p>
                           </div>
-                          {isAddonItem ? (
-                            <span className="text-xs text-muted-foreground shrink-0">Add-on</span>
-                          ) : (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button type="button" size="icon" variant="outline" className="h-6 w-6"
-                                onClick={() => updateCartQty(item.product_id, item.qty - 1)}>
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-6 text-center text-sm font-semibold">{item.qty}</span>
-                              <Button type="button" size="icon" variant="outline" className="h-6 w-6"
-                                onClick={() => updateCartQty(item.product_id, item.qty + 1)}>
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button type="button" size="icon" variant="outline" className="h-6 w-6"
+                              onClick={() => updateCartQty(item.product_id, item.qty - 1)}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center text-sm font-semibold">{item.qty}</span>
+                            <Button type="button" size="icon" variant="outline" className="h-6 w-6"
+                              onClick={() => updateCartQty(item.product_id, item.qty + 1)}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
                           <span className="text-sm font-semibold w-16 text-right shrink-0">
                             {formatCurrency(item.price * item.qty)}
                           </span>
