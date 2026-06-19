@@ -250,6 +250,9 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
   const balanceDue = Math.max(0, grandTotal - amountReceived)
   const isPaidInFull = balanceDue === 0 && cartItems.length > 0
 
+  const effectiveCustomerType = selectedCustomer?.type ?? watchedFields.customer_type ?? 'regular'
+  const showZeroPaymentError = cartItems.length > 0 && amountReceived === 0 && effectiveCustomerType !== 'retailer'
+
   const filteredProducts = activeProducts
     .filter((p) => typeFilter === 'all' || p.type === typeFilter)
     .sort((a, b) => typeFilter === 'all' ? (typeRank[a.type] ?? 1) - (typeRank[b.type] ?? 1) : 0)
@@ -452,11 +455,6 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
     }
     if (values.order_type === 'delivery' && !values.delivery_address) {
       toast({ title: 'Delivery address required', variant: 'destructive' })
-      return
-    }
-
-    if ((values.amount_received ?? 0) === 0 && selectedCustomer?.type !== 'retailer') {
-      toast({ title: 'Payment amount required', description: 'Enter the amount received, or mark this customer as a Retailer account to allow ₱0 payment.', variant: 'destructive' })
       return
     }
 
@@ -949,6 +947,10 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                   </div>
                 </div>
 
+                {showZeroPaymentError && (
+                  <p className="text-xs text-destructive">Regular customers require payment. Enter ₱0 only for retailer accounts.</p>
+                )}
+
                 {/* Payment mode pills — smaller, below payment row */}
                 <Controller name="payment_mode" control={control} render={({ field }) => (
                   <div className="flex gap-1.5">
@@ -980,7 +982,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                 {/* Actions */}
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>← Back</Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || showZeroPaymentError}>
                     {isSubmitting ? 'Saving…' : 'Record Sale'}
                   </Button>
                 </div>

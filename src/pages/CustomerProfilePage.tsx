@@ -80,7 +80,6 @@ export default function CustomerProfilePage() {
   const [selectedIds,      setSelectedIds]      = useState<Set<string>>(new Set())
   const [bulkPayMode,      setBulkPayMode]      = useState<BulkPayMode>('cash')
   const [isBulkPaying,     setIsBulkPaying]     = useState(false)
-  const [showPrintSuccess, setShowPrintSuccess] = useState(false)
 
   const handleSort = (key: string) => {
     const k = key as OrderSortKey
@@ -100,6 +99,14 @@ export default function CustomerProfilePage() {
   // Sales eligible for bulk payment
   const bulkableSales  = sales.filter((s) => s.status !== 'paid')
   const hasBulkable    = bulkableSales.length > 0
+  const paidSales      = sales.filter((s) => s.status === 'paid')
+
+  const isAndroid = /Android/i.test(navigator.userAgent)
+  const printScheme = isAndroid ? 'my.bluetoothprint.scheme://' : 'bprint://'
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+  const printStatementUrl = paidSales.length > 0
+    ? `${printScheme}${supabaseUrl}/functions/v1/bulk-receipt?sale_ids=${paidSales.map((s) => s.id).join(',')}`
+    : null
   const selectedSales  = bulkableSales.filter((s) => selectedIds.has(s.id))
   const bulkTotal      = selectedSales.reduce((sum, s) => sum + s.balance_due, 0)
   const allSelected    = bulkableSales.length > 0 && selectedIds.size === bulkableSales.length
@@ -131,7 +138,6 @@ export default function CustomerProfilePage() {
       await recordBulkPayment(Array.from(selectedIds), bulkPayMode, paidAt)
       toast({ title: `${selectedIds.size} ${selectedIds.size === 1 ? 'sale' : 'sales'} marked as paid` })
       exitSelectionMode()
-      setShowPrintSuccess(true)
     } catch (e) {
       toast({
         title: 'Bulk payment failed',
@@ -255,7 +261,7 @@ export default function CustomerProfilePage() {
   const pillInactive = 'bg-background text-muted-foreground border-border hover:bg-accent'
 
   return (
-    <div className={cn(selectionMode && 'pb-44')}>
+    <div>
 
       {/* Back button */}
       <div className="mb-5">
@@ -338,6 +344,18 @@ export default function CustomerProfilePage() {
                 </p>
               </div>
             </div>
+
+            {printStatementUrl && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => { window.location.href = printStatementUrl }}
+              >
+                <Printer className="h-3.5 w-3.5 mr-1.5" />
+                Print Statement
+              </Button>
+            )}
           </div>
 
           {/* ── Right column: order history ── */}
@@ -354,7 +372,7 @@ export default function CustomerProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { setSelectionMode(true); setShowPrintSuccess(false) }}
+                    onClick={() => setSelectionMode(true)}
                   >
                     <CreditCard className="h-3.5 w-3.5 mr-1.5" />
                     Bulk Payment
@@ -381,17 +399,6 @@ export default function CustomerProfilePage() {
               </div>
             </div>
 
-            {/* Print Statement success hint */}
-            {showPrintSuccess && (
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-2.5">
-                <p className="text-sm text-foreground">Payment recorded successfully.</p>
-                <Button size="sm" variant="outline" onClick={() => window.print()}>
-                  <Printer className="h-3.5 w-3.5 mr-1.5" />
-                  Print Statement
-                </Button>
-              </div>
-            )}
-
             <DataTable
               tableId="customer-order-history"
               columns={activeColumns}
@@ -408,6 +415,45 @@ export default function CustomerProfilePage() {
                 />
               }
             />
+
+            {/* ── Bulk payment action bar — inline below table ── */}
+            {selectionMode && (
+              <div className="mt-4 rounded-xl border border-border bg-card shadow-sm p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">
+                    {selectedIds.size > 0
+                      ? `${selectedIds.size} ${selectedIds.size === 1 ? 'order' : 'orders'} — ${formatCurrency(bulkTotal)}`
+                      : 'Select orders above'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={exitSelectionMode}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="flex gap-1.5">
+                  {BULK_PAY_MODES.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setBulkPayMode(m.value)}
+                      className={cn(pillBase, bulkPayMode === m.value ? pillActive : pillInactive)}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={isBulkPaying || selectedIds.size === 0}
+                  onClick={() => void handleBulkPayment()}
+                >
+                  {isBulkPaying ? 'Processing…' : 'Confirm Payment'}
+                </Button>
+              </div>
+            )}
           </div>
 
         </div>
@@ -429,47 +475,6 @@ export default function CustomerProfilePage() {
           onAdd={async () => { /* edit mode only */ }}
           onUpdate={updateCustomer}
         />
-      )}
-
-      {/* ── Bulk payment floating action bar ── */}
-      {selectionMode && (
-        <div className="fixed bottom-0 left-0 right-0 lg:left-60 z-40 border-t border-border bg-card/95 backdrop-blur-sm shadow-lg">
-          <div className="px-4 py-3 space-y-2.5 max-w-lg">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">
-                {selectedIds.size > 0
-                  ? `${selectedIds.size} ${selectedIds.size === 1 ? 'order' : 'orders'} — ${formatCurrency(bulkTotal)}`
-                  : 'Select orders above'}
-              </p>
-              <button
-                type="button"
-                onClick={exitSelectionMode}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
-                Cancel
-              </button>
-            </div>
-            <div className="flex gap-1.5">
-              {BULK_PAY_MODES.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setBulkPayMode(m.value)}
-                  className={cn(pillBase, bulkPayMode === m.value ? pillActive : pillInactive)}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <Button
-              className="w-full"
-              disabled={isBulkPaying || selectedIds.size === 0}
-              onClick={() => void handleBulkPayment()}
-            >
-              {isBulkPaying ? 'Processing…' : 'Confirm Payment'}
-            </Button>
-          </div>
-        </div>
       )}
 
     </div>
