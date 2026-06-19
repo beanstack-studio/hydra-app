@@ -6,6 +6,7 @@ import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { PhoneInput } from '@/components/shared/PhoneInput'
 import { useToast } from '@/hooks/use-toast'
 import { cn, cleanPhone, toTitleCase } from '@/lib/utils'
@@ -17,6 +18,7 @@ const customerSchema = z.object({
   phone: z.string(),
   messenger: z.string(),
   address: z.string(),
+  is_retailer: z.boolean(),
 })
 
 type CustomerSchema = z.infer<typeof customerSchema>
@@ -45,7 +47,7 @@ export function CustomerModal({ isOpen, onClose, customer, onAdd, onUpdate }: Cu
     formState: { errors, isSubmitting },
   } = useForm<CustomerSchema>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { name: '', type: 'regular' as CustomerType, phone: '', messenger: '', address: '' },
+    defaultValues: { name: '', type: 'regular' as CustomerType, phone: '', messenger: '', address: '', is_retailer: false },
   })
 
   useEffect(() => {
@@ -56,9 +58,10 @@ export function CustomerModal({ isOpen, onClose, customer, onAdd, onUpdate }: Cu
         phone: customer.phone ?? '',
         messenger: customer.messenger ?? '',
         address: customer.address ?? '',
+        is_retailer: customer.is_retailer,
       })
     } else {
-      reset({ name: '', type: 'regular', phone: '', messenger: '', address: '' })
+      reset({ name: '', type: 'regular', phone: '', messenger: '', address: '', is_retailer: false })
     }
   }, [customer, reset])
 
@@ -70,6 +73,7 @@ export function CustomerModal({ isOpen, onClose, customer, onAdd, onUpdate }: Cu
         phone: values.phone ? cleanPhone(values.phone) : null,
         messenger: values.messenger || null,
         address: values.address ? toTitleCase(values.address) : null,
+        is_retailer: values.is_retailer,
       }
       if (customer) {
         await onUpdate(customer.id, input)
@@ -137,6 +141,20 @@ export function CustomerModal({ isOpen, onClose, customer, onAdd, onUpdate }: Cu
           <Label htmlFor="cust-addr">Address</Label>
           <Input id="cust-addr" placeholder="Barangay, Street…" {...register('address')} />
         </div>
+
+        <Controller
+          name="is_retailer"
+          control={control}
+          render={({ field }) => (
+            <label htmlFor="cust-retailer" className="flex items-center justify-between gap-3 cursor-pointer select-none py-1">
+              <div>
+                <p className="text-sm font-medium">Retailer account</p>
+                <p className="text-xs text-muted-foreground">Allows recording sales with ₱0 payment received</p>
+              </div>
+              <Switch id="cust-retailer" checked={field.value} onCheckedChange={field.onChange} />
+            </label>
+          )}
+        />
 
         <div className="flex gap-2 pt-2">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>

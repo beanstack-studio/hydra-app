@@ -455,6 +455,11 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
       return
     }
 
+    if ((values.amount_received ?? 0) === 0 && !selectedCustomer?.is_retailer) {
+      toast({ title: 'Payment amount required', description: 'Enter the amount received, or mark this customer as a Retailer account to allow ₱0 payment.', variant: 'destructive' })
+      return
+    }
+
     try {
       let customerId = values.customer_id
 

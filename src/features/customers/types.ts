@@ -10,9 +10,10 @@ export interface Customer {
   phone: string | null
   messenger: string | null
   address: string | null
+  is_retailer: boolean
   created_at: string
   last_ordered_at?: string | null
   total_balance?: number
 }
 
-export type CustomerInput = Pick<Customer, 'name' | 'type' | 'phone' | 'messenger' | 'address'>
+export type CustomerInput = Pick<Customer, 'name' | 'type' | 'phone' | 'messenger' | 'address' | 'is_retailer'>

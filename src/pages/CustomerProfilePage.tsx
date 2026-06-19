@@ -200,7 +200,10 @@ export default function CustomerProfilePage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
-                <Badge variant="outline" className="mt-2">{TYPE_LABELS[customer.type]}</Badge>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge variant="outline">{TYPE_LABELS[customer.type]}</Badge>
+                  {customer.is_retailer && <Badge variant="outline" className="text-primary border-primary/40">Retailer</Badge>}
+                </div>
               </div>
               {isOwner && (
                 <Button size="sm" variant="outline" className="shrink-0 mt-1" onClick={() => setIsEditOpen(true)}>
