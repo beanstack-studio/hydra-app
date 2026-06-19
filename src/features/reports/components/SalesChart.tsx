@@ -60,6 +60,7 @@ export function SalesChart({ data }: SalesVsExpensesChartProps) {
             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={false}
             tickLine={false}
+            interval={Math.max(0, Math.ceil(chartData.length / 8) - 1)}
           />
           <YAxis
             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}

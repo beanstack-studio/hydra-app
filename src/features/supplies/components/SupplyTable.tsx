@@ -69,8 +69,8 @@ export function SupplyTable({
 }: SupplyTableProps) {
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [sortKey, setSortKey] = useState<SortKey>('qty')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const handleSort = (key: string) => {
     const k = key as SortKey

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Building2, Package, Wrench, Users, CreditCard, User,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSettings } from '@/features/settings/hooks/useSettings'
+import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { BusinessSettings } from '@/features/settings/components/BusinessSettings'
@@ -89,6 +90,24 @@ export default function SettingsPage() {
     addContact, updateContact, deleteContact,
   } = useSettings()
 
+  const { data: supplies } = useSupplies()
+  const supplyProductMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const supply of supplies) {
+      const productIds: string[] = []
+      if (supply.supply_product_links && supply.supply_product_links.length > 0) {
+        supply.supply_product_links.forEach((l) => { productIds.push(l.product_id) })
+      } else if (supply.linked_product_id) {
+        productIds.push(supply.linked_product_id)
+      }
+      for (const pid of productIds) {
+        if (!map[pid]) map[pid] = []
+        map[pid].push(supply.name)
+      }
+    }
+    return map
+  }, [supplies])
+
   const stationName     = station?.name ?? ''
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
   const planLabel       = PLAN_LABELS[station?.plan ?? 'free'] ?? 'Free'
@@ -125,6 +144,7 @@ export default function SettingsPage() {
             onUpdateProduct={updateProduct}
             onDeleteProduct={deleteProduct}
             onUpdateStationSettings={updateStationSettings}
+            supplyProductMap={supplyProductMap}
           />
         )
       case 'maintenance':

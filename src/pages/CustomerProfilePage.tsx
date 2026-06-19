@@ -217,10 +217,7 @@ export default function CustomerProfilePage() {
       header: 'Date',
       sortable: true,
       render: (sale) => (
-        <div>
-          <p className="text-sm font-medium whitespace-nowrap">{formatDate(sale.sale_date)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{sale.product_name} ×{sale.qty}</p>
-        </div>
+        <p className="text-sm font-medium whitespace-nowrap">{formatDate(sale.sale_date)}</p>
       ),
     },
     {
