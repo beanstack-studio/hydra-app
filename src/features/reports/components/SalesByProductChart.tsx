@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { ShoppingCart } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { ProductSalesSummary } from '../types'
@@ -56,7 +56,7 @@ export function SalesByProductChart({ data, total }: SalesByProductChartProps) {
         </div>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={chartData}
@@ -65,7 +65,7 @@ export function SalesByProductChart({ data, total }: SalesByProductChartProps) {
                 cx="50%"
                 cy="50%"
                 innerRadius={55}
-                outerRadius={90}
+                outerRadius={85}
                 paddingAngle={2}
               >
                 {chartData.map((_, i) => (
@@ -73,10 +73,20 @@ export function SalesByProductChart({ data, total }: SalesByProductChartProps) {
                 ))}
               </Pie>
               <Tooltip content={<PieTooltip />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
             </PieChart>
           </ResponsiveContainer>
-          <p className="text-xs text-muted-foreground text-center mt-1">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-3">
+            {chartData.map((entry, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                />
+                <span className="text-xs text-muted-foreground">{entry.name}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-2">
             Total: <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
           </p>
         </>

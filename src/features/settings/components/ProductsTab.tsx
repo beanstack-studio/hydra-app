@@ -1,13 +1,16 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Package, ImagePlus, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Package, ImagePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/shared/Modal'
+import { DataTable } from '@/components/shared/DataTable'
+import type { Column } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { formatCurrency, cn } from '@/lib/utils'
@@ -27,7 +30,6 @@ const itemSchema = z.object({
   type: z.enum(['water', 'ice', 'addon']),
   name: z.string().min(1, 'Name is required'),
   price: z.number({ error: 'Enter a valid price' }).min(0),
-  is_active: z.boolean(),
 })
 
 const containerSchema = z.object({
@@ -37,6 +39,16 @@ const containerSchema = z.object({
 
 type ItemSchema = z.infer<typeof itemSchema>
 type ContainerSchema = z.infer<typeof containerSchema>
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const TYPE_LABELS: Record<ItemType, string> = {
+  water: 'Water',
+  ice: 'Ice',
+  addon: 'Add-on',
+}
+
+const TYPE_ORDER: Record<string, number> = { water: 0, ice: 1, addon: 2 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -48,15 +60,10 @@ interface ProductsTabProps {
   onUpdateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
   onDeleteProduct: (id: string) => Promise<void>
   onUpdateStationSettings: (input: Partial<StationSettingsInput>) => Promise<void>
+  supplyProductMap: Record<string, string[]>
 }
 
 // ── Unified Item Modal (Product + Add-on) ────────────────────────────────────
-
-const TYPE_LABELS: Record<ItemType, string> = {
-  water: 'Water',
-  ice: 'Ice',
-  addon: 'Add-on',
-}
 
 interface ItemFormModalProps {
   isOpen: boolean
@@ -84,7 +91,7 @@ function ItemFormModal({
     formState: { errors, isSubmitting },
   } = useForm<ItemSchema>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { type: defaultType, name: '', price: 0, is_active: true },
+    defaultValues: { type: defaultType, name: '', price: 0 },
   })
 
   const selectedType = watch('type')
@@ -106,10 +113,9 @@ function ItemFormModal({
         type: editingProduct.type as ItemType,
         name: editingProduct.name,
         price: editingProduct.price,
-        is_active: editingProduct.is_active,
       })
     } else {
-      reset({ type: defaultType, name: '', price: 0, is_active: true })
+      reset({ type: defaultType, name: '', price: 0 })
     }
   }, [isOpen, editingProduct, defaultType, reset])
 
@@ -124,7 +130,7 @@ function ItemFormModal({
         name: values.name,
         type: values.type,
         price: values.price,
-        is_active: values.is_active,
+        is_active: editingProduct?.is_active ?? true,
         image_url: imageUrl,
       }
       if (editingProduct) {
@@ -204,26 +210,16 @@ function ItemFormModal({
           {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
         </div>
 
-        <div className="flex gap-3 items-end">
-          <div className="flex-1 space-y-1.5">
-            <Label htmlFor="item-price">
-              {selectedType === 'addon' ? 'Price' : 'Price per piece'}
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₱</span>
-              <Input id="item-price" type="number" step="0.01" min="0" className="pl-7"
-                {...register('price', { valueAsNumber: true })} />
-            </div>
-            {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+        <div className="space-y-1.5">
+          <Label htmlFor="item-price">
+            {selectedType === 'addon' ? 'Price' : 'Price per piece'}
+          </Label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₱</span>
+            <Input id="item-price" type="number" step="0.01" min="0" className="pl-7"
+              {...register('price', { valueAsNumber: true })} />
           </div>
-          {isEdit && (
-            <div className="flex flex-col items-center gap-1 pb-0.5">
-              <Label htmlFor="item-active" className="text-xs text-muted-foreground cursor-pointer">Active</Label>
-              <Controller name="is_active" control={control} render={({ field }) => (
-                <Switch id="item-active" checked={field.value} onCheckedChange={field.onChange} />
-              )} />
-            </div>
-          )}
+          {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
         </div>
 
         <div className="flex gap-2 pt-2">
@@ -307,45 +303,6 @@ function ContainerFeeModal({ isOpen, onClose, stationSettings, onSave }: Contain
   )
 }
 
-// ── Row component (shared by all sections) ────────────────────────────────────
-
-interface ItemRowProps {
-  label: string
-  sub: string
-  onEdit?: () => void
-  onDelete?: () => void
-  inactive?: boolean
-}
-
-function ItemRow({ label, sub, onEdit, onDelete, inactive }: ItemRowProps) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className={cn('shrink-0 h-2 w-2 rounded-full', inactive ? 'bg-muted-foreground' : 'bg-primary')} />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{label}</p>
-          <p className="text-xs text-muted-foreground">{sub}</p>
-        </div>
-      </div>
-      {(onEdit || onDelete) && (
-        <div className="flex items-center gap-1 shrink-0 ml-3">
-          {onEdit && (
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onEdit} aria-label="Edit">
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={onDelete} aria-label="Delete">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ProductsTab({
@@ -356,6 +313,7 @@ export function ProductsTab({
   onUpdateProduct,
   onDeleteProduct,
   onUpdateStationSettings,
+  supplyProductMap,
 }: ProductsTabProps) {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
@@ -368,21 +326,8 @@ export function ProductsTab({
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [isDeletingProduct, setIsDeletingProduct] = useState(false)
 
-  type SortState = { key: 'name' | 'price'; dir: 'asc' | 'desc' }
-  const [waterSort, setWaterSort] = useState<SortState>({ key: 'price', dir: 'asc' })
-  const [iceSort,   setIceSort]   = useState<SortState>({ key: 'price', dir: 'asc' })
-  const [addonSort, setAddonSort] = useState<SortState>({ key: 'price', dir: 'asc' })
-
-  const toggleSort = (
-    setState: Dispatch<SetStateAction<SortState>>,
-    current: SortState,
-    key: 'name' | 'price',
-  ) => {
-    setState(current.key === key
-      ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-      : { key, dir: 'asc' }
-    )
-  }
+  const [sortKey, setSortKey] = useState<'name' | 'price' | 'type'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const openAdd = (type: ItemType) => {
     setEditingProduct(null)
@@ -394,6 +339,16 @@ export function ProductsTab({
     setEditingProduct(p)
     setDefaultType(p.type as ItemType)
     setItemModalOpen(true)
+  }
+
+  const handleSort = (key: string) => {
+    const k = key as 'name' | 'price' | 'type'
+    if (sortKey === k) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(k)
+      setSortDir('asc')
+    }
   }
 
   const handleDeleteProduct = async () => {
@@ -410,67 +365,106 @@ export function ProductsTab({
     }
   }
 
+  const sortedProducts = [...products].sort((a, b) => {
+    let cmp = 0
+    if (sortKey === 'name') {
+      cmp = a.name.localeCompare(b.name)
+    } else if (sortKey === 'price') {
+      cmp = a.price - b.price
+    } else {
+      cmp = (TYPE_ORDER[a.type] ?? 0) - (TYPE_ORDER[b.type] ?? 0)
+    }
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const columns: Column<Product>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      sortable: true,
+      render: (p) => (
+        <div>
+          <p className="text-sm font-medium">{p.name}</p>
+          <Badge variant="outline" className="mt-0.5 text-xs">
+            {TYPE_LABELS[p.type as ItemType] ?? p.type}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      key: 'supplies',
+      header: 'Supplies Used',
+      render: (p) => (
+        <span className="text-sm text-muted-foreground">
+          {supplyProductMap[p.id]?.join(', ') || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      sortable: true,
+      render: (p) => (
+        <span className="text-sm font-medium">{formatCurrency(p.price)}</span>
+      ),
+    },
+    {
+      key: 'activate',
+      header: 'Active',
+      render: (p) =>
+        isOwner ? (
+          <Switch
+            checked={p.is_active}
+            onCheckedChange={(checked) => void onUpdateProduct(p.id, { is_active: checked })}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full inline-block',
+              p.is_active ? 'bg-primary' : 'bg-muted-foreground',
+            )}
+          />
+        ),
+    },
+    ...(isOwner
+      ? ([
+          {
+            key: 'actions',
+            header: '',
+            render: (p) => (
+              <div className="flex items-center justify-end gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={(e) => { e.stopPropagation(); openEditProduct(p) }}
+                  aria-label="Edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); setDeletingProduct(p) }}
+                  aria-label="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ),
+          },
+        ] as Column<Product>[])
+      : []),
+  ]
+
   if (isLoading) return <LoadingSkeleton rows={5} />
-
-  const sortProducts = (list: Product[], sort: { key: 'name' | 'price'; dir: 'asc' | 'desc' }) =>
-    [...list].sort((a, b) => {
-      const cmp = sort.key === 'price' ? a.price - b.price : a.name.localeCompare(b.name)
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-
-  const waterProducts = sortProducts(products.filter((p) => p.type === 'water'), waterSort)
-  const iceProducts   = sortProducts(products.filter((p) => p.type === 'ice'), iceSort)
-  const addonProducts = sortProducts(products.filter((p) => p.type === 'addon'), addonSort)
-
-  const containerActive = stationSettings?.container_fee_enabled ?? false
-  const containerName   = stationSettings?.container_name || 'Not configured'
-  const containerPrice  = stationSettings?.container_fee_price ?? 0
-
-  const SortIcon = ({ dir }: { dir: 'asc' | 'desc' | null }) => {
-    if (dir === 'asc')  return <ArrowUp className="h-3 w-3" />
-    if (dir === 'desc') return <ArrowDown className="h-3 w-3" />
-    return <ArrowUpDown className="h-3 w-3 opacity-40" />
-  }
-
-  const TableHead = ({ sort, onSort }: { sort: SortState; onSort: (k: 'name' | 'price') => void }) => (
-    <thead>
-      <tr className="border-b border-border bg-muted/40">
-        <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          <button type="button" onClick={() => onSort('name')} className="flex items-center gap-1 hover:text-foreground transition-colors">
-            Name <SortIcon dir={sort.key === 'name' ? sort.dir : null} />
-          </button>
-        </th>
-        <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          <button type="button" onClick={() => onSort('price')} className="flex items-center gap-1 hover:text-foreground transition-colors">
-            Price <SortIcon dir={sort.key === 'price' ? sort.dir : null} />
-          </button>
-        </th>
-        <th className="px-3 py-2.5" />
-      </tr>
-    </thead>
-  )
-
-  const ProductRow = ({ p }: { p: Product }) => (
-    <tr className="border-b border-border last:border-0">
-      <td className="px-3 py-2.5 text-sm font-medium">{p.name}</td>
-      <td className="px-3 py-2.5 text-sm text-muted-foreground">
-        {formatCurrency(p.price)}
-      </td>
-      {isOwner && (
-        <td className="px-3 py-2.5">
-          <div className="flex items-center justify-end gap-1">
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditProduct(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeletingProduct(p)}><Trash2 className="h-3.5 w-3.5" /></Button>
-          </div>
-        </td>
-      )}
-    </tr>
-  )
 
   return (
     <div className="space-y-4">
 
-      {/* ── Single Add button (owner only) ─────────────────────────────────── */}
+      {/* ── Add button (owner only) ─────────────────────────────────────────── */}
       {isOwner && (
         <div className="flex justify-end">
           <Button size="sm" onClick={() => openAdd('water')}>
@@ -479,115 +473,24 @@ export function ProductsTab({
         </div>
       )}
 
-      {/* ── Phone: stacked sections ─────────────────────────────────────────── */}
-      <div className="md:hidden space-y-8">
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Water</h2>
-          {waterProducts.length === 0
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No water products" description="Add gallon sizes." />
-            : <div className="space-y-2">{waterProducts.map((p) => (
-                <ItemRow key={p.id} label={p.name} sub={formatCurrency(p.price)}
-                  onEdit={isOwner ? () => openEditProduct(p) : undefined}
-                  onDelete={isOwner ? () => setDeletingProduct(p) : undefined}
-                  inactive={!p.is_active} />
-              ))}</div>
-          }
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ice</h2>
-          {iceProducts.length === 0
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No ice products" description="Add ice tube sizes." />
-            : <div className="space-y-2">{iceProducts.map((p) => (
-                <ItemRow key={p.id} label={p.name} sub={formatCurrency(p.price)}
-                  onEdit={isOwner ? () => openEditProduct(p) : undefined}
-                  onDelete={isOwner ? () => setDeletingProduct(p) : undefined}
-                  inactive={!p.is_active} />
-              ))}</div>
-          }
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add-ons</h2>
-          {addonProducts.length === 0 && !containerActive
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No add-ons" description="Add delivery zones and container fees." />
-            : <div className="space-y-2">
-                {containerActive && (
-                  <ItemRow label={containerName} sub={formatCurrency(containerPrice)}
-                    onEdit={isOwner ? () => setContainerModalOpen(true) : undefined} />
-                )}
-                {addonProducts.map((p) => (
-                  <ItemRow key={p.id} label={p.name} sub={formatCurrency(p.price)}
-                    onEdit={isOwner ? () => openEditProduct(p) : undefined}
-                  onDelete={isOwner ? () => setDeletingProduct(p) : undefined}
-                  inactive={!p.is_active} />
-                ))}
-              </div>
-          }
-        </section>
-      </div>
-
-      {/* ── Tablet+: 3 tables side by side ─────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-3 gap-4">
-
-        {/* Water */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Water</h2>
-          {waterProducts.length === 0
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No water products" description="Add gallon sizes." />
-            : <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <TableHead sort={waterSort} onSort={(k) => toggleSort(setWaterSort, waterSort, k)} />
-                  <tbody>{waterProducts.map((p) => <ProductRow key={p.id} p={p} />)}</tbody>
-                </table>
-              </div>
-          }
-        </section>
-
-        {/* Ice */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ice</h2>
-          {iceProducts.length === 0
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No ice products" description="Add ice tube sizes." />
-            : <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <TableHead sort={iceSort} onSort={(k) => toggleSort(setIceSort, iceSort, k)} />
-                  <tbody>{iceProducts.map((p) => <ProductRow key={p.id} p={p} />)}</tbody>
-                </table>
-              </div>
-          }
-        </section>
-
-        {/* Add-ons */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add-ons</h2>
-          {addonProducts.length === 0 && !containerActive
-            ? <EmptyState icon={<Package className="h-6 w-6" />} title="No add-ons" description="Add delivery zones and fees." />
-            : <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <TableHead sort={addonSort} onSort={(k) => toggleSort(setAddonSort, addonSort, k)} />
-                  <tbody>
-                    {containerActive && (
-                      <tr className="border-b border-border last:border-0">
-                        <td className="px-3 py-2.5 text-sm font-medium">{containerName}</td>
-                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{formatCurrency(containerPrice)}</td>
-                        {isOwner && (
-                          <td className="px-3 py-2.5">
-                            <div className="flex justify-end">
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setContainerModalOpen(true)}><Pencil className="h-3.5 w-3.5" /></Button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    )}
-                    {addonProducts.map((p) => <ProductRow key={p.id} p={p} />)}
-                  </tbody>
-                </table>
-              </div>
-          }
-        </section>
-
-      </div>
+      {/* ── Products table ──────────────────────────────────────────────────── */}
+      {products.length === 0 ? (
+        <EmptyState
+          icon={<Package className="h-6 w-6" />}
+          title="No products yet"
+          description="Add water, ice, or add-on products to get started."
+        />
+      ) : (
+        <DataTable
+          tableId="products"
+          columns={columns}
+          data={sortedProducts}
+          rowKey={(p) => p.id}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+        />
+      )}
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
 
