@@ -534,3 +534,20 @@ Full scheduling + pay computation for staff members.
 11. Delivery/Pickup → reminder created?
 12. Walk-in → no reminder created?
 13. Role check before owner-only UI?
+
+---
+
+## Response format — mandatory after every task
+
+After completing any change (code edit, deploy, fix, refactor), always end the response with a **Changes summary** block:
+
+```
+---
+**Changes**
+- `path/to/file.tsx` — what changed and why
+- `path/to/other.ts` — what changed and why
+- Deployed: yes/no (URL if yes)
+- Committed: yes/no (commit message if yes)
+```
+
+Keep entries short (one line each). Always include the file path. Never skip this block.
