@@ -27,7 +27,8 @@ export function useAuth() {
     }
 
     // Primary: read custom claims stamped by the Postgres JWT hook
-    let stationId = session.user.app_metadata?.station_id as string | undefined
+    const claimStationId = session.user.app_metadata?.station_id as string | undefined
+    let stationId = claimStationId
     let role = session.user.app_metadata?.role as string | undefined
 
     // Fallback: look up from users table by auth id
@@ -57,10 +58,34 @@ export function useAuth() {
       }
     }
 
+    // Third fallback: accept a pending invitation.
+    // Handles the case where an owner sent an OTP invite but the users row was
+    // never created. The SECURITY DEFINER function stamps the users row from
+    // the invitations table so the JWT hook picks it up on the next refresh.
+    if (!stationId || !role) {
+      const { data: invResult } = await supabase.rpc('accept_invitation')
+      const accepted = invResult as { station_id?: string; error?: string } | null
+      if (accepted?.station_id && !accepted.error) {
+        stationId = accepted.station_id
+        role = 'staff'
+      }
+    }
+
     if (!stationId || !role) {
       // Authenticated but no station record — show setup error instead of silent loop
       setNoStation()
       return
+    }
+
+    // If station_id was not in the JWT claim (found via users table or invitation
+    // acceptance), refresh the token now so the Postgres JWT hook can stamp
+    // station_id into app_metadata. This is required for RLS policies to work.
+    // The refreshed client token will be used for all subsequent Supabase queries.
+    if (!claimStationId) {
+      const { data: refreshed } = await supabase.auth.refreshSession()
+      if (refreshed?.session?.user.app_metadata?.station_id) {
+        stationId = refreshed.session.user.app_metadata.station_id as string
+      }
     }
 
     const { data: stationRow } = await supabase
