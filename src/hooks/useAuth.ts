@@ -62,12 +62,23 @@ export function useAuth() {
     // Handles the case where an owner sent an OTP invite but the users row was
     // never created. The SECURITY DEFINER function stamps the users row from
     // the invitations table so the JWT hook picks it up on the next refresh.
+    //
+    // IMPORTANT: refreshSession() is called ONLY here, after a successful
+    // invitation acceptance, so the JWT hook picks up the new station_id claim.
+    // Do NOT call refreshSession() generically when claimStationId is missing —
+    // that causes an infinite onAuthStateChange → loadSession loop and 429 errors.
     if (!stationId || !role) {
       const { data: invResult } = await supabase.rpc('accept_invitation')
       const accepted = invResult as { station_id?: string; error?: string } | null
       if (accepted?.station_id && !accepted.error) {
         stationId = accepted.station_id
         role = 'staff'
+        // Refresh the JWT exactly once so the Postgres JWT hook can stamp
+        // station_id into app_metadata, enabling RLS for this session.
+        const { data: refreshed } = await supabase.auth.refreshSession()
+        if (refreshed?.session?.user.app_metadata?.station_id) {
+          stationId = refreshed.session.user.app_metadata.station_id as string
+        }
       }
     }
 
@@ -75,17 +86,6 @@ export function useAuth() {
       // Authenticated but no station record — show setup error instead of silent loop
       setNoStation()
       return
-    }
-
-    // If station_id was not in the JWT claim (found via users table or invitation
-    // acceptance), refresh the token now so the Postgres JWT hook can stamp
-    // station_id into app_metadata. This is required for RLS policies to work.
-    // The refreshed client token will be used for all subsequent Supabase queries.
-    if (!claimStationId) {
-      const { data: refreshed } = await supabase.auth.refreshSession()
-      if (refreshed?.session?.user.app_metadata?.station_id) {
-        stationId = refreshed.session.user.app_metadata.station_id as string
-      }
     }
 
     const { data: stationRow } = await supabase
