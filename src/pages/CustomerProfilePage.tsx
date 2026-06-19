@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User } from 'lucide-react'
+import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User, Printer } from 'lucide-react'
+import { formatInTimeZone } from 'date-fns-tz'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -13,21 +14,23 @@ import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatDate, formatExportAmount, formatPhone, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, formatExportAmount, formatPhone, nowPH, PH_TZ, cn } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
 
 const ORDER_HISTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { key: 'date',        label: 'Date' },                              // visible
+  { key: 'date',        label: 'Date' },
   { key: 'product',     label: 'Product',     defaultChecked: false },
   { key: 'qty',         label: 'Qty',         defaultChecked: false },
-  { key: 'order_type',  label: 'Order Type' },                       // visible
-  { key: 'total',       label: 'Total' },                            // visible
+  { key: 'order_type',  label: 'Order Type' },
+  { key: 'total',       label: 'Total' },
   { key: 'balance_due', label: 'Balance Due', defaultChecked: false },
-  { key: 'status',      label: 'Status' },                           // visible
+  { key: 'status',      label: 'Status' },
   { key: 'payment',     label: 'Payment',     defaultChecked: false },
 ]
 
 type OrderSortKey = 'date' | 'order_type' | 'amount' | 'status'
 type SortDir = 'asc' | 'desc'
+type BulkPayMode = 'cash' | 'gcash' | 'maya'
 
 const STATUS_ORDER: Record<string, number> = { unpaid: 0, partial: 1, paid: 2 }
 import type { SaleWithPayments, SaleStatus, PaymentMode } from '@/features/sales/types'
@@ -51,38 +54,96 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   pickup: 'Pickup',
 }
 
+const BULK_PAY_MODES: { value: BulkPayMode; label: string }[] = [
+  { value: 'cash',  label: 'Cash' },
+  { value: 'gcash', label: 'GCash' },
+  { value: 'maya',  label: 'Transfer' },
+]
 
 export default function CustomerProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
-  const { customer, sales, isLoading, error, recordPayment, updateCustomer } = useCustomerProfile(id)
-  const [payingSale, setPayingSale] = useState<SaleWithPayments | null>(null)
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<OrderSortKey>('date')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer } = useCustomerProfile(id)
+
+  // ── Sort state ────────────────────────────────────────────────────────────
+  const [payingSale,  setPayingSale]  = useState<SaleWithPayments | null>(null)
+  const [isEditOpen,  setIsEditOpen]  = useState(false)
+  const [sortKey,     setSortKey]     = useState<OrderSortKey>('date')
+  const [sortDir,     setSortDir]     = useState<SortDir>('desc')
+
+  // ── Bulk payment state ────────────────────────────────────────────────────
+  const [selectionMode,    setSelectionMode]    = useState(false)
+  const [selectedIds,      setSelectedIds]      = useState<Set<string>>(new Set())
+  const [bulkPayMode,      setBulkPayMode]      = useState<BulkPayMode>('cash')
+  const [isBulkPaying,     setIsBulkPaying]     = useState(false)
+  const [showPrintSuccess, setShowPrintSuccess] = useState(false)
 
   const handleSort = (key: string) => {
     const k = key as OrderSortKey
-    if (sortKey === k) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(k)
-      setSortDir('asc')
-    }
+    if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(k); setSortDir('asc') }
   }
 
   const sortedSales = [...sales].sort((a, b) => {
     let cmp = 0
-    if (sortKey === 'date') cmp = a.sale_date.localeCompare(b.sale_date)
+    if (sortKey === 'date')       cmp = a.sale_date.localeCompare(b.sale_date)
     if (sortKey === 'order_type') cmp = a.order_type.localeCompare(b.order_type)
-    if (sortKey === 'amount') cmp = a.total_amount - b.total_amount
-    if (sortKey === 'status') cmp = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0)
+    if (sortKey === 'amount')     cmp = a.total_amount - b.total_amount
+    if (sortKey === 'status')     cmp = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0)
     return sortDir === 'asc' ? cmp : -cmp
   })
 
+  // Sales eligible for bulk payment
+  const bulkableSales  = sales.filter((s) => s.status !== 'paid')
+  const hasBulkable    = bulkableSales.length > 0
+  const selectedSales  = bulkableSales.filter((s) => selectedIds.has(s.id))
+  const bulkTotal      = selectedSales.reduce((sum, s) => sum + s.balance_due, 0)
+  const allSelected    = bulkableSales.length > 0 && selectedIds.size === bulkableSales.length
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  const handleToggle = useCallback((saleId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(saleId)
+      else next.delete(saleId)
+      return next
+    })
+  }, [])
+
+  const handleSelectAll = useCallback((checked: boolean) => {
+    if (checked) setSelectedIds(new Set(bulkableSales.map((s) => s.id)))
+    else setSelectedIds(new Set())
+  }, [bulkableSales])
+
+  const handleBulkPayment = async () => {
+    if (selectedIds.size === 0) return
+    setIsBulkPaying(true)
+    try {
+      const paidAt = formatInTimeZone(nowPH(), PH_TZ, 'yyyy-MM-dd')
+      await recordBulkPayment(Array.from(selectedIds), bulkPayMode, paidAt)
+      toast({ title: `${selectedIds.size} ${selectedIds.size === 1 ? 'sale' : 'sales'} marked as paid` })
+      exitSelectionMode()
+      setShowPrintSuccess(true)
+    } catch (e) {
+      toast({
+        title: 'Bulk payment failed',
+        description: e instanceof Error ? e.message : 'Something went wrong',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsBulkPaying(false)
+    }
+  }
+
+  // ── Export rows ───────────────────────────────────────────────────────────
   const orderHistoryExportRows = sortedSales.map((s) => ({
     date:        formatDate(s.sale_date),
     product:     s.product_name,
@@ -94,7 +155,25 @@ export default function CustomerProfilePage() {
     payment:     s.payment_mode ?? '',
   }))
 
-  const orderHistoryColumns: Column<SaleWithPayments>[] = [
+  // ── Columns ───────────────────────────────────────────────────────────────
+  const checkboxColumn: Column<SaleWithPayments> = {
+    key: 'checkbox',
+    header: '',
+    render: (sale) => {
+      if (sale.status === 'paid') return null
+      return (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(sale.id)}
+          onChange={(e) => handleToggle(sale.id, e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
+          className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+        />
+      )
+    },
+  }
+
+  const baseColumns: Column<SaleWithPayments>[] = [
     {
       key: 'date',
       header: 'Date',
@@ -138,7 +217,7 @@ export default function CustomerProfilePage() {
           <Badge variant={STATUS_VARIANT[sale.status]}>
             {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
           </Badge>
-          {sale.status !== 'paid' && (
+          {!selectionMode && sale.status !== 'paid' && (
             <Button
               size="sm"
               variant="outline"
@@ -154,6 +233,10 @@ export default function CustomerProfilePage() {
     },
   ]
 
+  const activeColumns: Column<SaleWithPayments>[] = selectionMode
+    ? [checkboxColumn, ...baseColumns]
+    : baseColumns
+
   const handlePayment = async (
     saleId: string,
     amount: number,
@@ -164,11 +247,16 @@ export default function CustomerProfilePage() {
     await recordPayment(saleId, amount, paymentMode, paidAt, remarks)
   }
 
-  const totalSpent = sales.reduce((sum, s) => sum + s.total_amount, 0)
+  const totalSpent   = sales.reduce((sum, s) => sum + s.total_amount, 0)
   const totalBalance = sales.reduce((sum, s) => sum + s.balance_due, 0)
 
+  const pillBase    = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
+  const pillActive  = 'bg-primary text-primary-foreground border-primary'
+  const pillInactive = 'bg-background text-muted-foreground border-border hover:bg-accent'
+
   return (
-    <div>
+    <div className={cn(selectionMode && 'pb-44')}>
+
       {/* Back button */}
       <div className="mb-5">
         <Button
@@ -202,7 +290,7 @@ export default function CustomerProfilePage() {
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <Badge variant="outline">{TYPE_LABELS[customer.type]}</Badge>
-                  {customer.is_retailer && <Badge variant="outline" className="text-primary border-primary/40">Retailer</Badge>}
+                  {customer.type === 'retailer' && <Badge variant="outline" className="text-primary border-primary/40">Retailer</Badge>}
                 </div>
               </div>
               {isOwner && (
@@ -254,21 +342,59 @@ export default function CustomerProfilePage() {
 
           {/* ── Right column: order history ── */}
           <div>
+
+            {/* Table header */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                 Order History
               </h2>
-              <TableOptionsButton
-                exportColumns={ORDER_HISTORY_EXPORT_COLUMNS}
-                exportRows={orderHistoryExportRows}
-                exportFilename={`hydra-orders-${customer?.name ?? 'customer'}`}
-                exportTitle={customer ? `Orders — ${customer.name}` : 'Order History'}
-              />
+              <div className="flex items-center gap-2">
+                {/* Bulk payment button — only when there are unpaid/partial sales */}
+                {hasBulkable && !selectionMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setSelectionMode(true); setShowPrintSuccess(false) }}
+                  >
+                    <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                    Bulk Payment
+                  </Button>
+                )}
+                {/* Select all — shown in selection mode */}
+                {selectionMode && (
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                    />
+                    Select all
+                  </label>
+                )}
+                <TableOptionsButton
+                  exportColumns={ORDER_HISTORY_EXPORT_COLUMNS}
+                  exportRows={orderHistoryExportRows}
+                  exportFilename={`hydra-orders-${customer?.name ?? 'customer'}`}
+                  exportTitle={customer ? `Orders — ${customer.name}` : 'Order History'}
+                />
+              </div>
             </div>
+
+            {/* Print Statement success hint */}
+            {showPrintSuccess && (
+              <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-2.5">
+                <p className="text-sm text-foreground">Payment recorded successfully.</p>
+                <Button size="sm" variant="outline" onClick={() => window.print()}>
+                  <Printer className="h-3.5 w-3.5 mr-1.5" />
+                  Print Statement
+                </Button>
+              </div>
+            )}
 
             <DataTable
               tableId="customer-order-history"
-              columns={orderHistoryColumns}
+              columns={activeColumns}
               data={sortedSales}
               rowKey={(sale) => sale.id}
               sortKey={sortKey}
@@ -283,10 +409,11 @@ export default function CustomerProfilePage() {
               }
             />
           </div>
+
         </div>
       )}
 
-
+      {/* ── Single payment modal ── */}
       <RecordPaymentModal
         sale={payingSale}
         isOpen={!!payingSale}
@@ -299,10 +426,52 @@ export default function CustomerProfilePage() {
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           customer={customer}
-          onAdd={async () => { /* edit mode only — onAdd never called */ }}
+          onAdd={async () => { /* edit mode only */ }}
           onUpdate={updateCustomer}
         />
       )}
+
+      {/* ── Bulk payment floating action bar ── */}
+      {selectionMode && (
+        <div className="fixed bottom-0 left-0 right-0 lg:left-60 z-40 border-t border-border bg-card/95 backdrop-blur-sm shadow-lg">
+          <div className="px-4 py-3 space-y-2.5 max-w-lg">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} ${selectedIds.size === 1 ? 'order' : 'orders'} — ${formatCurrency(bulkTotal)}`
+                  : 'Select orders above'}
+              </p>
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              {BULK_PAY_MODES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setBulkPayMode(m.value)}
+                  className={cn(pillBase, bulkPayMode === m.value ? pillActive : pillInactive)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              disabled={isBulkPaying || selectedIds.size === 0}
+              onClick={() => void handleBulkPayment()}
+            >
+              {isBulkPaying ? 'Processing…' : 'Confirm Payment'}
+            </Button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

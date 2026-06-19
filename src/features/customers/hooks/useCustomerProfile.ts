@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Customer, CustomerInput } from '../types'
 import type { SaleWithPayments, PaymentMode } from '@/features/sales/types'
 
+type BulkPaymentMode = 'cash' | 'gcash' | 'maya'
+
 interface UseCustomerProfileReturn {
   customer: Customer | null
   sales: SaleWithPayments[]
@@ -15,6 +17,11 @@ interface UseCustomerProfileReturn {
     paymentMode: PaymentMode,
     paidAt: string,
     remarks: string,
+  ) => Promise<void>
+  recordBulkPayment: (
+    saleIds: string[],
+    paymentMode: BulkPaymentMode,
+    paidAt: string,
   ) => Promise<void>
   updateCustomer: (id: string, input: Partial<CustomerInput>) => Promise<void>
 }
@@ -92,11 +99,44 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
     await fetchData()
   }, [sales, stationId, fetchData])
 
+  const recordBulkPayment = useCallback(async (
+    saleIds: string[],
+    paymentMode: BulkPaymentMode,
+    paidAt: string,
+  ) => {
+    const targets = sales.filter((s) => saleIds.includes(s.id) && s.status !== 'paid')
+    await Promise.all(targets.map(async (sale) => {
+      const { error: updateErr } = await supabase
+        .from('sales')
+        .update({
+          amount_received: sale.total_amount,
+          status: 'paid',
+          payment_mode: paymentMode,
+          paid_at: paidAt,
+        })
+        .eq('id', sale.id)
+      if (updateErr) throw new Error(updateErr.message)
+
+      const { error: payErr } = await supabase
+        .from('sale_payments')
+        .insert({
+          station_id: stationId,
+          sale_id: sale.id,
+          amount: sale.balance_due,
+          payment_mode: paymentMode,
+          paid_at: paidAt,
+          remarks: 'Bulk payment',
+        })
+      if (payErr) throw new Error(payErr.message)
+    }))
+    await fetchData()
+  }, [sales, stationId, fetchData])
+
   const updateCustomer = useCallback(async (id: string, input: Partial<CustomerInput>) => {
     const { error: e } = await supabase.from('customers').update(input).eq('id', id)
     if (e) throw new Error(e.message)
     await fetchData()
   }, [fetchData])
 
-  return { customer, sales, isLoading, error, recordPayment, updateCustomer }
+  return { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer }
 }
