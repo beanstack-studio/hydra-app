@@ -20,6 +20,7 @@ interface UseCustomerProfileReturn {
   ) => Promise<void>
   recordBulkPayment: (
     saleIds: string[],
+    amount: number,
     paymentMode: BulkPaymentMode,
     paidAt: string,
   ) => Promise<void>
@@ -101,18 +102,40 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
 
   const recordBulkPayment = useCallback(async (
     saleIds: string[],
+    amount: number,
     paymentMode: BulkPaymentMode,
     paidAt: string,
   ) => {
     const targets = sales.filter((s) => saleIds.includes(s.id) && s.status !== 'paid')
-    await Promise.all(targets.map(async (sale) => {
+    // Sort oldest-first so payment is applied in chronological order
+    const sorted = [...targets].sort((a, b) => a.sale_date.localeCompare(b.sale_date))
+
+    // Pre-compute allocations before hitting the DB
+    let remaining = amount
+    const allocations: Array<{
+      sale: SaleWithPayments
+      applying: number
+      newAmountReceived: number
+      newStatus: 'paid' | 'partial'
+    }> = []
+    for (const sale of sorted) {
+      if (remaining <= 0) break
+      const applying = Math.min(remaining, sale.balance_due)
+      remaining -= applying
+      const newAmountReceived = sale.amount_received + applying
+      const newBalance = sale.total_amount - newAmountReceived
+      const newStatus: 'paid' | 'partial' = newBalance <= 0 ? 'paid' : 'partial'
+      allocations.push({ sale, applying, newAmountReceived, newStatus })
+    }
+
+    await Promise.all(allocations.map(async ({ sale, applying, newAmountReceived, newStatus }) => {
       const { error: updateErr } = await supabase
         .from('sales')
         .update({
-          amount_received: sale.total_amount,
-          status: 'paid',
+          amount_received: newAmountReceived,
+          status: newStatus,
           payment_mode: paymentMode,
-          paid_at: paidAt,
+          ...(newStatus === 'paid' ? { paid_at: paidAt } : {}),
         })
         .eq('id', sale.id)
       if (updateErr) throw new Error(updateErr.message)
@@ -122,10 +145,10 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
         .insert({
           station_id: stationId,
           sale_id: sale.id,
-          amount: sale.balance_due,
+          amount: applying,
           payment_mode: paymentMode,
           paid_at: paidAt,
-          remarks: 'Bulk payment',
+          remarks: newStatus === 'paid' ? 'Bulk payment' : 'Partial bulk payment',
         })
       if (payErr) throw new Error(payErr.message)
     }))

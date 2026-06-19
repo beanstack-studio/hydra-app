@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User, Printer } from 'lucide-react'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { DataTable } from '@/components/shared/DataTable'
@@ -80,6 +81,7 @@ export default function CustomerProfilePage() {
   const [selectedIds,      setSelectedIds]      = useState<Set<string>>(new Set())
   const [bulkPayMode,      setBulkPayMode]      = useState<BulkPayMode>('cash')
   const [isBulkPaying,     setIsBulkPaying]     = useState(false)
+  const [bulkAmountInput,  setBulkAmountInput]  = useState(0)
 
   const handleSort = (key: string) => {
     const k = key as OrderSortKey
@@ -107,13 +109,26 @@ export default function CustomerProfilePage() {
   const printStatementUrl = paidSales.length > 0
     ? `${printScheme}${supabaseUrl}/functions/v1/bulk-receipt?sale_ids=${paidSales.map((s) => s.id).join(',')}`
     : null
-  const selectedSales  = bulkableSales.filter((s) => selectedIds.has(s.id))
-  const bulkTotal      = selectedSales.reduce((sum, s) => sum + s.balance_due, 0)
-  const allSelected    = bulkableSales.length > 0 && selectedIds.size === bulkableSales.length
+  const selectedSales     = bulkableSales.filter((s) => selectedIds.has(s.id))
+  const bulkTotal         = selectedSales.reduce((sum, s) => sum + s.balance_due, 0)
+  const allSelected       = bulkableSales.length > 0 && selectedIds.size === bulkableSales.length
+  const bulkBalance       = Math.max(0, bulkTotal - bulkAmountInput)
+  const bulkIsOverpayment = bulkAmountInput > bulkTotal && bulkTotal > 0
+
+  // Auto-fill payment amount whenever selection changes
+  useEffect(() => {
+    setBulkAmountInput(bulkTotal)
+  }, [bulkTotal])
+
+  const handleBulkAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const parsed = parseFloat(e.target.value)
+    setBulkAmountInput(isNaN(parsed) ? 0 : parsed)
+  }, [])
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false)
     setSelectedIds(new Set())
+    setBulkAmountInput(0)
   }, [])
 
   const handleToggle = useCallback((saleId: string, checked: boolean) => {
@@ -131,12 +146,29 @@ export default function CustomerProfilePage() {
   }, [bulkableSales])
 
   const handleBulkPayment = async () => {
-    if (selectedIds.size === 0) return
+    if (selectedIds.size === 0 || bulkAmountInput <= 0) return
     setIsBulkPaying(true)
     try {
       const paidAt = formatInTimeZone(nowPH(), PH_TZ, 'yyyy-MM-dd')
-      await recordBulkPayment(Array.from(selectedIds), bulkPayMode, paidAt)
-      toast({ title: `${selectedIds.size} ${selectedIds.size === 1 ? 'sale' : 'sales'} marked as paid` })
+      const cappedAmount = Math.min(bulkAmountInput, bulkTotal)
+
+      // Pre-compute how many orders will be fully settled (for toast message)
+      const sortedSelected = [...selectedSales].sort((a, b) => a.sale_date.localeCompare(b.sale_date))
+      let remaining = cappedAmount
+      let settledCount = 0
+      for (const sale of sortedSelected) {
+        if (remaining <= 0) break
+        if (remaining >= sale.balance_due) settledCount++
+        remaining -= Math.min(remaining, sale.balance_due)
+      }
+
+      await recordBulkPayment(Array.from(selectedIds), cappedAmount, bulkPayMode, paidAt)
+      toast({
+        title: `${formatCurrency(cappedAmount)} paid`,
+        description: settledCount < selectedIds.size
+          ? `${settledCount} of ${selectedIds.size} orders fully settled`
+          : `${settledCount} ${settledCount === 1 ? 'order' : 'orders'} settled`,
+      })
       exitSelectionMode()
     } catch (e) {
       toast({
@@ -259,6 +291,8 @@ export default function CustomerProfilePage() {
   const pillBase    = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
   const pillActive  = 'bg-primary text-primary-foreground border-primary'
   const pillInactive = 'bg-background text-muted-foreground border-border hover:bg-accent'
+
+  const bulkAmountDisplayValue: string | number = bulkAmountInput === 0 ? '' : bulkAmountInput
 
   return (
     <div>
@@ -418,40 +452,88 @@ export default function CustomerProfilePage() {
 
             {/* ── Bulk payment action bar — inline below table ── */}
             {selectionMode && (
-              <div className="mt-4 rounded-xl border border-border bg-card shadow-sm p-4 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">
-                    {selectedIds.size > 0
-                      ? `${selectedIds.size} ${selectedIds.size === 1 ? 'order' : 'orders'} — ${formatCurrency(bulkTotal)}`
-                      : 'Select orders above'}
-                  </p>
-                  <button
-                    type="button"
+              <div className="mt-4 rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
+
+                {/* Header label */}
+                <p className="text-sm font-semibold text-foreground">
+                  {selectedIds.size > 0
+                    ? `${selectedIds.size} ${selectedIds.size === 1 ? 'order' : 'orders'} selected`
+                    : 'Select orders above'}
+                </p>
+
+                {selectedIds.size > 0 && (
+                  <>
+                    {/* Total */}
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Total</span>
+                      <span className="text-xl font-bold text-primary">{formatCurrency(bulkTotal)}</span>
+                    </div>
+
+                    {/* Payment amount input */}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-muted-foreground shrink-0">Payment</span>
+                      <div className="relative flex-1 max-w-[180px]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₱</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className="pl-8 h-11 text-2xl font-bold text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          value={bulkAmountDisplayValue}
+                          onChange={handleBulkAmountChange}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Payment mode pills */}
+                    <div className="flex gap-1.5">
+                      {BULK_PAY_MODES.map((m) => (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => setBulkPayMode(m.value)}
+                          className={cn(pillBase, bulkPayMode === m.value ? pillActive : pillInactive)}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Balance due */}
+                    {bulkBalance > 0 && (
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm text-muted-foreground">Balance due</span>
+                        <span className="text-base font-semibold text-destructive">{formatCurrency(bulkBalance)}</span>
+                      </div>
+                    )}
+
+                    {/* Overpayment warning */}
+                    {bulkIsOverpayment && (
+                      <p className="text-xs text-amber-600">Overpayment — excess amount will not be applied</p>
+                    )}
+                  </>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    disabled={isBulkPaying}
                     onClick={exitSelectionMode}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150"
                   >
                     Cancel
-                  </button>
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    disabled={isBulkPaying || selectedIds.size === 0 || bulkAmountInput <= 0}
+                    onClick={() => void handleBulkPayment()}
+                  >
+                    {isBulkPaying ? 'Processing…' : 'Confirm Payment'}
+                  </Button>
                 </div>
-                <div className="flex gap-1.5">
-                  {BULK_PAY_MODES.map((m) => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setBulkPayMode(m.value)}
-                      className={cn(pillBase, bulkPayMode === m.value ? pillActive : pillInactive)}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <Button
-                  className="w-full"
-                  disabled={isBulkPaying || selectedIds.size === 0}
-                  onClick={() => void handleBulkPayment()}
-                >
-                  {isBulkPaying ? 'Processing…' : 'Confirm Payment'}
-                </Button>
+
               </div>
             )}
           </div>
