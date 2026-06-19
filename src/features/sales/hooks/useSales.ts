@@ -3,6 +3,47 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleInsert, PaymentMode } from '../types'
 
+async function restoreLinkedSupplies(stationId: string, productId: string, qtySold: number) {
+  const { data: junctionLinks } = await supabase
+    .from('supply_product_links')
+    .select('supply_id, units_per_sale')
+    .eq('station_id', stationId)
+    .eq('product_id', productId)
+
+  const handledIds = new Set((junctionLinks ?? []).map((l: { supply_id: string }) => l.supply_id))
+
+  const { data: directLinked } = await supabase
+    .from('supplies')
+    .select('id, qty, units_per_sale')
+    .eq('station_id', stationId)
+    .eq('linked_product_id', productId)
+
+  const toRestore: { supply_id: string; units_per_sale: number }[] = [
+    ...(junctionLinks ?? []).map((l: { supply_id: string; units_per_sale: number }) => ({ supply_id: l.supply_id, units_per_sale: l.units_per_sale })),
+    ...(directLinked ?? [])
+      .filter((s: { id: string }) => !handledIds.has(s.id))
+      .map((s: { id: string; units_per_sale: number }) => ({ supply_id: s.id, units_per_sale: s.units_per_sale })),
+  ]
+
+  if (toRestore.length === 0) return
+
+  const supplyIds = toRestore.map((l) => l.supply_id)
+  const { data: currentQtys } = await supabase
+    .from('supplies')
+    .select('id, qty')
+    .in('id', supplyIds)
+
+  const qtyMap = new Map((currentQtys ?? []).map((s: { id: string; qty: number }) => [s.id, s.qty]))
+
+  await Promise.all(
+    toRestore.map((l) => {
+      const currentQty = qtyMap.get(l.supply_id) ?? 0
+      const newQty = currentQty + qtySold * l.units_per_sale
+      return supabase.from('supplies').update({ qty: newQty }).eq('id', l.supply_id)
+    })
+  )
+}
+
 async function deductLinkedSupplies(stationId: string, productId: string, qtySold: number) {
   // Check supply_product_links junction table first (multi-link, post-migration)
   const { data: junctionLinks } = await supabase
@@ -163,6 +204,18 @@ export function useSales(): UseSalesReturn {
   }, [fetchData, stationId])
 
   const deleteSale = useCallback(async (saleId: string) => {
+    // Restore supplies deducted when the sale was originally recorded
+    const sale = data.find((s) => s.id === saleId)
+    if (sale && stationId) {
+      const itemsToRestore = sale.items && sale.items.length > 0
+        ? sale.items
+        : [{ product_id: sale.product_id, qty: sale.qty }]
+      await Promise.all(
+        itemsToRestore
+          .filter((i) => !!i.product_id)
+          .map((i) => restoreLinkedSupplies(stationId, i.product_id, i.qty))
+      )
+    }
     // Delete related records first to avoid FK constraint errors
     await supabase.from('reminders').delete().eq('sale_id', saleId)
     await supabase.from('sale_payments').delete().eq('sale_id', saleId)
@@ -173,7 +226,7 @@ export function useSales(): UseSalesReturn {
       .eq('station_id', stationId)
     if (e) throw new Error(e.message)
     await fetchData()
-  }, [fetchData, stationId])
+  }, [fetchData, stationId, data])
 
   const confirmFulfillment = useCallback(async (saleId: string) => {
     const { error: e } = await supabase

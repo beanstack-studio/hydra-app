@@ -259,30 +259,8 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
 
   // Cart operations
   // Delivery add-ons behave like regular products — qty freely adjustable.
-  // Non-deliverable ice products: ice products with "15kg" / "1/2 sack" / "half sack" in name.
   const isDeliveryAddon = useCallback((p: Product) =>
     p.type === 'addon' && p.name.toLowerCase().includes('delivery'), [])
-
-  const isNonDeliverable = useCallback((p: Product) => {
-    const n = p.name.toLowerCase()
-    return p.type === 'ice' && (
-      n.includes('15kg') || n.includes('15 kg') ||
-      n.includes('1/2 sack') || n.includes('half sack') || n.includes('halfsack')
-    )
-  }, [])
-
-  // Delivery is disabled when ALL non-addon cart items are non-deliverable ice products
-  const cartHasOnlyNonDeliverable = useMemo(() => {
-    const nonAddonItems = cartItems.filter((i) => {
-      const p = activeProducts.find((ap) => ap.id === i.product_id)
-      return p && p.type !== 'addon'
-    })
-    if (nonAddonItems.length === 0) return false
-    return nonAddonItems.every((i) => {
-      const p = activeProducts.find((ap) => ap.id === i.product_id)
-      return p ? isNonDeliverable(p) : false
-    })
-  }, [cartItems, activeProducts, isNonDeliverable])
 
   const addToCart = useCallback((product: Product) => {
     setCartItems((prev) => {
@@ -382,13 +360,6 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
       }))
     }
   }, [orderType, activeProducts, isDeliveryAddon])
-
-  // Auto-switch away from delivery if cart becomes non-deliverable-only
-  useEffect(() => {
-    if (cartHasOnlyNonDeliverable && orderType === 'delivery') {
-      setValue('order_type', 'walk-in')
-    }
-  }, [cartHasOnlyNonDeliverable, orderType, setValue])
 
   // Clear scheduled time when it's no longer in available slots (e.g. user picks today, current time is past)
   const scheduledTime = watchedFields.scheduled_time ?? ''
@@ -785,17 +756,13 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                     control={control}
                     render={({ field }) => (
                       <div className="flex gap-1.5">
-                        {ORDER_TYPES.map((t) => {
-                          const deliveryBlocked = t.value === 'delivery' && cartHasOnlyNonDeliverable
-                          return (
-                            <button key={t.value} type="button"
-                              onClick={() => { if (!deliveryBlocked) field.onChange(t.value) }}
-                              disabled={deliveryBlocked}
-                              className={cn(pillBase, field.value === t.value ? pillActive : pillInactive, deliveryBlocked && 'opacity-40 cursor-not-allowed')}>
-                              {t.label}
-                            </button>
-                          )
-                        })}
+                        {ORDER_TYPES.map((t) => (
+                          <button key={t.value} type="button"
+                            onClick={() => field.onChange(t.value)}
+                            className={cn(pillBase, field.value === t.value ? pillActive : pillInactive)}>
+                            {t.label}
+                          </button>
+                        ))}
                       </div>
                     )}
                   />
