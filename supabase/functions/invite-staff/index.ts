@@ -41,8 +41,20 @@ Deno.serve(async (req) => {
     })
   }
 
-  const stationId = caller.app_metadata?.station_id as string | undefined
-  const role      = caller.app_metadata?.role as string | undefined
+  // Primary: read from JWT custom claims stamped by the Postgres JWT hook
+  let stationId = caller.app_metadata?.station_id as string | undefined
+  let role      = caller.app_metadata?.role as string | undefined
+
+  // Fallback: query the users table directly (mirrors useAuth.ts fallback logic)
+  if (!stationId || !role) {
+    const { data: userRow } = await adminClient
+      .from('users')
+      .select('station_id, role')
+      .eq('id', caller.id)
+      .maybeSingle()
+    stationId = (userRow?.station_id as string | undefined) ?? stationId
+    role      = (userRow?.role      as string | undefined) ?? role
+  }
 
   if (!stationId || role !== 'owner') {
     return new Response(
