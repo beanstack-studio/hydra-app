@@ -3,8 +3,16 @@ import { supabase } from '@/lib/supabase'
 
 export function useAccount() {
   const updateName = useCallback(async (fullName: string): Promise<void> => {
-    const { error } = await supabase.auth.updateUser({ data: { full_name: fullName } })
+    const { data: { user }, error } = await supabase.auth.updateUser({ data: { full_name: fullName } })
     if (error) throw new Error(error.message)
+    if (user) {
+      // Keep public.users in sync — auth metadata and the users table are not auto-synced
+      const { error: dbErr } = await supabase
+        .from('users')
+        .update({ full_name: fullName })
+        .eq('id', user.id)
+      if (dbErr) throw new Error(dbErr.message)
+    }
   }, [])
 
   const updateEmail = useCallback(async (newEmail: string): Promise<void> => {

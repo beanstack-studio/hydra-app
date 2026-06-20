@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, UserPlus, Users, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
+import { Pencil, Trash2, UserPlus, Users, ChevronUp, ChevronDown, ArrowUpDown, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -114,46 +114,80 @@ export function TeamSettings() {
                 <th className={thCls('name')} onClick={() => handleSort('name')}>
                   <span className="inline-flex items-center gap-1">Name {sortIcon('name')}</span>
                 </th>
+                <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Phone
+                </th>
+                <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Email
+                </th>
                 <th className={thCls('pay_rate')} onClick={() => handleSort('pay_rate')}>
                   <span className="inline-flex items-center gap-1">Pay Rate {sortIcon('pay_rate')}</span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Access
                 </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {sorted.map((s) => (
-                <tr key={s.id} className="border-b border-border last:border-0 transition-colors duration-150">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium">{s.full_name}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-sm text-muted-foreground">
-                      {s.pay_rate != null ? `${formatCurrency(s.pay_rate)} / day` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {isOwner && (
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="icon" variant="ghost" className="h-8 w-8"
-                          onClick={() => openEdit(s)}
-                          aria-label={`Edit ${s.full_name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon" variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setRemovingStaff(s)}
-                          aria-label={`Remove ${s.full_name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {sorted.map((s) => {
+                const hasAccess = !!s.email && activeEmails.has(s.email.toLowerCase())
+                return (
+                  <tr key={s.id} className="border-b border-border last:border-0 transition-colors duration-150">
+                    <td className="px-4 py-3">
+                      <p className="text-sm font-medium">{s.full_name}</p>
+                      {s.phone && (
+                        <p className="text-xs text-muted-foreground mt-0.5 md:hidden">{s.phone}</p>
+                      )}
+                      {s.email && (
+                        <p className="text-xs text-muted-foreground mt-0.5 lg:hidden">{s.email}</p>
+                      )}
+                    </td>
+                    <td className="hidden md:table-cell px-4 py-3">
+                      <span className="text-sm text-muted-foreground">{s.phone ?? '—'}</span>
+                    </td>
+                    <td className="hidden lg:table-cell px-4 py-3">
+                      <span className="text-sm text-muted-foreground">{s.email ?? '—'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-muted-foreground">
+                        {s.pay_rate != null ? `${formatCurrency(s.pay_rate)} / day` : '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {hasAccess ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Has access</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isOwner && (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon" variant="ghost" className="h-8 w-8"
+                            onClick={() => openEdit(s)}
+                            aria-label={`Edit ${s.full_name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon" variant="ghost"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setRemovingStaff(s)}
+                            aria-label={`Remove ${s.full_name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

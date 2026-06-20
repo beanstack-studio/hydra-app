@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Mail } from 'lucide-react'
+import { Mail, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -162,35 +162,38 @@ export function StaffProfileModal({
               className="flex-1 min-w-0"
               {...register('email')}
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={!watchedEmail || !!errors.email || !canInvite || isAlreadyActive}
-              onClick={() => void handleSendInvite()}
-              className="shrink-0"
-              title={
-                !canInvite
-                  ? 'Upgrade to Pro to invite staff'
-                  : !watchedEmail
-                  ? 'Enter an email address first'
-                  : errors.email
-                  ? 'Fix the email address first'
-                  : isAlreadyActive
-                  ? 'This person already has access to the station'
-                  : `Send invite to ${watchedEmail}`
-              }
-            >
-              <Mail className="h-4 w-4 mr-1.5" />
-              Invite
-            </Button>
+            {isAlreadyActive ? (
+              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/8 px-3 text-xs font-semibold text-primary">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Has access
+              </span>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!watchedEmail || !!errors.email || !canInvite}
+                onClick={() => void handleSendInvite()}
+                className="shrink-0"
+                title={
+                  !canInvite
+                    ? 'Upgrade to Pro to invite staff'
+                    : !watchedEmail
+                    ? 'Enter an email address first'
+                    : errors.email
+                    ? 'Fix the email address first'
+                    : `Send invite to ${watchedEmail}`
+                }
+              >
+                <Mail className="h-4 w-4 mr-1.5" />
+                Invite
+              </Button>
+            )}
           </div>
           {errors.email && (
             <p className="text-xs text-destructive">{errors.email.message}</p>
           )}
-          {isAlreadyActive ? (
-            <p className="text-xs font-medium text-primary">Already has access to this station</p>
-          ) : inviteSent ? (
+          {!isAlreadyActive && (inviteSent ? (
             <p className="text-xs font-medium text-primary">Invite sent — link &amp; verification code emailed to {watchedEmail}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -198,7 +201,7 @@ export function StaffProfileModal({
                 ? 'Sends an invitation so this person can set a password and log in.'
                 : 'Pro plan required to invite staff members.'}
             </p>
-          )}
+          ))}
         </div>
 
         {/* ── Pay ─────────────────────────────────────────────────────── */}
