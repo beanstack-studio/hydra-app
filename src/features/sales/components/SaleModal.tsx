@@ -286,6 +286,8 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
   }, [])
 
   // Customer search
+  const GHOST_CUSTOMER_NAMES = new Set(['no name', 'no-name', 'walk in', 'walk-in', 'walk_in', ''])
+
   const searchCustomers = useCallback(async (q: string) => {
     if (q.length < 1 || !stationId) { setCustomerResults([]); return }
     setSearchLoading(true)
@@ -294,8 +296,11 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
       .select('*')
       .eq('station_id', stationId)
       .ilike('name', `%${q}%`)
-      .limit(5)
-    setCustomerResults((data ?? []) as Customer[])
+      .limit(10)
+    const filtered = ((data ?? []) as Customer[]).filter(
+      (c) => c.type !== 'one_time' && !GHOST_CUSTOMER_NAMES.has(c.name.trim().toLowerCase())
+    ).slice(0, 5)
+    setCustomerResults(filtered)
     setSearchLoading(false)
   }, [stationId])
 
