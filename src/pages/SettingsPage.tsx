@@ -59,11 +59,14 @@ const PLAN_LABELS: Record<string, string> = {
 export default function SettingsPage() {
   const navigate      = useNavigate()
   const [searchParams] = useSearchParams()
-  const role    = useAuthStore((s) => s.role)
-  const station = useAuthStore((s) => s.station)
-  const plan    = usePlan()
-  const isOwner = role === 'owner' || role === 'super_admin'
-  const isFree  = plan === 'free'
+  const role     = useAuthStore((s) => s.role)
+  const station  = useAuthStore((s) => s.station)
+  const user     = useAuthStore((s) => s.user)
+  const plan     = usePlan()
+  const isOwner  = role === 'owner' || role === 'super_admin'
+  const isFree   = plan === 'free'
+  const userName    = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ''
+  const userInitial = userName.charAt(0).toUpperCase()
 
   const [active, setActive] = useState<Section | null>(null)
 
@@ -235,16 +238,29 @@ export default function SettingsPage() {
         {active === null ? (
           /* Hub */
           <div className="space-y-6">
-            <div className="flex items-center justify-between mb-8">
-              <ProfileCard noMargin />
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="self-start flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150 shrink-0"
-                aria-label="Close settings"
-              >
-                <X className="h-4 w-4" />
-              </button>
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between">
+                <ProfileCard noMargin />
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="self-start flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150 shrink-0"
+                  aria-label="Close settings"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {userName && (
+                <div className="flex items-center gap-2.5 px-1 pt-1 border-t border-border">
+                  <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-primary leading-none">{userInitial}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate leading-tight">{userName}</p>
+                    <p className="text-[10px] text-muted-foreground capitalize leading-tight">{role ?? 'staff'}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

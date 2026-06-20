@@ -219,14 +219,24 @@ export function Sidebar() {
       </nav>
 
       {/* User + sign out */}
-      <div className={cn('px-3 py-3 border-t shrink-0 space-y-1', BORDER)}>
+      <div className={cn('p-3 border-t shrink-0', BORDER)}>
         {userName && (
-          <p className="px-1 text-xs text-white/35 truncate">{userName}</p>
+          <div className="flex items-center gap-2.5 px-1 mb-2 min-w-0">
+            <div className="h-7 w-7 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <span className="text-xs font-bold text-white leading-none">
+                {userName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white/85 truncate leading-tight">{userName}</p>
+              <p className="text-[10px] text-white/45 capitalize leading-tight">{role ?? 'staff'}</p>
+            </div>
+          </div>
         )}
         <button
           type="button"
           onClick={() => void supabase.auth.signOut()}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/50 hover:bg-white/8 hover:text-white/90 transition-all duration-150"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-white/50 hover:bg-white/8 hover:text-white/90 transition-all duration-150"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           Sign Out
