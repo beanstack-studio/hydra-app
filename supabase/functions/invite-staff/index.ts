@@ -63,6 +63,18 @@ Deno.serve(async (req) => {
       )
     }
 
+    // ── Fetch station info for email personalisation ────────────────────────────
+    const { data: stationRow } = await adminClient
+      .from('stations')
+      .select('name, owner_name')
+      .eq('id', stationId)
+      .maybeSingle()
+
+    const stationName = (stationRow?.name as string | null) ?? 'your station'
+    const ownerName   = (stationRow?.owner_name as string | null)
+                        ?? (caller.user_metadata?.full_name as string | undefined)
+                        ?? 'Your station owner'
+
     // ── Delete any existing auth user for this email ────────────────────────────
     // inviteUserByEmail fails with 422 if the user already exists. We proactively
     // find and delete them (they're from a previous failed or test invite) so the
@@ -104,7 +116,7 @@ Deno.serve(async (req) => {
     //   Supabase Dashboard → Auth → Email Templates → Invite User
     //   Add: <p>Your verification code: <strong>{{ index .Data "temp_code" }}</strong></p>
     const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: full_name ?? null, temp_code: tempCode },
+      data: { full_name: full_name ?? null, temp_code: tempCode, station_name: stationName, owner_name: ownerName },
       redirectTo: redirect_to,
     })
 
