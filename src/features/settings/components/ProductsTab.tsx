@@ -326,7 +326,7 @@ export function ProductsTab({
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [isDeletingProduct, setIsDeletingProduct] = useState(false)
 
-  const [sortKey, setSortKey] = useState<'name' | 'price' | 'type'>('name')
+  const [sortKey, setSortKey] = useState<'name' | 'price'>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const openAdd = (type: ItemType) => {
@@ -342,7 +342,7 @@ export function ProductsTab({
   }
 
   const handleSort = (key: string) => {
-    const k = key as 'name' | 'price' | 'type'
+    const k = key as 'name' | 'price'
     if (sortKey === k) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -365,31 +365,18 @@ export function ProductsTab({
     }
   }
 
-  const sortedProducts = [...products].sort((a, b) => {
-    let cmp = 0
-    if (sortKey === 'name') {
-      cmp = a.name.localeCompare(b.name)
-    } else if (sortKey === 'price') {
-      cmp = a.price - b.price
-    } else {
-      cmp = (TYPE_ORDER[a.type] ?? 0) - (TYPE_ORDER[b.type] ?? 0)
-    }
-    return sortDir === 'asc' ? cmp : -cmp
-  })
+  const sortProducts = (list: Product[]) =>
+    [...list].sort((a, b) => {
+      const cmp = sortKey === 'price' ? a.price - b.price : a.name.localeCompare(b.name)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   const columns: Column<Product>[] = [
     {
       key: 'name',
-      header: 'Name',
+      header: 'Product Name',
       sortable: true,
-      render: (p) => (
-        <div>
-          <p className="text-sm font-medium">{p.name}</p>
-          <Badge variant="outline" className="mt-0.5 text-xs">
-            {TYPE_LABELS[p.type as ItemType] ?? p.type}
-          </Badge>
-        </div>
-      ),
+      render: (p) => <p className="text-sm font-medium">{p.name}</p>,
     },
     {
       key: 'supplies',
@@ -459,10 +446,14 @@ export function ProductsTab({
       : []),
   ]
 
+  const waterProducts  = sortProducts(products.filter((p) => p.type === 'water'))
+  const iceProducts    = sortProducts(products.filter((p) => p.type === 'ice'))
+  const addonProducts  = sortProducts(products.filter((p) => p.type === 'addon'))
+
   if (isLoading) return <LoadingSkeleton rows={5} />
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
 
       {/* ── Add button (owner only) ─────────────────────────────────────────── */}
       {isOwner && (
@@ -473,24 +464,59 @@ export function ProductsTab({
         </div>
       )}
 
-      {/* ── Products table ──────────────────────────────────────────────────── */}
-      {products.length === 0 ? (
-        <EmptyState
-          icon={<Package className="h-6 w-6" />}
-          title="No products yet"
-          description="Add water, ice, or add-on products to get started."
-        />
-      ) : (
-        <DataTable
-          tableId="products"
-          columns={columns}
-          data={sortedProducts}
-          rowKey={(p) => p.id}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
-      )}
+      {/* ── Water ──────────────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Water</p>
+        {waterProducts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No water products yet.</p>
+        ) : (
+          <DataTable
+            tableId="products-water"
+            columns={columns}
+            data={waterProducts}
+            rowKey={(p) => p.id}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+        )}
+      </div>
+
+      {/* ── Ice ────────────────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Ice</p>
+        {iceProducts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No ice products yet.</p>
+        ) : (
+          <DataTable
+            tableId="products-ice"
+            columns={columns}
+            data={iceProducts}
+            rowKey={(p) => p.id}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+        )}
+      </div>
+
+      {/* ── Add-ons ────────────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Add-ons</p>
+        {addonProducts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No add-ons yet.</p>
+        ) : (
+          <DataTable
+            tableId="products-addon"
+            columns={columns}
+            data={addonProducts}
+            rowKey={(p) => p.id}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
+        )}
+      </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
 
