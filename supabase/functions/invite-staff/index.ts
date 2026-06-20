@@ -52,13 +52,17 @@ Deno.serve(async (req) => {
   }
 
   // ── Upsert invitation record ─────────────────────────────────────────────────
-  // Use upsert so re-sending to the same email just refreshes invited_at
+  // Delete any existing invitation for this email+station first (handles re-invites
+  // and avoids relying on a specific unique constraint name for upsert).
+  await adminClient
+    .from('invitations')
+    .delete()
+    .eq('station_id', stationId)
+    .eq('email', email)
+
   const { error: invErr } = await adminClient
     .from('invitations')
-    .upsert(
-      { station_id: stationId, email, full_name: full_name ?? null, status: 'pending' },
-      { onConflict: 'station_id,email', ignoreDuplicates: false },
-    )
+    .insert({ station_id: stationId, email, full_name: full_name ?? null, status: 'pending' })
 
   if (invErr) {
     return new Response(JSON.stringify({ error: invErr.message }), {
