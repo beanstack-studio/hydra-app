@@ -78,5 +78,22 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ── Clean up auto-created station from handle_new_user trigger ───────────────
+  // The trigger fires on every auth.users INSERT and auto-creates a station
+  // (meant for owner self-signups). Invited staff don't need their own station —
+  // accept_invitation() will link them to the owner's station after they set a
+  // password. We delete the orphan station here so there's no debris.
+  const { data: autoRow } = await adminClient
+    .from('users')
+    .select('station_id')
+    .eq('email', email)
+    .maybeSingle()
+
+  if (autoRow?.station_id && autoRow.station_id !== stationId) {
+    await adminClient.from('users').delete().eq('email', email)
+    // CASCADE on stations will clean up station_settings and any other dependents
+    await adminClient.from('stations').delete().eq('id', autoRow.station_id)
+  }
+
   return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS })
 })
