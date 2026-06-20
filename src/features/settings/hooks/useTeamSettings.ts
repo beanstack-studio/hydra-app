@@ -136,7 +136,18 @@ export function useTeamSettings(): UseTeamSettingsReturn {
       },
     })
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      // FunctionsHttpError.context is the raw Response — read the actual error body
+      let message = error.message
+      const ctx = (error as unknown as { context?: Response }).context
+      if (ctx) {
+        try {
+          const body = await ctx.json() as { error?: string }
+          if (body.error) message = body.error
+        } catch { /* ignore JSON parse failures */ }
+      }
+      throw new Error(message)
+    }
     if ((data as { error?: string } | null)?.error) {
       throw new Error((data as { error: string }).error)
     }
