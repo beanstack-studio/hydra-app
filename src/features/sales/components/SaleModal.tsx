@@ -252,7 +252,10 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
   const isPaidInFull = balanceDue === 0 && cartItems.length > 0
 
   const effectiveCustomerType = selectedCustomer?.type ?? watchedFields.customer_type ?? 'regular'
-  const showZeroPaymentError = cartItems.length > 0 && amountReceived === 0 && effectiveCustomerType !== 'retailer'
+  const isOneTimeCustomer     = effectiveCustomerType === 'one_time'
+  // One Time → must pay in full (no partial, no deferred). Retailer → ₱0 ok (deferred). Regular → must pay something.
+  const showZeroPaymentError      = cartItems.length > 0 && amountReceived === 0 && effectiveCustomerType !== 'retailer'
+  const showOneTimePartialError   = isOneTimeCustomer && cartItems.length > 0 && balanceDue > 0 && amountReceived > 0
 
   const filteredProducts = activeProducts
     .filter((p) => typeFilter === 'all' || p.type === typeFilter)
@@ -716,9 +719,9 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                     <button
                       type="button"
                       onClick={selectOneTimeCustomer}
-                      className="text-xs text-muted-foreground hover:text-primary transition-colors duration-150 text-left"
+                      className="w-full rounded-md border border-dashed border-border bg-muted/30 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors duration-150"
                     >
-                      Skip — One Time / anonymous customer
+                      One Time — no name needed
                     </button>
                   )}
 
@@ -950,8 +953,14 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                   </div>
                 </div>
 
-                {showZeroPaymentError && (
+                {showZeroPaymentError && !isOneTimeCustomer && (
                   <p className="text-xs text-destructive">Regular customers require payment. Enter ₱0 only for retailer accounts.</p>
+                )}
+                {showZeroPaymentError && isOneTimeCustomer && (
+                  <p className="text-xs text-destructive">One Time customers must pay in full.</p>
+                )}
+                {showOneTimePartialError && (
+                  <p className="text-xs text-destructive">One Time customers must pay in full. Register as Regular for partial payments.</p>
                 )}
 
                 {/* Payment mode pills — smaller, below payment row */}
@@ -985,7 +994,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                 {/* Actions */}
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>← Back</Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting || showZeroPaymentError}>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || showZeroPaymentError || showOneTimePartialError}>
                     {isSubmitting ? 'Saving…' : 'Record Sale'}
                   </Button>
                 </div>

@@ -250,13 +250,17 @@ export default function SettingsPage() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              {userName && (
+              {user && (
                 <div className="flex items-center gap-2.5 px-1 pt-1 border-t border-border">
                   <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-primary leading-none">{userInitial}</span>
+                    <span className="text-xs font-bold text-primary leading-none">
+                      {(userName || user.email || 'U').charAt(0).toUpperCase()}
+                    </span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate leading-tight">{userName}</p>
+                    <p className="text-sm font-medium text-foreground truncate leading-tight">
+                      {userName || user.email || 'Account'}
+                    </p>
                     <p className="text-[10px] text-muted-foreground capitalize leading-tight">{role ?? 'staff'}</p>
                   </div>
                 </div>
