@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/shared/StatCard'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
+import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { SalesChart } from '@/features/reports/components/SalesChart'
 import { ExpenseSummary } from '@/features/reports/components/ExpenseSummary'
 import { SalesByProductChart } from '@/features/reports/components/SalesByProductChart'
@@ -8,19 +9,32 @@ import { InsightsSection } from '@/features/reports/components/InsightsSection'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { useReports } from '@/features/reports/hooks/useReports'
 import { usePlan } from '@/hooks/usePlan'
-import { formatCurrency, nowPH, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, nowPH, cn, PH_TZ } from '@/lib/utils'
+import { formatInTimeZone } from 'date-fns-tz'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
+const MODE_LABELS: Record<string, string> = {
+  daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', ytd: 'YTD',
+}
+
 export default function ReportsPage() {
   const plan = usePlan()
 
-  const { data, isLoading, error, mode, month, year, setMode, setMonth, setYear } = useReports()
+  const {
+    data, isLoading, error,
+    mode, month, year, selectedDate, weekStart, weekEnd,
+    setMode, setMonth, setYear, setSelectedDate,
+    goToPrevWeek, goToNextWeek,
+  } = useReports()
 
-  const currentYear = nowPH().getFullYear()
+  const now         = nowPH()
+  const todayStr    = formatInTimeZone(now, PH_TZ, 'yyyy-MM-dd')
+  const currentYear = now.getFullYear()
   const yearOptions = [currentYear - 1, currentYear]
 
   if (plan === 'free') return <UpgradeWall title="Reports" feature="Reports" />
@@ -31,11 +45,11 @@ export default function ReportsPage() {
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {/* Mode toggle + date picker */}
+      {/* Mode toggle + date controls */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
-        {/* Monthly / YTD pill toggle */}
+        {/* Daily / Weekly / Monthly / YTD pill toggle */}
         <div className="flex rounded-md border border-input overflow-hidden text-sm">
-          {(['monthly', 'ytd'] as const).map((m) => (
+          {(['daily', 'weekly', 'monthly', 'ytd'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -47,11 +61,45 @@ export default function ReportsPage() {
                   : 'bg-background text-muted-foreground hover:text-foreground'
               )}
             >
-              {m === 'monthly' ? 'Monthly' : 'YTD'}
+              {MODE_LABELS[m]}
             </button>
           ))}
         </div>
 
+        {/* Daily: single date picker */}
+        {mode === 'daily' && (
+          <DatePickerInput
+            value={selectedDate}
+            onChange={setSelectedDate}
+            max={todayStr}
+          />
+        )}
+
+        {/* Weekly: prev / week range / next */}
+        {mode === 'weekly' && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={goToPrevWeek}
+              className="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground transition-colors duration-150"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="px-2 text-sm font-medium whitespace-nowrap">
+              {formatDate(weekStart + 'T00:00:00')} – {formatDate(weekEnd + 'T00:00:00')}
+            </span>
+            <button
+              type="button"
+              onClick={goToNextWeek}
+              disabled={weekStart >= todayStr}
+              className="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Monthly: month dropdown */}
         {mode === 'monthly' && (
           <select
             value={month}
@@ -64,13 +112,16 @@ export default function ReportsPage() {
           </select>
         )}
 
-        <select
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        {/* Year dropdown: monthly + YTD only */}
+        {(mode === 'monthly' || mode === 'ytd') && (
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
       </div>
 
       {isLoading ? (

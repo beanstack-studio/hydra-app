@@ -5,7 +5,22 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { nowPH, PH_TZ } from '@/lib/utils'
 import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking } from '../types'
 
-export type ReportMode = 'monthly' | 'ytd'
+export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
+
+// ── Week helpers ──────────────────────────────────────────────────────────────
+
+function getMondayStr(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  const day = d.getDay() // 0=Sun … 6=Sat
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
+  return formatInTimeZone(d, PH_TZ, 'yyyy-MM-dd')
+}
+
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return formatInTimeZone(d, PH_TZ, 'yyyy-MM-dd')
+}
 
 interface UseReportsReturn {
   data: ReportsData | null
@@ -14,18 +29,34 @@ interface UseReportsReturn {
   mode: ReportMode
   month: number
   year: number
+  selectedDate: string
+  weekStart: string
+  weekEnd: string
   setMode: (m: ReportMode) => void
   setMonth: (m: number) => void
   setYear: (y: number) => void
+  setSelectedDate: (d: string) => void
+  setWeekStart: (d: string) => void
+  goToPrevWeek: () => void
+  goToNextWeek: () => void
 }
 
 export function useReports(): UseReportsReturn {
   const stationId = useAuthStore((s) => s.stationId)
 
   const now = nowPH()
-  const [mode,  setMode]  = useState<ReportMode>('monthly')
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year,  setYear]  = useState(now.getFullYear())
+  const todayStr = formatInTimeZone(now, PH_TZ, 'yyyy-MM-dd')
+
+  const [mode,         setMode]         = useState<ReportMode>('monthly')
+  const [month,        setMonth]        = useState(now.getMonth() + 1)
+  const [year,         setYear]         = useState(now.getFullYear())
+  const [selectedDate, setSelectedDate] = useState(todayStr)
+  const [weekStart,    setWeekStart]    = useState(() => getMondayStr(todayStr))
+
+  const weekEnd = addDaysStr(weekStart, 6)
+
+  const goToPrevWeek = useCallback(() => setWeekStart((ws) => addDaysStr(ws, -7)), [])
+  const goToNextWeek = useCallback(() => setWeekStart((ws) => addDaysStr(ws, 7)), [])
 
   const [data, setData] = useState<ReportsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -42,8 +73,15 @@ export function useReports(): UseReportsReturn {
       let startDate: string
       let endDate: string
       let billsMaxMonth: number | null = null
+      const includeBills = mode === 'monthly' || mode === 'ytd'
 
-      if (mode === 'ytd') {
+      if (mode === 'daily') {
+        startDate = selectedDate
+        endDate   = selectedDate
+      } else if (mode === 'weekly') {
+        startDate = weekStart
+        endDate   = weekEnd
+      } else if (mode === 'ytd') {
         startDate = `${year}-01-01`
         endDate = year === currentYear
           ? formatInTimeZone(todayPH, PH_TZ, 'yyyy-MM-dd')
@@ -80,7 +118,7 @@ export function useReports(): UseReportsReturn {
           .eq('station_id', stationId)
           .gte('expense_date', startDate)
           .lte('expense_date', endDate),
-        billsQuery,
+        includeBills ? billsQuery : Promise.resolve({ data: [], error: null }),
       ])
 
       const sales    = salesRes.data    ?? []
@@ -104,14 +142,27 @@ export function useReports(): UseReportsReturn {
         dailyExpMap.set(dateKey, (dailyExpMap.get(dateKey) ?? 0) + (e.amount as number))
       }
 
-      const allDates = new Set([...dailySalesMap.keys(), ...dailyExpMap.keys()])
-      const dailyPoints: DailyPoint[] = Array.from(allDates)
-        .sort()
-        .map((date) => ({
-          date,
-          sales: dailySalesMap.get(date) ?? 0,
-          expenses: dailyExpMap.get(date) ?? 0,
-        }))
+      let dailyPoints: DailyPoint[]
+      if (mode === 'weekly') {
+        // Always show all 7 days Mon–Sun even if no data
+        dailyPoints = Array.from({ length: 7 }, (_, i) => {
+          const dateKey = addDaysStr(weekStart, i)
+          return {
+            date:     dateKey,
+            sales:    dailySalesMap.get(dateKey) ?? 0,
+            expenses: dailyExpMap.get(dateKey) ?? 0,
+          }
+        })
+      } else {
+        const allDates = new Set([...dailySalesMap.keys(), ...dailyExpMap.keys()])
+        dailyPoints = Array.from(allDates)
+          .sort()
+          .map((date) => ({
+            date,
+            sales:    dailySalesMap.get(date) ?? 0,
+            expenses: dailyExpMap.get(date) ?? 0,
+          }))
+      }
 
       // ── Expense summary by category ──────────────────────────────────────
       const expenseMap = new Map<string, number>()
@@ -226,9 +277,14 @@ export function useReports(): UseReportsReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, mode, month, year])
+  }, [stationId, mode, month, year, selectedDate, weekStart, weekEnd])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  return { data, isLoading, error, mode, month, year, setMode, setMonth, setYear }
+  return {
+    data, isLoading, error,
+    mode, month, year, selectedDate, weekStart, weekEnd,
+    setMode, setMonth, setYear, setSelectedDate, setWeekStart,
+    goToPrevWeek, goToNextWeek,
+  }
 }
