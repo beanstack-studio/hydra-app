@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 
-type AuthView = 'login' | 'signup' | 'forgot' | 'recover'
+type AuthView = 'login' | 'signup' | 'forgot' | 'recover' | 'invite'
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -43,32 +43,47 @@ const recoverSchema = z.object({
   path: ['confirmPassword'],
 })
 
+const inviteSchema = z.object({
+  temp_code: z.string().min(1, 'Enter the verification code from your invite email'),
+  password: z.string()
+    .min(8, 'At least 8 characters')
+    .regex(/\d/, 'Must include at least one number'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
 type LoginSchema   = z.infer<typeof loginSchema>
 type SignUpSchema  = z.infer<typeof signUpSchema>
 type ForgotSchema  = z.infer<typeof forgotSchema>
 type RecoverSchema = z.infer<typeof recoverSchema>
+type InviteSchema  = z.infer<typeof inviteSchema>
 
 export default function LoginPage() {
   const isPasswordRecovery  = useAuthStore((s) => s.isPasswordRecovery)
   const isInviteAcceptance  = useAuthStore((s) => s.isInviteAcceptance)
   const isInviteExpired     = useAuthStore((s) => s.isInviteExpired)
   const clearInviteExpired  = useAuthStore((s) => s.clearInviteExpired)
-  const setInviteAcceptance = useAuthStore((s) => s.setInviteAcceptance)
   const noStation           = useAuthStore((s) => s.noStation)
   const clearAuth           = useAuthStore((s) => s.clearAuth)
   const [view, setView]     = useState<AuthView>('login')
   const [authError,      setAuthError]      = useState<string | null>(null)
   const [signUpSuccess,  setSignUpSuccess]  = useState(false)
   const [forgotSuccess,  setForgotSuccess]  = useState(false)
+  const [inviteSuccess,  setInviteSuccess]  = useState(false)
 
   const [showLoginPw,        setShowLoginPw]        = useState(false)
   const [showSignUpPw,       setShowSignUpPw]       = useState(false)
   const [showSignUpConfirm,  setShowSignUpConfirm]  = useState(false)
   const [showRecoverPw,      setShowRecoverPw]      = useState(false)
   const [showRecoverConfirm, setShowRecoverConfirm] = useState(false)
+  const [showInvitePw,       setShowInvitePw]       = useState(false)
+  const [showInviteConfirm,  setShowInviteConfirm]  = useState(false)
 
   useEffect(() => {
-    if (isPasswordRecovery || isInviteAcceptance) setView('recover')
+    if (isPasswordRecovery) setView('recover')
+    if (isInviteAcceptance) setView('invite')
   }, [isPasswordRecovery, isInviteAcceptance])
 
   const {
@@ -94,6 +109,12 @@ export default function LoginPage() {
     handleSubmit: hsRecover,
     formState: { errors: recoverErrors, isSubmitting: recoverSubmitting },
   } = useForm<RecoverSchema>({ resolver: zodResolver(recoverSchema) })
+
+  const {
+    register: regInvite,
+    handleSubmit: hsInvite,
+    formState: { errors: inviteErrors, isSubmitting: inviteSubmitting },
+  } = useForm<InviteSchema>({ resolver: zodResolver(inviteSchema) })
 
   const onLogin = hsLogin(async (data) => {
     setAuthError(null)
@@ -130,14 +151,33 @@ export default function LoginPage() {
   const onRecover = hsRecover(async (data) => {
     setAuthError(null)
     const { error } = await supabase.auth.updateUser({ password: data.password })
-    if (error) {
-      setAuthError(error.message)
-    } else if (isInviteAcceptance) {
-      // Clear invite flags so the USER_UPDATED event triggers a normal loadSession
-      // which runs accept_invitation() to link this user to the station.
-      sessionStorage.removeItem('hydra_invite_pending')
-      setInviteAcceptance(false)
+    if (error) setAuthError(error.message)
+  })
+
+  const onInviteSetup = hsInvite(async (data) => {
+    setAuthError(null)
+
+    // 1. Verify the code matches the invitation record
+    const { data: valid, error: verifyErr } = await supabase.rpc('verify_invite_code', {
+      p_code: data.temp_code.trim().toUpperCase(),
+    })
+    if (verifyErr || !valid) {
+      setAuthError('Incorrect verification code. Check your invite email and try again.')
+      return
     }
+
+    // 2. Set the permanent password
+    const { error: updateErr } = await supabase.auth.updateUser({ password: data.password })
+    if (updateErr) {
+      setAuthError(updateErr.message)
+      return
+    }
+
+    // 3. Show success screen, then reload so loadSession runs accept_invitation()
+    setInviteSuccess(true)
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 2500)
   })
 
   const handleSignOut = async () => {
@@ -399,18 +439,12 @@ export default function LoginPage() {
               )
             )}
 
-            {/* ── Set New Password ─────────────────────────────────────── */}
+            {/* ── Set New Password (password recovery) ─────────────────── */}
             {view === 'recover' && (
               <form onSubmit={onRecover} noValidate className="space-y-4">
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-1">
-                    {isInviteAcceptance ? 'Set up your password' : 'Set a new password'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isInviteAcceptance
-                      ? 'Create a password to access your station account.'
-                      : 'Choose a strong password for your account.'}
-                  </p>
+                  <p className="text-sm font-semibold text-foreground mb-1">Set a new password</p>
+                  <p className="text-xs text-muted-foreground">Choose a strong password for your account.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="rec-pw">New Password</Label>
@@ -463,6 +497,110 @@ export default function LoginPage() {
                   {recoverSubmitting ? 'Saving…' : 'Set Password'}
                 </Button>
               </form>
+            )}
+
+            {/* ── Invite Acceptance ─────────────────────────────────────── */}
+            {view === 'invite' && (
+              inviteSuccess ? (
+                <div className="text-center space-y-4 py-4">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary text-2xl">✓</span>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Password set!</p>
+                    <p className="text-xs text-muted-foreground">Logging you in to your station…</p>
+                  </div>
+                  <div className="flex justify-center">
+                    <div className="h-1 w-24 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary rounded-full animate-[progress_2.5s_linear_forwards]" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={onInviteSetup} noValidate className="space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-1">Set up your password</p>
+                    <p className="text-xs text-muted-foreground">
+                      Enter the verification code from your invite email, then choose a password.
+                    </p>
+                  </div>
+
+                  {/* Verification code */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inv-code">Verification Code</Label>
+                    <Input
+                      id="inv-code"
+                      type="text"
+                      placeholder="e.g. ABC123"
+                      autoFocus
+                      autoComplete="off"
+                      className="tracking-widest uppercase font-mono"
+                      {...regInvite('temp_code')}
+                    />
+                    {inviteErrors.temp_code && (
+                      <p className="text-xs text-destructive">{inviteErrors.temp_code.message}</p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">Check your invite email for this code.</p>
+                  </div>
+
+                  {/* New password */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inv-pw">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="inv-pw"
+                        type={showInvitePw ? 'text' : 'password'}
+                        placeholder="8+ characters"
+                        className="pr-10"
+                        {...regInvite('password')}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                        onClick={() => setShowInvitePw((v) => !v)}
+                      >
+                        {showInvitePw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {inviteErrors.password
+                      ? <p className="text-xs text-destructive">{inviteErrors.password.message}</p>
+                      : <p className="text-[11px] text-muted-foreground">8+ characters · at least one number</p>
+                    }
+                  </div>
+
+                  {/* Confirm password */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inv-pw2">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="inv-pw2"
+                        type={showInviteConfirm ? 'text' : 'password'}
+                        placeholder="Repeat password"
+                        className="pr-10"
+                        {...regInvite('confirmPassword')}
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                        onClick={() => setShowInviteConfirm((v) => !v)}
+                      >
+                        {showInviteConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {inviteErrors.confirmPassword && (
+                      <p className="text-xs text-destructive">{inviteErrors.confirmPassword.message}</p>
+                    )}
+                  </div>
+
+                  {authError && <p className="text-sm text-destructive">{authError}</p>}
+
+                  <Button type="submit" className="w-full" disabled={inviteSubmitting}>
+                    {inviteSubmitting ? 'Verifying…' : 'Set Password & Log In'}
+                  </Button>
+                </form>
+              )
             )}
           </div>
         </div>

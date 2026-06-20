@@ -35,6 +35,11 @@ export function useAuth() {
       return
     }
 
+    // Guard: if LoginPage is already showing the invite setup form, don't let the
+    // USER_UPDATED auth event (fired right after updateUser) race ahead and redirect
+    // to the app before the success screen has finished.
+    if (useAuthStore.getState().isInviteAcceptance) return
+
     if (!session) {
       const currentId = useAuthStore.getState().user?.id ?? ''
       if (!currentId.startsWith(DEV_USER_PREFIX)) {

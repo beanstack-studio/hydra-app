@@ -105,7 +105,7 @@ export function StaffProfileModal({
     try {
       await onSendInvite(email, watchedName)
       setInviteSent(true)
-      toast({ title: 'Invite sent', description: `Sign-in link sent to ${email}` })
+      toast({ title: 'Invite sent', description: `Link and verification code sent to ${email}` })
     } catch (e) {
       toast({
         title: 'Invite failed',
@@ -191,7 +191,7 @@ export function StaffProfileModal({
           {isAlreadyActive ? (
             <p className="text-xs font-medium text-primary">Already has access to this station</p>
           ) : inviteSent ? (
-            <p className="text-xs font-medium text-primary">Invite sent to {watchedEmail}</p>
+            <p className="text-xs font-medium text-primary">Invite sent — link &amp; verification code emailed to {watchedEmail}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
               {canInvite

@@ -81,12 +81,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Generate verification code ─────────────────────────────────────────────
+    // 6-char alphanumeric code — sent in the invite email body via email template
+    // variable {{ index .Data "temp_code" }}. Staff must type it on the setup page.
+    const tempCode = Math.random().toString(36).slice(2, 8).toUpperCase()
+
     // ── Refresh invitation record ───────────────────────────────────────────────
     await adminClient.from('invitations').delete().eq('station_id', stationId).eq('email', email)
 
     const { error: invErr } = await adminClient
       .from('invitations')
-      .insert({ station_id: stationId, email, full_name: full_name ?? null, status: 'pending' })
+      .insert({ station_id: stationId, email, full_name: full_name ?? null, status: 'pending', temp_code: tempCode })
 
     if (invErr) {
       return new Response(JSON.stringify({ error: `Invitation insert: ${invErr.message}` }), {
@@ -95,8 +100,11 @@ Deno.serve(async (req) => {
     }
 
     // ── Send invite email ───────────────────────────────────────────────────────
+    // temp_code is passed as user metadata so the email template can render it:
+    //   Supabase Dashboard → Auth → Email Templates → Invite User
+    //   Add: <p>Your verification code: <strong>{{ index .Data "temp_code" }}</strong></p>
     const { error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: full_name ?? null },
+      data: { full_name: full_name ?? null, temp_code: tempCode },
       redirectTo: redirect_to,
     })
 
