@@ -540,7 +540,7 @@ export default function LoginPage() {
                     {inviteErrors.temp_code && (
                       <p className="text-xs text-destructive">{inviteErrors.temp_code.message}</p>
                     )}
-                    <p className="text-[11px] text-muted-foreground">Check your invite email for this code.</p>
+                    <p className="text-[11px] text-muted-foreground">Check your invite email. Code uses uppercase letters and numbers — no O, I, or L.</p>
                   </div>
 
                   {/* New password */}

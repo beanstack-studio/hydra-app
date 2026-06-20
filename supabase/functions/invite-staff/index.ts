@@ -96,7 +96,12 @@ Deno.serve(async (req) => {
     // ── Generate verification code ─────────────────────────────────────────────
     // 6-char alphanumeric code — sent in the invite email body via email template
     // variable {{ index .Data "temp_code" }}. Staff must type it on the setup page.
-    const tempCode = Math.random().toString(36).slice(2, 8).toUpperCase()
+    // Unambiguous characters only — no 0/O, 1/I/L confusion
+    const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+    const tempCode = Array.from(
+      { length: 6 },
+      () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
+    ).join('')
 
     // ── Refresh invitation record ───────────────────────────────────────────────
     await adminClient.from('invitations').delete().eq('station_id', stationId).eq('email', email)
