@@ -25,7 +25,7 @@ import type { Sale, CartItem, SaleInsert, SaleStatus, CustomerType, OrderType, P
 const saleSchema = z.object({
   customer_id: z.string().nullable(),
   customer_name: z.string(),
-  customer_type: z.enum(['walk_in', 'regular', 'retailer']),
+  customer_type: z.enum(['walk_in', 'regular', 'retailer', 'one_time']),
   customer_phone: z.string(),
   container_enabled: z.boolean(),
   container_qty: z.number().min(1),
@@ -47,7 +47,7 @@ type SaleSchema = z.infer<typeof saleSchema>
 
 // Walk-in is an order type only — not a customer classification
 const CUSTOMER_TYPES: { value: CustomerType; label: string }[] = [
-  { value: 'regular', label: 'Regular' },
+  { value: 'regular',  label: 'Regular' },
   { value: 'retailer', label: 'Retailer' },
 ]
 
@@ -64,9 +64,10 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
 ]
 
 const CUSTOMER_TYPE_BADGE: Record<CustomerType, string> = {
-  walk_in: 'Walk-in',
-  regular: 'Regular',
+  walk_in:  'Walk-in',
+  regular:  'Regular',
   retailer: 'Retailer',
+  one_time: 'One Time',
 }
 
 type ProductTypeFilter = 'all' | 'water' | 'ice' | 'addon'
@@ -330,8 +331,19 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
     setCustomerResults([])
     setValue('customer_id', null)
     setValue('customer_name', '')
+    setValue('customer_type', 'regular')
     setValue('customer_phone', '')
     setValue('delivery_address', '')
+  }
+
+  const selectOneTimeCustomer = () => {
+    setIsNewCustomer(true)
+    setCustomerResults([])
+    setCustomerQuery('')
+    setValue('customer_name', '')
+    setValue('customer_id', null)
+    setValue('customer_type', 'one_time')
+    setValue('customer_phone', '')
   }
 
   // Reset on close
@@ -375,7 +387,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
   if (cartItems.length === 0) nextBlockers.push('Add at least one product')
   if (!hasCustomer) {
     nextBlockers.push('Select or enter a customer')
-  } else if (isNewCustomer && !customerQuery.trim()) {
+  } else if (isNewCustomer && !customerQuery.trim() && watchedFields.customer_type !== 'one_time') {
     nextBlockers.push('Enter customer name')
   } else if (orderType === 'delivery' || orderType === 'pickup') {
     if (isClosedDay) nextBlockers.push('Station is closed on the selected date')
@@ -412,7 +424,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
       toast({ title: 'Add at least one product', variant: 'destructive' })
       return
     }
-    if (isNewCustomer && !customerQuery.trim()) {
+    if (isNewCustomer && !customerQuery.trim() && values.customer_type !== 'one_time') {
       toast({ title: 'Customer name required', variant: 'destructive' })
       return
     }
@@ -432,7 +444,8 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
     try {
       let customerId = values.customer_id
 
-      if (isNewCustomer && customerQuery.trim()) {
+      // One Time customers: no customer record created, sale is anonymous
+      if (isNewCustomer && customerQuery.trim() && values.customer_type !== 'one_time') {
         const { data: newCust, error: custErr } = await supabase
           .from('customers')
           .insert({
@@ -464,7 +477,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
         scheduledAt = isNaN(parsed.getTime()) ? null : parsed.toISOString()
       }
 
-      const customerName = toTitleCase(customerQuery.trim() || 'Walk-in')
+      const customerName = values.customer_type === 'one_time' ? '' : toTitleCase(customerQuery.trim())
       const discountValue = values.discount ?? 0
       const finalTotal = cartTotal + (values.container_enabled ? values.container_qty * containerPrice : 0) - discountValue
       const amountReceived = Math.min(values.amount_received, finalTotal)
@@ -630,64 +643,87 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                 <div className="px-4 py-3 space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</p>
 
-                  <div className="relative">
-                    <Input
-                      placeholder="Customer name…"
-                      value={customerQuery}
-                      readOnly={!!selectedCustomer}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setCustomerQuery(val)
-                        setValue('customer_name', val)
-                        if (!isNewCustomer) setValue('customer_id', null)
-                      }}
-                      autoComplete="off"
-                      className={cn(selectedCustomer && 'bg-muted/50 cursor-default')}
-                    />
-
-                    {/* Search dropdown */}
-                    {!selectedCustomer && !isNewCustomer && customerQuery.length >= 1 && (
-                      <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-52 overflow-y-auto">
-                        {searchLoading ? (
-                          <p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
-                        ) : (
-                          <>
-                            {customerResults.length === 0 && (
-                              <p className="px-3 py-2 text-xs text-muted-foreground">No customers found</p>
-                            )}
-                            {customerResults.map((c) => (
-                              <button key={c.id} type="button"
-                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
-                                onClick={() => selectCustomer(c)}>
-                                <span className="text-sm font-medium">{c.name}</span>
-                                <Badge variant="outline">{CUSTOMER_TYPE_BADGE[c.type]}</Badge>
-                              </button>
-                            ))}
-                            {customerResults.length < 5 && (
-                              <button type="button"
-                                className={cn('w-full flex items-center px-3 py-2 hover:bg-accent text-left gap-2',
-                                  customerResults.length > 0 && 'border-t border-border')}
-                                onClick={selectNewCustomer}>
-                                <Plus className="h-3.5 w-3.5 text-primary shrink-0" />
-                                <span className="text-sm text-primary font-medium">New: "{customerQuery}"</span>
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {(selectedCustomer || isNewCustomer) && (
+                  {/* One Time chip — shown instead of search input */}
+                  {isNewCustomer && watchedFields.customer_type === 'one_time' ? (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border border-border">
+                      <span className="text-sm text-muted-foreground italic flex-1">Anonymous — One Time</span>
                       <button type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                        className="text-muted-foreground hover:text-foreground p-1 transition-colors duration-150"
                         onClick={clearCustomer}>
                         <X className="h-3.5 w-3.5" />
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Input
+                        placeholder="Customer name…"
+                        value={customerQuery}
+                        readOnly={!!selectedCustomer}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setCustomerQuery(val)
+                          setValue('customer_name', val)
+                          if (!isNewCustomer) setValue('customer_id', null)
+                        }}
+                        autoComplete="off"
+                        className={cn(selectedCustomer && 'bg-muted/50 cursor-default')}
+                      />
 
-                  {/* New customer: type pills (Regular / Retailer only) */}
-                  {isNewCustomer && (
+                      {/* Search dropdown */}
+                      {!selectedCustomer && !isNewCustomer && customerQuery.length >= 1 && (
+                        <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-52 overflow-y-auto">
+                          {searchLoading ? (
+                            <p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+                          ) : (
+                            <>
+                              {customerResults.length === 0 && (
+                                <p className="px-3 py-2 text-xs text-muted-foreground">No customers found</p>
+                              )}
+                              {customerResults.map((c) => (
+                                <button key={c.id} type="button"
+                                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
+                                  onClick={() => selectCustomer(c)}>
+                                  <span className="text-sm font-medium">{c.name}</span>
+                                  <Badge variant="outline">{CUSTOMER_TYPE_BADGE[c.type]}</Badge>
+                                </button>
+                              ))}
+                              {customerResults.length < 5 && (
+                                <button type="button"
+                                  className={cn('w-full flex items-center px-3 py-2 hover:bg-accent text-left gap-2',
+                                    customerResults.length > 0 && 'border-t border-border')}
+                                  onClick={selectNewCustomer}>
+                                  <Plus className="h-3.5 w-3.5 text-primary shrink-0" />
+                                  <span className="text-sm text-primary font-medium">New: "{customerQuery}"</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {(selectedCustomer || isNewCustomer) && (
+                        <button type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                          onClick={clearCustomer}>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* One Time shortcut — shown when no customer is selected yet */}
+                  {!selectedCustomer && !isNewCustomer && (
+                    <button
+                      type="button"
+                      onClick={selectOneTimeCustomer}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors duration-150 text-left"
+                    >
+                      Skip — One Time / anonymous customer
+                    </button>
+                  )}
+
+                  {/* New customer: type pills (Regular / Retailer) — only when name is being entered */}
+                  {isNewCustomer && watchedFields.customer_type !== 'one_time' && (
                     <Controller
                       name="customer_type"
                       control={control}

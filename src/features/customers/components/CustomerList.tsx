@@ -13,15 +13,23 @@ type CustomerSortKey = 'name' | 'type' | 'last_ordered' | 'balance'
 type SortDir = 'asc' | 'desc'
 
 const TYPE_LABELS: Record<CustomerType, string> = {
-  walk_in: 'Walk-in',
-  regular: 'Regular',
+  walk_in:  'Walk-in',
+  regular:  'Regular',
   retailer: 'Retailer',
+  one_time: 'One Time',
 }
 
 const TYPE_VARIANT: Record<CustomerType, 'default' | 'secondary' | 'outline'> = {
-  walk_in: 'outline',
-  regular: 'default',
+  walk_in:  'outline',
+  regular:  'default',
   retailer: 'secondary',
+  one_time: 'outline',
+}
+
+const GHOST_NAMES = new Set(['no name', 'no-name', 'walk in', 'walk-in', 'walk_in', ''])
+
+function isGhostCustomer(c: Customer): boolean {
+  return c.type === 'one_time' || GHOST_NAMES.has(c.name.trim().toLowerCase())
 }
 
 export const CUSTOMER_COLUMN_CONFIG: ColumnConfig[] = [
@@ -69,7 +77,7 @@ export function CustomerList({
     }
   }
 
-  const sorted = [...customers].sort((a, b) => {
+  const sorted = [...customers].filter((c) => !isGhostCustomer(c)).sort((a, b) => {
     let cmp = 0
     if (sortKey === 'name') cmp = a.name.localeCompare(b.name)
     else if (sortKey === 'type') cmp = a.type.localeCompare(b.type)

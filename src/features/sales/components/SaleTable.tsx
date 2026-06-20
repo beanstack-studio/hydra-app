@@ -103,8 +103,10 @@ export function SaleTable({
       key: 'customer',
       header: 'Customer',
       sortable: true,
-      render: (s: Sale) => (
+      render: (s: Sale) => s.customer_name ? (
         <p className="font-medium text-sm">{s.customer_name}</p>
+      ) : (
+        <p className="text-sm italic text-muted-foreground">Unknown</p>
       ),
     },
     {

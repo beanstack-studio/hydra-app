@@ -1,7 +1,7 @@
 export type PaymentMode = 'cash' | 'gcash' | 'maya' | 'utang'
 export type OrderType = 'walk-in' | 'delivery' | 'pickup'
 export type SaleStatus = 'paid' | 'partial' | 'unpaid'
-export type CustomerType = 'walk_in' | 'regular' | 'retailer'
+export type CustomerType = 'walk_in' | 'regular' | 'retailer' | 'one_time'
 
 export interface CartItem {
   product_id: string
