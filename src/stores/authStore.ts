@@ -18,6 +18,8 @@ interface AuthState {
   station: Station | null
   isInitialized: boolean
   isPasswordRecovery: boolean
+  isInviteAcceptance: boolean
+  isInviteExpired: boolean
   noStation: boolean
   viewPlan: 'free' | null
   setAuth: (params: { user: User; stationId: string; role: Role; station: Station }) => void
@@ -25,6 +27,9 @@ interface AuthState {
   clearAuth: () => void
   setInitialized: () => void
   setPasswordRecovery: (v: boolean) => void
+  setInviteAcceptance: (v: boolean) => void
+  setInviteExpired: () => void
+  clearInviteExpired: () => void
   setNoStation: () => void
   setViewRole: (r: Role) => void
   setViewPlan: (p: 'free' | null) => void
@@ -37,10 +42,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
   station: null,
   isInitialized: false,
   isPasswordRecovery: false,
+  isInviteAcceptance: false,
+  isInviteExpired: false,
   noStation: false,
   viewPlan: null,
   setAuth: ({ user, stationId, role, station }) =>
-    set({ user, stationId, role, station, noStation: false, isPasswordRecovery: false }),
+    set({ user, stationId, role, station, noStation: false, isPasswordRecovery: false, isInviteAcceptance: false }),
   setStation: (station) =>
     set({ station }),
   clearAuth: () =>
@@ -49,6 +56,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ isInitialized: true }),
   setPasswordRecovery: (v: boolean) =>
     set({ isPasswordRecovery: v }),
+  setInviteAcceptance: (v: boolean) =>
+    set({ isInviteAcceptance: v }),
+  setInviteExpired: () =>
+    set({ isInitialized: true, isInviteExpired: true }),
+  clearInviteExpired: () =>
+    set({ isInviteExpired: false }),
   setNoStation: () =>
     set({ isInitialized: true, noStation: true }),
   setViewRole: (r: Role) =>

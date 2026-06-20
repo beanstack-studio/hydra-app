@@ -32,6 +32,7 @@ interface StaffProfileModalProps {
   staff: StaffMember | null   // null = adding new member
   onSave: (input: MemberInput) => Promise<void>
   onSendInvite: (email: string, fullName: string) => Promise<void>
+  activeEmails: Set<string>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ export function StaffProfileModal({
   staff,
   onSave,
   onSendInvite,
+  activeEmails,
 }: StaffProfileModalProps) {
   const { toast } = useToast()
   const station = useAuthStore((s) => s.station)
@@ -117,6 +119,8 @@ export function StaffProfileModal({
     ? `${formatCurrency(watchedPayRate)} / day`
     : null
 
+  const isAlreadyActive = !!watchedEmail && activeEmails.has(watchedEmail.toLowerCase())
+
   return (
     <Modal
       isOpen={isOpen}
@@ -162,7 +166,7 @@ export function StaffProfileModal({
               type="button"
               size="sm"
               variant="outline"
-              disabled={!watchedEmail || !!errors.email || !canInvite}
+              disabled={!watchedEmail || !!errors.email || !canInvite || isAlreadyActive}
               onClick={() => void handleSendInvite()}
               className="shrink-0"
               title={
@@ -172,7 +176,9 @@ export function StaffProfileModal({
                   ? 'Enter an email address first'
                   : errors.email
                   ? 'Fix the email address first'
-                  : `Send sign-in link to ${watchedEmail}`
+                  : isAlreadyActive
+                  ? 'This person already has access to the station'
+                  : `Send invite to ${watchedEmail}`
               }
             >
               <Mail className="h-4 w-4 mr-1.5" />
@@ -182,12 +188,14 @@ export function StaffProfileModal({
           {errors.email && (
             <p className="text-xs text-destructive">{errors.email.message}</p>
           )}
-          {inviteSent ? (
+          {isAlreadyActive ? (
+            <p className="text-xs font-medium text-primary">Already has access to this station</p>
+          ) : inviteSent ? (
             <p className="text-xs font-medium text-primary">Invite sent to {watchedEmail}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
               {canInvite
-                ? 'Sends a sign-in link so this person can log into the app.'
+                ? 'Sends an invitation so this person can set a password and log in.'
                 : 'Pro plan required to invite staff members.'}
             </p>
           )}

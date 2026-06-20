@@ -14,9 +14,27 @@ export function useAuth() {
   const clearAuth = useAuthStore((s) => s.clearAuth)
   const setInitialized = useAuthStore((s) => s.setInitialized)
   const setNoStation = useAuthStore((s) => s.setNoStation)
+  const setInviteAcceptance = useAuthStore((s) => s.setInviteAcceptance)
+  const setInviteExpired = useAuthStore((s) => s.setInviteExpired)
   const stationChannelRef = useRef<RealtimeChannel | null>(null)
 
   const loadSession = useCallback(async (session: Session | null) => {
+    // Invite acceptance: the staff member clicked an invite link.
+    // The flag is set in supabase.ts before the client processes the URL hash.
+    if (sessionStorage.getItem('hydra_invite_pending') === '1') {
+      sessionStorage.removeItem('hydra_invite_pending')
+      if (!session) {
+        // Token expired or already used — show a clear error instead of a broken form.
+        setInviteExpired()
+        return
+      }
+      // Valid session from the invite token → show set-password form.
+      // Flag is cleared in LoginPage after updateUser() succeeds.
+      setInviteAcceptance(true)
+      setInitialized()
+      return
+    }
+
     if (!session) {
       const currentId = useAuthStore.getState().user?.id ?? ''
       if (!currentId.startsWith(DEV_USER_PREFIX)) {
@@ -119,7 +137,7 @@ export function useAuth() {
         (payload) => { setStation(payload.new as Station) }
       )
       .subscribe()
-  }, [setAuth, setStation, clearAuth, setInitialized, setNoStation])
+  }, [setAuth, setStation, clearAuth, setInitialized, setNoStation, setInviteAcceptance, setInviteExpired])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

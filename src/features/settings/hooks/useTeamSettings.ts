@@ -42,6 +42,7 @@ export interface MemberInput {
 
 interface UseTeamSettingsReturn {
   staff: StaffMember[]
+  activeEmails: Set<string>
   isLoading: boolean
   addMember: (input: MemberInput) => Promise<void>
   editMember: (id: string, input: MemberInput) => Promise<void>
@@ -52,16 +53,32 @@ interface UseTeamSettingsReturn {
 export function useTeamSettings(): UseTeamSettingsReturn {
   const stationId = useAuthStore((s) => s.stationId)
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [activeEmails, setActiveEmails] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     if (!stationId) { setIsLoading(false); return }
-    const { data } = await supabase
-      .from('staff')
-      .select('id, full_name, phone, email, pay_type, pay_rate, created_at')
-      .eq('station_id', stationId)
-      .order('created_at')
-    setStaff((data ?? []) as StaffMember[])
+
+    const [staffResult, usersResult] = await Promise.all([
+      supabase
+        .from('staff')
+        .select('id, full_name, phone, email, pay_type, pay_rate, created_at')
+        .eq('station_id', stationId)
+        .order('created_at'),
+      supabase
+        .from('users')
+        .select('email')
+        .eq('station_id', stationId)
+        .not('email', 'is', null),
+    ])
+
+    setStaff((staffResult.data ?? []) as StaffMember[])
+
+    const emailSet = new Set(
+      ((usersResult.data ?? []) as Array<{ email: string }>)
+        .map((u) => u.email.toLowerCase()),
+    )
+    setActiveEmails(emailSet)
     setIsLoading(false)
   }, [stationId])
 
@@ -107,21 +124,25 @@ export function useTeamSettings(): UseTeamSettingsReturn {
 
   const sendInvite = useCallback(async (email: string, fullName: string) => {
     if (!stationId) return
-    const { error: inviteErr } = await supabase.from('invitations').insert({
-      station_id: stationId,
-      email,
-      full_name: fullName,
-    })
-    if (inviteErr) throw new Error(inviteErr.message)
 
-    const { error: otpErr } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.functions.invoke('invite-staff', {
+      body: {
+        email,
+        full_name: fullName,
+        redirect_to: window.location.origin,
+      },
     })
-    if (otpErr) throw new Error(otpErr.message)
+
+    if (error) throw new Error(error.message)
+    if ((data as { error?: string } | null)?.error) {
+      throw new Error((data as { error: string }).error)
+    }
 
     await fetchAll()
   }, [stationId, fetchAll])
 
-  return { staff, isLoading, addMember, editMember, removeMember, sendInvite }
+  return { staff, activeEmails, isLoading, addMember, editMember, removeMember, sendInvite }
 }

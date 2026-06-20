@@ -49,10 +49,14 @@ type ForgotSchema  = z.infer<typeof forgotSchema>
 type RecoverSchema = z.infer<typeof recoverSchema>
 
 export default function LoginPage() {
-  const isPasswordRecovery = useAuthStore((s) => s.isPasswordRecovery)
-  const noStation          = useAuthStore((s) => s.noStation)
-  const clearAuth          = useAuthStore((s) => s.clearAuth)
-  const [view, setView]    = useState<AuthView>('login')
+  const isPasswordRecovery  = useAuthStore((s) => s.isPasswordRecovery)
+  const isInviteAcceptance  = useAuthStore((s) => s.isInviteAcceptance)
+  const isInviteExpired     = useAuthStore((s) => s.isInviteExpired)
+  const clearInviteExpired  = useAuthStore((s) => s.clearInviteExpired)
+  const setInviteAcceptance = useAuthStore((s) => s.setInviteAcceptance)
+  const noStation           = useAuthStore((s) => s.noStation)
+  const clearAuth           = useAuthStore((s) => s.clearAuth)
+  const [view, setView]     = useState<AuthView>('login')
   const [authError,      setAuthError]      = useState<string | null>(null)
   const [signUpSuccess,  setSignUpSuccess]  = useState(false)
   const [forgotSuccess,  setForgotSuccess]  = useState(false)
@@ -64,8 +68,8 @@ export default function LoginPage() {
   const [showRecoverConfirm, setShowRecoverConfirm] = useState(false)
 
   useEffect(() => {
-    if (isPasswordRecovery) setView('recover')
-  }, [isPasswordRecovery])
+    if (isPasswordRecovery || isInviteAcceptance) setView('recover')
+  }, [isPasswordRecovery, isInviteAcceptance])
 
   const {
     register: regLogin,
@@ -126,7 +130,14 @@ export default function LoginPage() {
   const onRecover = hsRecover(async (data) => {
     setAuthError(null)
     const { error } = await supabase.auth.updateUser({ password: data.password })
-    if (error) setAuthError(error.message)
+    if (error) {
+      setAuthError(error.message)
+    } else if (isInviteAcceptance) {
+      // Clear invite flags so the USER_UPDATED event triggers a normal loadSession
+      // which runs accept_invitation() to link this user to the station.
+      sessionStorage.removeItem('hydra_invite_pending')
+      setInviteAcceptance(false)
+    }
   })
 
   const handleSignOut = async () => {
@@ -162,6 +173,25 @@ export default function LoginPage() {
       <p className="text-xl font-bold text-foreground tracking-tight">Hydra</p>
     </div>
   )
+
+  if (isInviteExpired) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm space-y-6">
+          <BrandHeader />
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4 text-center">
+            <p className="text-sm font-semibold text-foreground">Invite link expired</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              This invite link has expired or was already used. Ask your station owner to send a new invite.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => { clearInviteExpired(); setView('login') }}>
+              Back to Sign In
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (noStation) {
     return (
@@ -373,8 +403,14 @@ export default function LoginPage() {
             {view === 'recover' && (
               <form onSubmit={onRecover} noValidate className="space-y-4">
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-1">Set a new password</p>
-                  <p className="text-xs text-muted-foreground">Choose a strong password for your account.</p>
+                  <p className="text-sm font-semibold text-foreground mb-1">
+                    {isInviteAcceptance ? 'Set up your password' : 'Set a new password'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isInviteAcceptance
+                      ? 'Create a password to access your station account.'
+                      : 'Choose a strong password for your account.'}
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="rec-pw">New Password</Label>

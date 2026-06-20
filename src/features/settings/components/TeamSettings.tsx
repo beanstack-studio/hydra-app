@@ -22,7 +22,7 @@ export function TeamSettings() {
   const currentRole = useAuthStore((s) => s.role)
   const isOwner = currentRole === 'owner'
 
-  const { staff, isLoading, addMember, editMember, removeMember, sendInvite } = useTeamSettings()
+  const { staff, activeEmails, isLoading, addMember, editMember, removeMember, sendInvite } = useTeamSettings()
 
   const [profileOpen,   setProfileOpen]   = useState(false)
   const [editingStaff,  setEditingStaff]  = useState<StaffMember | null>(null)
@@ -166,6 +166,7 @@ export function TeamSettings() {
         staff={editingStaff}
         onSave={handleSave}
         onSendInvite={sendInvite}
+        activeEmails={activeEmails}
       />
 
       <Modal isOpen={!!removingStaff} onClose={() => setRemovingStaff(null)} title="Remove Team Member" size="sm">
