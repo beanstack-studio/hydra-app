@@ -177,9 +177,9 @@ Deno.serve(async (req) => {
     const total = sale.total_amount as number
     grandTotal += total
 
-    // Pre-wrap the date+summary line at word boundaries to prevent mid-word cuts
-    const fullLine = `${saleDate}  ${itemSummary}`
-    for (const line of wrapText(fullLine, 32)) {
+    // Date on its own line, then item summary below (wrapped at word boundaries)
+    entries.push({ type: 0, content: saleDate, bold: 0, align: 0, format: 0 })
+    for (const line of wrapText(itemSummary, 32)) {
       entries.push({ type: 0, content: line, bold: 0, align: 0, format: 0 })
     }
     entries.push({ type: 0, content: formatCurrency(total), bold: 0, align: 2, format: 0 })
