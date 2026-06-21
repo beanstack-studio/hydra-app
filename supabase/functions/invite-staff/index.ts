@@ -66,14 +66,24 @@ Deno.serve(async (req) => {
     // ── Fetch station info for email personalisation ────────────────────────────
     const { data: stationRow } = await adminClient
       .from('stations')
-      .select('name, owner_name')
+      .select('name')
       .eq('id', stationId)
       .maybeSingle()
 
     const stationName = (stationRow?.name as string | null) ?? 'your station'
-    const ownerName   = (stationRow?.owner_name as string | null)
-                        ?? (caller.user_metadata?.full_name as string | undefined)
-                        ?? 'Your station owner'
+
+    // Use public.users.full_name as the owner's display name — it is kept in sync
+    // by the app's updateName flow. stations.owner_name can be stale if the owner
+    // renamed themselves after the station was created.
+    const { data: ownerRow } = await adminClient
+      .from('users')
+      .select('full_name')
+      .eq('id', caller.id)
+      .maybeSingle()
+
+    const ownerName = (ownerRow?.full_name as string | null)
+                      ?? (caller.user_metadata?.full_name as string | undefined)
+                      ?? 'Your station owner'
 
     // ── Delete any existing auth user for this email ────────────────────────────
     // inviteUserByEmail fails with 422 if the user already exists. We proactively
