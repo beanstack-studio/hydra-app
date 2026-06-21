@@ -170,7 +170,8 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
                 const isAndroid = /Android/i.test(navigator.userAgent)
                 const scheme = isAndroid ? 'my.bluetoothprint.scheme://' : 'bprint://'
                 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
-                const url = `${scheme}${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}`
+                const platformParam = isAndroid ? '&platform=android' : ''
+                const url = `${scheme}${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}${platformParam}`
                 const a = document.createElement('a')
                 a.setAttribute('href', url)
                 a.click()

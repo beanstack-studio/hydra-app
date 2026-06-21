@@ -41,6 +41,26 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
+// Wraps text at word boundaries to prevent mid-word cuts on thermal printers
+function wrapText(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text]
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if (!current) {
+      current = word
+    } else if (current.length + 1 + word.length <= maxChars) {
+      current += ' ' + word
+    } else {
+      lines.push(current)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
 // — Handler
 
 Deno.serve(async (req) => {
@@ -121,7 +141,11 @@ Deno.serve(async (req) => {
 
   // 2. Station name + contact info
   entries.push({ type: 0, content: stationName, bold: 1, align: 1, format: 2 })
-  if (address) entries.push({ type: 0, content: address, bold: 0, align: 1, format: 0 })
+  if (address) {
+    for (const line of wrapText(address, 32)) {
+      entries.push({ type: 0, content: line, bold: 0, align: 1, format: 0 })
+    }
+  }
   if (phone) entries.push({ type: 0, content: phone, bold: 0, align: 1, format: 0 })
   if (messengerContact) entries.push({ type: 0, content: messengerContact.value, bold: 0, align: 1, format: 0 })
 
@@ -135,8 +159,14 @@ Deno.serve(async (req) => {
 
   let grandTotal = 0
 
-  // 4. List each sale
-  for (const sale of sales) {
+  // 4. List each sale — separated by dashed lines between dates
+  for (let idx = 0; idx < sales.length; idx++) {
+    const sale = sales[idx]
+    // Dashed separator before each sale entry (after the first, which already has the header dash)
+    if (idx > 0) {
+      entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
+    }
+
     const saleDate = formatPHDate(sale.sale_date as string)
     const rawItems: Array<{ product_name: string; qty: number; price: number }> =
       Array.isArray(sale.items) && sale.items.length > 0
@@ -147,7 +177,11 @@ Deno.serve(async (req) => {
     const total = sale.total_amount as number
     grandTotal += total
 
-    entries.push({ type: 0, content: `${saleDate}  ${itemSummary}`, bold: 0, align: 0, format: 0 })
+    // Pre-wrap the date+summary line at word boundaries to prevent mid-word cuts
+    const fullLine = `${saleDate}  ${itemSummary}`
+    for (const line of wrapText(fullLine, 32)) {
+      entries.push({ type: 0, content: line, bold: 0, align: 0, format: 0 })
+    }
     entries.push({ type: 0, content: formatCurrency(total), bold: 0, align: 2, format: 0 })
   }
 

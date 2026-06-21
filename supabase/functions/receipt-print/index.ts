@@ -47,6 +47,33 @@ function formatPhoneDigits(digits: string): string {
   return digits
 }
 
+// Wraps text at word boundaries to prevent mid-word cuts on thermal printers
+function wrapText(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text]
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if (!current) {
+      current = word
+    } else if (current.length + 1 + word.length <= maxChars) {
+      current += ' ' + word
+    } else {
+      lines.push(current)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+// Formats a single receipt item line with price right-aligned, padded to lineWidth
+function formatItemLine(desc: string, price: string, lineWidth: number): string {
+  const total = desc.length + price.length
+  if (total >= lineWidth) return `${desc} ${price}`
+  return desc + ' '.repeat(lineWidth - total) + price
+}
+
 // — Handler
 
 Deno.serve(async (req) => {
@@ -56,6 +83,7 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url)
   const txnId = url.searchParams.get('txn_id')
+  const isAndroid = url.searchParams.get('platform') === 'android'
 
   if (!txnId) {
     return new Response(JSON.stringify({ error: 'txn_id required' }), {
@@ -161,8 +189,12 @@ Deno.serve(async (req) => {
   // 2. Station name
   entries.push({ type: 0, content: stationName, bold: 1, align: 1, format: 2 })
 
-  // 3. Address & Contacts
-  if (address) entries.push({ type: 0, content: address, bold: 0, align: 1, format: 0 })
+  // 3. Address & Contacts — pre-wrap to prevent mid-word cuts on thermal printers
+  if (address) {
+    for (const line of wrapText(address, 32)) {
+      entries.push({ type: 0, content: line, bold: 0, align: 1, format: 0 })
+    }
+  }
   if (phone) entries.push({ type: 0, content: phone, bold: 0, align: 1, format: 0 })
   if (messengerContact) entries.push({ type: 0, content: messengerContact.value, bold: 0, align: 1, format: 0 })
   if (email) entries.push({ type: 0, content: email, bold: 0, align: 1, format: 0 })
@@ -176,42 +208,28 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: paidAt, bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '--------------------------------', bold: 0, align: 0, format: 0 })
 
-  // 11. Two-Line Item Display Strategy:
-  // First line: Qty and Name left-aligned (align: 0)
-  // Second line: Price right-aligned (align: 2)
+  // Items — Android: single line with price right-aligned via space padding (fills width)
+  //         iOS: two-line (desc left, price right) — existing format preserved
   for (const item of items) {
-    entries.push({
-      type: 0,
-      content: `${item.qty} x ${item.name} @${item.unit}`,
-      bold: 0,
-      align: 0,
-      format: 0,
-    })
-    entries.push({
-      type: 0,
-      content: formatCurrency(item.subtotal),
-      bold: 0,
-      align: 2,
-      format: 0,
-    })
+    const desc = `${item.qty} x ${item.name} @${item.unit}`
+    const price = formatCurrency(item.subtotal)
+    if (isAndroid) {
+      entries.push({ type: 0, content: formatItemLine(desc, price, 32), bold: 0, align: 0, format: 0 })
+    } else {
+      entries.push({ type: 0, content: desc, bold: 0, align: 0, format: 0 })
+      entries.push({ type: 0, content: price, bold: 0, align: 2, format: 0 })
+    }
   }
 
-  // 12. Container fee block matching the item row split structure
   if (containerFee) {
-    entries.push({
-      type: 0,
-      content: '1 x Container Fee',
-      bold: 0,
-      align: 0,
-      format: 0,
-    })
-    entries.push({
-      type: 0,
-      content: formatCurrency(containerFee),
-      bold: 0,
-      align: 2,
-      format: 0,
-    })
+    const cDesc = '1 x Container Fee'
+    const cPrice = formatCurrency(containerFee)
+    if (isAndroid) {
+      entries.push({ type: 0, content: formatItemLine(cDesc, cPrice, 32), bold: 0, align: 0, format: 0 })
+    } else {
+      entries.push({ type: 0, content: cDesc, bold: 0, align: 0, format: 0 })
+      entries.push({ type: 0, content: cPrice, bold: 0, align: 2, format: 0 })
+    }
   }
 
   // Divider
@@ -259,6 +277,12 @@ Deno.serve(async (req) => {
   entries.push({ type: 0, content: 'Thank you for your order!', bold: 0, align: 1, format: 0 })
   entries.push({ type: 0, content: '', bold: 0, align: 0, format: 0 })
 
-  const obj = Object.fromEntries(entries.map((v, i) => [String(i).padStart(2, '0'), v]))
+  // Android: use 3-digit zero-padded keys ("001", "002", ..., "010", "011", ...)
+  // This ensures ALL keys have leading zeros → none qualify as JS integer indices
+  // → object iterates in insertion order on Android's JS-based print app.
+  // iOS: keep 2-digit keys ("00", "01", ...) — unchanged, already works correctly.
+  const padWidth = isAndroid ? 3 : 2
+  const startIdx = isAndroid ? 1 : 0
+  const obj = Object.fromEntries(entries.map((v, i) => [String(i + startIdx).padStart(padWidth, '0'), v]))
   return new Response(JSON.stringify(obj), { headers: JSON_HEADERS })
 })
