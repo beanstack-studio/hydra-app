@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Receipt, Trash2, Paperclip } from 'lucide-react'
+import { Receipt, Trash2, Paperclip, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -180,12 +180,13 @@ export function ExpenseTable({
         <div className="flex items-center gap-1 justify-end">
           {!e.payment_method && (
             <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-primary hover:text-primary"
+              title="Mark as paid"
               onClick={(ev) => { ev.stopPropagation(); onPay(e) }}
             >
-              Pay
+              <CreditCard className="h-4 w-4" />
             </Button>
           )}
           {e.receipt_url && (

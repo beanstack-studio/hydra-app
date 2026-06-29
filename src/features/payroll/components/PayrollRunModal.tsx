@@ -68,7 +68,7 @@ export function PayrollRunModal({ isOpen, onClose, staff, existingRuns, onRun }:
 
   const [periodStart,  setPeriodStart]  = useState(firstOfMonth)
   const [periodEnd,    setPeriodEnd]    = useState(todayPH)
-  const [paymentDate,  setPaymentDate]  = useState(todayPH)
+  const [paymentDate,  setPaymentDate]  = useState('')
   const [paymentMode,  setPaymentMode]  = useState<PaymentMode | null>(null)
   const [entries,      setEntries]      = useState<Record<string, ManualEntry>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -139,10 +139,13 @@ export function PayrollRunModal({ isOpen, onClose, staff, existingRuns, onRun }:
     try {
       await onRun(periodStart, periodEnd, paymentDate, previewItems)
       toast({
-        title: 'Payroll complete',
-        description: `${formatCurrency(grandTotal)} in labor expenses created.`,
+        title: paymentDate ? 'Payroll complete' : 'Payroll run saved',
+        description: paymentDate
+          ? `${formatCurrency(grandTotal)} in labor expenses created.`
+          : `${formatCurrency(grandTotal)} pending payment.`,
       })
       setEntries({})
+      setPaymentDate('')
       onClose()
     } catch (e) {
       toast({
@@ -184,7 +187,7 @@ export function PayrollRunModal({ isOpen, onClose, staff, existingRuns, onRun }:
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="pr-paid">Payment Date <span className="text-destructive">*</span></Label>
+            <Label htmlFor="pr-paid">Payment Date</Label>
             <DatePickerInput id="pr-paid" value={paymentDate} onChange={setPaymentDate} />
           </div>
           <div className="space-y-1.5">

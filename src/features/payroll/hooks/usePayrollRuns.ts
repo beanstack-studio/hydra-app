@@ -14,6 +14,7 @@ interface UsePayrollRunsReturn {
     paidDate: string,
     items: Array<PayPreviewItem & { payment_mode: PaymentMode | null }>
   ) => Promise<void>
+  payPayrollRun: (runId: string, paidDate: string, paymentMode: PaymentMode | null) => Promise<void>
   deletePayrollRun: (runId: string) => Promise<void>
 }
 
@@ -83,6 +84,7 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
   ) => {
     if (!stationId || items.length === 0) return
     const totalAmount = items.reduce((sum, i) => sum + i.gross_pay, 0)
+    const isPaid = paidDate !== ''
 
     // 1. Create the payroll run record
     const { data: run, error: runErr } = await supabase
@@ -91,9 +93,9 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
         station_id: stationId,
         period_start: periodStart,
         period_end: periodEnd,
-        status: 'paid',
+        status: isPaid ? 'paid' : 'unpaid',
         total_amount: totalAmount,
-        paid_at: paidDate,
+        paid_at: isPaid ? paidDate : null,
       })
       .select()
       .single()
@@ -116,9 +118,54 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
     )
     if (itemsErr) throw new Error(itemsErr.message)
 
-    // 3. Create one labor expense per staff member (auto-links payroll to expenses)
+    // 3. Create labor expenses only when paid immediately
+    if (isPaid) {
+      const { error: expErr } = await supabase.from('expenses').insert(
+        items.map((item) => ({
+          station_id: stationId,
+          category: 'labor',
+          item: `Payroll: ${item.staff_name}`,
+          price: item.gross_pay,
+          amount: item.gross_pay,
+          frequency: 'one_off',
+          expense_date: paidDate,
+          payment_method: item.payment_mode ?? null,
+          remarks: `${item.staff_name} — ${periodStart} to ${periodEnd}`,
+        }))
+      )
+      if (expErr) throw new Error(expErr.message)
+    }
+
+    await fetchData()
+  }, [stationId, fetchData])
+
+  const payPayrollRun = useCallback(async (
+    runId: string,
+    paidDate: string,
+    paymentMode: PaymentMode | null
+  ) => {
+    if (!stationId) return
+    const run = data.find((r) => r.id === runId)
+    if (!run || !run.payroll_items) throw new Error('Run not found')
+
+    // 1. Mark the run as paid
+    const { error: updateErr } = await supabase
+      .from('payroll_runs')
+      .update({ status: 'paid', paid_at: paidDate })
+      .eq('id', runId)
+      .eq('station_id', stationId)
+    if (updateErr) throw new Error(updateErr.message)
+
+    // 2. Update payment_mode on each payroll item
+    const { error: itemsErr } = await supabase
+      .from('payroll_items')
+      .update({ payment_mode: paymentMode })
+      .eq('payroll_run_id', runId)
+    if (itemsErr) throw new Error(itemsErr.message)
+
+    // 3. Create labor expense entries
     const { error: expErr } = await supabase.from('expenses').insert(
-      items.map((item) => ({
+      run.payroll_items.map((item) => ({
         station_id: stationId,
         category: 'labor',
         item: `Payroll: ${item.staff_name}`,
@@ -126,14 +173,14 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
         amount: item.gross_pay,
         frequency: 'one_off',
         expense_date: paidDate,
-        payment_method: item.payment_mode ?? null,
-        remarks: `${item.staff_name} — ${periodStart} to ${periodEnd}`,
+        payment_method: paymentMode ?? null,
+        remarks: `${item.staff_name} — ${run.period_start} to ${run.period_end}`,
       }))
     )
     if (expErr) throw new Error(expErr.message)
 
     await fetchData()
-  }, [stationId, fetchData])
+  }, [stationId, data, fetchData])
 
   const deletePayrollRun = useCallback(async (runId: string) => {
     if (!stationId) return
@@ -169,5 +216,5 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
     await fetchData()
   }, [stationId, data, fetchData])
 
-  return { data, isLoading, error, runPayroll, deletePayrollRun }
+  return { data, isLoading, error, runPayroll, payPayrollRun, deletePayrollRun }
 }

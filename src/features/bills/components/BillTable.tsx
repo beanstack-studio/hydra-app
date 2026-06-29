@@ -262,13 +262,13 @@ export function BillTable() {
         <div className="flex items-center gap-1 justify-end">
           {!bill.date_paid && (
             <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-primary hover:text-primary"
+              title="Mark as paid"
               onClick={(e) => { e.stopPropagation(); setPayingBill(bill) }}
             >
-              <CreditCard className="h-3.5 w-3.5 mr-1" />
-              Pay
+              <CreditCard className="h-4 w-4" />
             </Button>
           )}
           {isOwner && (
