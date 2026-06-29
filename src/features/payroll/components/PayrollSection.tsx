@@ -8,7 +8,7 @@ import { UpgradeWall } from '@/components/shared/UpgradeWall'
 export function PayrollSection() {
   const plan = usePlan()
   const { staff, isLoading: staffLoading }                       = useTeamSettings()
-  const { data: payrollRuns, isLoading: runsLoading, runPayroll } = usePayrollRuns()
+  const { data: payrollRuns, isLoading: runsLoading, runPayroll, deletePayrollRun } = usePayrollRuns()
 
   if (plan === 'free') return <UpgradeWall title="Payroll" feature="Payroll" showTitle={false} />
 
@@ -20,6 +20,7 @@ export function PayrollSection() {
       payrollRuns={payrollRuns}
       isLoading={false}
       onRun={runPayroll}
+      onDelete={deletePayrollRun}
     />
   )
 }

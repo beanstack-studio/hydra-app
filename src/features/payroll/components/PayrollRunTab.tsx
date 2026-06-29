@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Play, ArrowUpDown } from 'lucide-react'
+import { ChevronDown, ChevronUp, Play, ArrowUpDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
+import { Modal } from '@/components/shared/Modal'
 import { PayrollRunModal } from './PayrollRunModal'
 import { PayrollDetailModal } from './PayrollDetailModal'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
+import { useAuthStore } from '@/stores/authStore'
 import type { StaffMember } from '@/features/settings/hooks/useTeamSettings'
 import type { PayrollRun, PayPreviewItem, PaymentMode } from '../types'
 
@@ -20,14 +23,19 @@ interface PayrollRunTabProps {
     paidDate: string,
     items: Array<PayPreviewItem & { payment_mode: PaymentMode | null }>
   ) => Promise<void>
+  onDelete: (runId: string) => Promise<void>
 }
 
 type PayrollSortKey = 'period' | 'pmt_date' | 'total'
 type SortDir = 'asc' | 'desc'
 
-export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun }: PayrollRunTabProps) {
+export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun, onDelete }: PayrollRunTabProps) {
+  const { toast } = useToast()
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [isRunModalOpen,  setIsRunModalOpen]  = useState(false)
   const [detailRun,       setDetailRun]       = useState<PayrollRun | null>(null)
+  const [deletingRun,     setDeletingRun]     = useState<PayrollRun | null>(null)
+  const [isDeleting,      setIsDeleting]      = useState(false)
   const [sortKey,         setSortKey]         = useState<PayrollSortKey>('period')
   const [sortDir,         setSortDir]         = useState<SortDir>('desc')
 
@@ -47,6 +55,20 @@ export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun }: PayrollR
   const sortIcon = (key: PayrollSortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="h-3 w-3 opacity-40" />
     return sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+  }
+
+  const handleDelete = async () => {
+    if (!deletingRun) return
+    setIsDeleting(true)
+    try {
+      await onDelete(deletingRun.id)
+      toast({ title: 'Payroll run deleted' })
+      setDeletingRun(null)
+    } catch (e) {
+      toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const thCls = cn(
@@ -88,6 +110,7 @@ export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun }: PayrollR
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Status
                   </th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -116,6 +139,18 @@ export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun }: PayrollR
                         {run.status === 'paid' ? 'Paid' : 'Draft'}
                       </Badge>
                     </td>
+                    <td className="px-4 py-3">
+                      {isOwner && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setDeletingRun(run) }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -137,6 +172,26 @@ export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun }: PayrollR
         isOpen={detailRun !== null}
         onClose={() => setDetailRun(null)}
       />
+
+      <Modal isOpen={!!deletingRun} onClose={() => setDeletingRun(null)} title="Delete Payroll Run" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Delete payroll run for{' '}
+            <span className="font-semibold text-foreground">
+              {deletingRun ? `${formatDate(deletingRun.period_start + 'T00:00:00')} to ${formatDate(deletingRun.period_end + 'T00:00:00')}` : ''}
+            </span>?{' '}
+            This will also delete all payroll items and related expense entries for this run. This cannot be undone.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingRun(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" className="flex-1" disabled={isDeleting} onClick={handleDelete}>
+              {isDeleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

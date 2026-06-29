@@ -14,6 +14,7 @@ interface UsePayrollRunsReturn {
     paidDate: string,
     items: Array<PayPreviewItem & { payment_mode: PaymentMode | null }>
   ) => Promise<void>
+  deletePayrollRun: (runId: string) => Promise<void>
 }
 
 // Pure computation — no Supabase. Can be imported directly by modal components.
@@ -134,5 +135,39 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
     await fetchData()
   }, [stationId, fetchData])
 
-  return { data, isLoading, error, runPayroll }
+  const deletePayrollRun = useCallback(async (runId: string) => {
+    if (!stationId) return
+    const run = data.find((r) => r.id === runId)
+    if (!run) throw new Error('Payroll run not found')
+
+    // 1. Delete related labor expenses (by period range + category)
+    const { error: expErr } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('station_id', stationId)
+      .eq('category', 'labor')
+      .like('item', 'Payroll:%')
+      .gte('expense_date', run.period_start)
+      .lte('expense_date', run.period_end)
+    if (expErr) throw new Error(expErr.message)
+
+    // 2. Delete payroll items
+    const { error: itemsErr } = await supabase
+      .from('payroll_items')
+      .delete()
+      .eq('payroll_run_id', runId)
+    if (itemsErr) throw new Error(itemsErr.message)
+
+    // 3. Delete the run itself
+    const { error: runErr } = await supabase
+      .from('payroll_runs')
+      .delete()
+      .eq('id', runId)
+      .eq('station_id', stationId)
+    if (runErr) throw new Error(runErr.message)
+
+    await fetchData()
+  }, [stationId, data, fetchData])
+
+  return { data, isLoading, error, runPayroll, deletePayrollRun }
 }
