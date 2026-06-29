@@ -150,7 +150,7 @@ export default function ReportsPage() {
             />
             <SalesByProductChart
               data={data?.productSales ?? []}
-              total={data?.totalSalesAmount ?? 0}
+              total={(data?.productSales ?? []).reduce((s, p) => s + p.total_amount, 0)}
             />
           </div>
 

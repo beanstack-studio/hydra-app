@@ -145,6 +145,17 @@ export function useSales(): UseSalesReturn {
       .select()
       .single()
     if (e) throw new Error(e.message)
+    // Record initial payment in sale_payments so reports see it on the sale date
+    if (stationId && input.amount_received > 0 && input.payment_mode !== 'utang') {
+      await supabase.from('sale_payments').insert({
+        station_id: stationId,
+        sale_id: (row as Sale).id,
+        amount: input.amount_received,
+        payment_mode: input.payment_mode,
+        paid_at: input.sale_date,
+        remarks: null,
+      })
+    }
     if (stationId) {
       const itemsToDeduct = input.items && input.items.length > 0
         ? input.items
