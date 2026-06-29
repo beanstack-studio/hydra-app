@@ -130,7 +130,7 @@ export default function ReportsPage() {
         <div className="space-y-6">
           {/* Summary stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <StatCard label="Total Sales" value={formatCurrency(data?.totalSalesAmount ?? 0)} />
+            <StatCard label="Total Income" value={formatCurrency(data?.totalSalesAmount ?? 0)} />
             <StatCard label="Total Expenses" value={formatCurrency(data?.totalExpensesAmount ?? 0)} />
             <StatCard
               label="Net Profit"

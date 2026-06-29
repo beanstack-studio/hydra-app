@@ -108,13 +108,13 @@ export function useReports(): UseReportsReturn {
       const [paymentsRes, salesRes, expensesRes, billsRes] = await Promise.all([
         supabase
           .from('sale_payments')
-          .select('paid_at, amount')
+          .select('paid_at, amount, sale_id')
           .eq('station_id', stationId)
           .gte('paid_at', startDate)
           .lte('paid_at', endDate),
         supabase
           .from('sales')
-          .select('sale_date, total_amount, status, product_name, qty, customer_name, items')
+          .select('id, sale_date, total_amount, status, product_name, qty, customer_name, items, amount_received, payment_mode')
           .eq('station_id', stationId)
           .gte('sale_date', startDate)
           .lte('sale_date', endDate),
@@ -135,11 +135,24 @@ export function useReports(): UseReportsReturn {
       const queryError = paymentsRes.error?.message || salesRes.error?.message || expensesRes.error?.message
       if (queryError) setError(`Could not load all data: ${queryError}`)
 
-      // ── Daily payments map (revenue = cash actually received) ────────────
+      // ── Sales with a sale_payments record (new flow after addSale fix) ───
+      const paidSaleIds = new Set(payments.map((p) => p.sale_id as string))
+
+      // ── Daily income map: payments received + fallback for pre-fix sales ─
       const dailySalesMap = new Map<string, number>()
+      // Primary: explicit sale_payments records
       for (const p of payments) {
         const dateKey = p.paid_at as string  // stored as YYYY-MM-DD
         dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + (p.amount as number))
+      }
+      // Fallback: sales with amount_received > 0 but no sale_payments record yet
+      for (const s of sales) {
+        if (paidSaleIds.has(s.id as string)) continue
+        if ((s.payment_mode as string) === 'utang') continue
+        const amtReceived = (s.amount_received as number) ?? 0
+        if (amtReceived <= 0) continue
+        const dateKey = s.sale_date as string
+        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + amtReceived)
       }
 
       // ── Daily expenses map ───────────────────────────────────────────────
@@ -266,7 +279,11 @@ export function useReports(): UseReportsReturn {
       const totalExpensesAmount =
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
-      const totalSalesAmount = payments.reduce((s, p) => s + (p.amount as number), 0)
+      const paymentsTotal = payments.reduce((s, p) => s + (p.amount as number), 0)
+      const fallbackTotal = sales
+        .filter((s) => !paidSaleIds.has(s.id as string) && (s.payment_mode as string) !== 'utang' && ((s.amount_received as number) ?? 0) > 0)
+        .reduce((s, r) => s + ((r.amount_received as number) ?? 0), 0)
+      const totalSalesAmount = paymentsTotal + fallbackTotal
 
       setData({
         dailyPoints,
