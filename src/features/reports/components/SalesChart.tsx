@@ -49,8 +49,11 @@ export function SalesChart({ data }: SalesVsExpensesChartProps) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
         Sales vs Expenses
+      </p>
+      <p className="text-xs text-muted-foreground/70 mb-4">
+        Revenue reflects actual payments received, not order totals
       </p>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={chartData} barGap={2} barCategoryGap="30%">

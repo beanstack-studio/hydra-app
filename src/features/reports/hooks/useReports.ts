@@ -105,7 +105,13 @@ export function useReports(): UseReportsReturn {
         billsQuery = billsQuery.lte('month', billsMaxMonth)
       }
 
-      const [salesRes, expensesRes, billsRes] = await Promise.all([
+      const [paymentsRes, salesRes, expensesRes, billsRes] = await Promise.all([
+        supabase
+          .from('sale_payments')
+          .select('paid_at, amount')
+          .eq('station_id', stationId)
+          .gte('paid_at', startDate)
+          .lte('paid_at', endDate),
         supabase
           .from('sales')
           .select('sale_date, total_amount, status, product_name, qty, customer_name, items')
@@ -121,18 +127,19 @@ export function useReports(): UseReportsReturn {
         includeBills ? billsQuery : Promise.resolve({ data: [], error: null }),
       ])
 
+      const payments = paymentsRes.data ?? []
       const sales    = salesRes.data    ?? []
       const expenses = expensesRes.data ?? []
       const bills    = billsRes.data    ?? []
 
-      const queryError = salesRes.error?.message || expensesRes.error?.message
+      const queryError = paymentsRes.error?.message || salesRes.error?.message || expensesRes.error?.message
       if (queryError) setError(`Could not load all data: ${queryError}`)
 
-      // ── Daily sales map ──────────────────────────────────────────────────
+      // ── Daily payments map (revenue = cash actually received) ────────────
       const dailySalesMap = new Map<string, number>()
-      for (const s of sales) {
-        const dateKey = formatInTimeZone(new Date(s.sale_date as string), PH_TZ, 'yyyy-MM-dd')
-        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + (s.total_amount as number))
+      for (const p of payments) {
+        const dateKey = p.paid_at as string  // stored as YYYY-MM-DD
+        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + (p.amount as number))
       }
 
       // ── Daily expenses map ───────────────────────────────────────────────
@@ -259,7 +266,7 @@ export function useReports(): UseReportsReturn {
       const totalExpensesAmount =
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
-      const totalSalesAmount = sales.reduce((s, r) => s + (r.total_amount as number), 0)
+      const totalSalesAmount = payments.reduce((s, p) => s + (p.amount as number), 0)
 
       setData({
         dailyPoints,
