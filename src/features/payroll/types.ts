@@ -2,7 +2,7 @@ import type { DayKey, PayType } from '@/features/settings/types'
 
 export type { PayType }
 export type PaymentMode = 'cash' | 'gcash' | 'maya'
-export type PayrollStatus = 'draft' | 'paid' | 'unpaid'
+export type PayrollStatus = 'draft' | 'paid'
 
 export interface StaffSchedule {
   id: string

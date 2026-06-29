@@ -93,7 +93,7 @@ export function usePayrollRuns(): UsePayrollRunsReturn {
         station_id: stationId,
         period_start: periodStart,
         period_end: periodEnd,
-        status: isPaid ? 'paid' : 'unpaid',
+        status: isPaid ? 'paid' : 'draft',
         total_amount: totalAmount,
         paid_at: isPaid ? paidDate : null,
       })
