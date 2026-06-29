@@ -270,30 +270,30 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="pt-2 border-t border-border space-y-3">
-              {user && (
-                <div className="flex items-center gap-2.5 px-1">
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center gap-2.5 px-1">
+                {user && (
                   <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
                     <span className="text-xs font-bold text-primary leading-none">
                       {(userName || user.email || 'U').charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate leading-tight">
-                      {userName || user.email || 'Account'}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground capitalize leading-tight">{role ?? 'staff'}</p>
-                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate leading-tight">
+                    {userName || user?.email || 'Account'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground capitalize leading-tight">{role ?? 'staff'}</p>
                 </div>
-              )}
-              <button
-                type="button"
-                onClick={() => void supabase.auth.signOut()}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-destructive transition-colors duration-150"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
+                <button
+                  type="button"
+                  title="Sign Out"
+                  onClick={() => void supabase.auth.signOut()}
+                  className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors duration-150 shrink-0"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         ) : (
