@@ -80,6 +80,12 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
               <span className="text-muted-foreground text-xs">{formatCurrency(item.subtotal)}</span>
             </div>
           ))}
+          {sale.discount_amount > 0 && (
+            <div className="flex items-center justify-between border-t border-border/50 pt-1 mt-1">
+              <span className="text-sm text-muted-foreground">Discount applied</span>
+              <span className="text-sm font-medium text-destructive">−{formatCurrency(sale.discount_amount)}</span>
+            </div>
+          )}
         </div>
 
         {/* Section 3: Delivery/Pickup details */}

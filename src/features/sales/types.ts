@@ -26,6 +26,7 @@ export interface Sale {
   container_price: number
 
   total_amount: number
+  discount_amount: number
   payment_mode: PaymentMode
   amount_received: number
   balance_due: number
@@ -56,6 +57,7 @@ export interface SaleInsert {
   container_price: number
 
   total_amount: number
+  discount_amount: number
   payment_mode: PaymentMode
   amount_received: number
   status: SaleStatus

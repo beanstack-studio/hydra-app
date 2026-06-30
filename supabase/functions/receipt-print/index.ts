@@ -157,6 +157,7 @@ Deno.serve(async (req) => {
       ? (sale.container_qty as number) * (sale.container_price as number)
       : 0
 
+  const discountAmt: number = (sale.discount_amount as number | null) ?? 0
   const total         = sale.total_amount as number
   const paymentMethod = (sale.payment_mode as string).toUpperCase()
 
@@ -229,6 +230,17 @@ Deno.serve(async (req) => {
     } else {
       entries.push({ type: 0, content: cDesc, bold: 0, align: 0, format: 0 })
       entries.push({ type: 0, content: cPrice, bold: 0, align: 2, format: 0 })
+    }
+  }
+
+  if (discountAmt > 0) {
+    const dDesc = 'Discount'
+    const dPrice = `-${formatCurrency(discountAmt)}`
+    if (isAndroid) {
+      entries.push({ type: 0, content: formatItemLine(dDesc, dPrice, 32), bold: 0, align: 0, format: 0 })
+    } else {
+      entries.push({ type: 0, content: dDesc, bold: 0, align: 0, format: 0 })
+      entries.push({ type: 0, content: dPrice, bold: 0, align: 2, format: 0 })
     }
   }
 

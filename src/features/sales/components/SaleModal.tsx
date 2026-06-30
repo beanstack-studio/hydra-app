@@ -7,6 +7,7 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { Package, Plus, Minus, X, ShoppingCart } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
+import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -506,6 +507,7 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
         container_qty: values.container_enabled ? values.container_qty : 0,
         container_price: values.container_enabled ? containerPrice : 0,
         total_amount: finalTotal,
+        discount_amount: discountValue,
         payment_mode: values.payment_mode,
         amount_received: amountReceived,
         status: saleStatus,
@@ -914,11 +916,17 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground flex-1">Discount</span>
-                    <div className="relative w-28">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₱</span>
-                      <Input type="number" step="0.01" min="0" className="pl-6 h-8 text-sm"
-                        {...register('discount', { valueAsNumber: true })} />
-                    </div>
+                    <Controller
+                      name="discount"
+                      control={control}
+                      render={({ field }) => (
+                        <CurrencyInput
+                          value={field.value ?? 0}
+                          onChange={(v) => field.onChange(v ?? 0)}
+                          className="w-28 h-8"
+                        />
+                      )}
+                    />
                     <button type="button"
                       onClick={() => { setShowDiscount(false); setValue('discount', 0) }}
                       className="text-muted-foreground hover:text-destructive transition-colors">
