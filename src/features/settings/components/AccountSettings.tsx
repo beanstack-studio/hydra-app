@@ -9,16 +9,19 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccount } from '../hooks/useAccount'
+import { supabase } from '@/lib/supabase'
 
 const nameSchema = z.object({
   full_name: z.string().min(1, 'Name is required').max(80),
 })
 
 const emailSchema = z.object({
+  current_password: z.string().min(1, 'Enter your current password'),
   email: z.string().email('Enter a valid email'),
 })
 
 const passwordSchema = z.object({
+  current_password: z.string().min(1, 'Enter your current password'),
   password: z.string()
     .min(8, 'At least 8 characters')
     .regex(/\d/, 'Must include at least one number'),
@@ -43,11 +46,15 @@ export function AccountSettings() {
     ? fullName.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
     : email.slice(0, 2).toUpperCase()
 
-  const [editingName,     setEditingName]     = useState(false)
-  const [editingEmail,    setEditingEmail]    = useState(false)
-  const [editingPassword, setEditingPassword] = useState(false)
-  const [showNewPw,       setShowNewPw]       = useState(false)
-  const [showConfirmPw,   setShowConfirmPw]   = useState(false)
+  const [editingName,        setEditingName]        = useState(false)
+  const [editingEmail,       setEditingEmail]       = useState(false)
+  const [editingPassword,    setEditingPassword]    = useState(false)
+  const [showCurrentEmailPw, setShowCurrentEmailPw] = useState(false)
+  const [showNewPw,          setShowNewPw]          = useState(false)
+  const [showConfirmPw,      setShowConfirmPw]      = useState(false)
+  const [showCurrentPw,      setShowCurrentPw]      = useState(false)
+  const [currentEmailPwError, setCurrentEmailPwError] = useState('')
+  const [currentPwError,      setCurrentPwError]      = useState('')
 
   const nameForm = useForm<NameValues>({
     resolver: zodResolver(nameSchema),
@@ -56,12 +63,12 @@ export function AccountSettings() {
 
   const emailForm = useForm<EmailValues>({
     resolver: zodResolver(emailSchema),
-    defaultValues: { email: '' },
+    defaultValues: { current_password: '', email: '' },
   })
 
   const passwordForm = useForm<PasswordValues>({
     resolver: zodResolver(passwordSchema),
-    defaultValues: { password: '', confirm: '' },
+    defaultValues: { current_password: '', password: '', confirm: '' },
   })
 
   const onSaveName = nameForm.handleSubmit(async ({ full_name }) => {
@@ -74,7 +81,13 @@ export function AccountSettings() {
     }
   })
 
-  const onSaveEmail = emailForm.handleSubmit(async ({ email: newEmail }) => {
+  const onSaveEmail = emailForm.handleSubmit(async ({ current_password, email: newEmail }) => {
+    setCurrentEmailPwError('')
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: current_password })
+    if (authErr) {
+      setCurrentEmailPwError('Incorrect password')
+      return
+    }
     try {
       await updateEmail(newEmail)
       toast({ title: 'Confirmation sent', description: `Check ${newEmail} to confirm the change.` })
@@ -85,7 +98,13 @@ export function AccountSettings() {
     }
   })
 
-  const onSavePassword = passwordForm.handleSubmit(async ({ password }) => {
+  const onSavePassword = passwordForm.handleSubmit(async ({ current_password, password }) => {
+    setCurrentPwError('')
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: current_password })
+    if (authErr) {
+      setCurrentPwError('Incorrect password')
+      return
+    }
     try {
       await updatePassword(password)
       toast({ title: 'Password updated' })
@@ -162,7 +181,12 @@ export function AccountSettings() {
               <p className="text-sm font-medium text-foreground">Email address</p>
             </div>
             {!editingEmail && (
-              <Button size="sm" variant="ghost" onClick={() => { emailForm.reset({ email: '' }); setEditingEmail(true) }}>
+              <Button size="sm" variant="ghost" onClick={() => {
+                emailForm.reset({ current_password: '', email: '' })
+                setCurrentEmailPwError('')
+                setShowCurrentEmailPw(false)
+                setEditingEmail(true)
+              }}>
                 Change
               </Button>
             )}
@@ -171,6 +195,37 @@ export function AccountSettings() {
           {editingEmail && (
             <form onSubmit={onSaveEmail} className="space-y-3 pt-1">
               <div>
+                <Label htmlFor="email_current_password" className="text-xs">Current password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="email_current_password"
+                    type={showCurrentEmailPw ? 'text' : 'password'}
+                    placeholder="Your current password"
+                    {...emailForm.register('current_password')}
+                    className="pr-10"
+                    autoFocus
+                    onChange={(e) => {
+                      if (currentEmailPwError) setCurrentEmailPwError('')
+                      void emailForm.register('current_password').onChange(e)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    onClick={() => setShowCurrentEmailPw((v) => !v)}
+                  >
+                    {showCurrentEmailPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {currentEmailPwError
+                  ? <p className="text-xs text-destructive mt-1">{currentEmailPwError}</p>
+                  : emailForm.formState.errors.current_password && (
+                    <p className="text-xs text-destructive mt-1">{emailForm.formState.errors.current_password.message}</p>
+                  )
+                }
+              </div>
+              <div>
                 <Label htmlFor="new_email" className="text-xs">New email</Label>
                 <Input
                   id="new_email"
@@ -178,7 +233,6 @@ export function AccountSettings() {
                   placeholder={email}
                   {...emailForm.register('email')}
                   className="mt-1"
-                  autoFocus
                 />
                 {emailForm.formState.errors.email && (
                   <p className="text-xs text-destructive mt-1">{emailForm.formState.errors.email.message}</p>
@@ -203,7 +257,14 @@ export function AccountSettings() {
               <p className="text-sm font-medium text-foreground">Password</p>
             </div>
             {!editingPassword && (
-              <Button size="sm" variant="ghost" onClick={() => { passwordForm.reset(); setEditingPassword(true) }}>
+              <Button size="sm" variant="ghost" onClick={() => {
+                passwordForm.reset()
+                setCurrentPwError('')
+                setShowCurrentPw(false)
+                setShowNewPw(false)
+                setShowConfirmPw(false)
+                setEditingPassword(true)
+              }}>
                 Change
               </Button>
             )}
@@ -212,6 +273,37 @@ export function AccountSettings() {
           {editingPassword && (
             <form onSubmit={onSavePassword} className="space-y-3 pt-1">
               <div>
+                <Label htmlFor="current_password" className="text-xs">Current password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="current_password"
+                    type={showCurrentPw ? 'text' : 'password'}
+                    placeholder="Your current password"
+                    {...passwordForm.register('current_password')}
+                    className="pr-10"
+                    autoFocus
+                    onChange={(e) => {
+                      if (currentPwError) setCurrentPwError('')
+                      void passwordForm.register('current_password').onChange(e)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    onClick={() => setShowCurrentPw((v) => !v)}
+                  >
+                    {showCurrentPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {currentPwError
+                  ? <p className="text-xs text-destructive mt-1">{currentPwError}</p>
+                  : passwordForm.formState.errors.current_password && (
+                    <p className="text-xs text-destructive mt-1">{passwordForm.formState.errors.current_password.message}</p>
+                  )
+                }
+              </div>
+              <div>
                 <Label htmlFor="new_password" className="text-xs">New password</Label>
                 <div className="relative mt-1">
                   <Input
@@ -219,7 +311,6 @@ export function AccountSettings() {
                     type={showNewPw ? 'text' : 'password'}
                     {...passwordForm.register('password')}
                     className="pr-10"
-                    autoFocus
                   />
                   <button
                     type="button"
