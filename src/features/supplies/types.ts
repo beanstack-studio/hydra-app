@@ -23,6 +23,18 @@ export interface Supply {
   supply_product_links?: SupplyProductLink[]
 }
 
+export interface RestockHistory {
+  id: string
+  station_id: string
+  supply_id: string
+  supplier: string
+  price_per_unit: number
+  qty_added: number
+  total_cost: number
+  restocked_at: string
+  created_at: string
+}
+
 export interface SupplyInput {
   name: string
   type: SupplyType
