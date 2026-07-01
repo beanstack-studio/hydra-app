@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Package, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
 import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -10,18 +9,6 @@ import { formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
-
-const STATUS_VARIANT: Record<SupplyStatus, 'success' | 'outline' | 'destructive'> = {
-  in_stock:     'success',
-  low_stock:    'outline',
-  out_of_stock: 'destructive',
-}
-
-const STATUS_LABEL: Record<SupplyStatus, string> = {
-  in_stock:     'In Stock',
-  low_stock:    'Low',
-  out_of_stock: 'Out',
-}
 
 // Lower number = shown first (out/low before in_stock)
 const STATUS_ORDER: Record<SupplyStatus, number> = {
@@ -92,10 +79,9 @@ export function SupplyTable({
         const sa = STATUS_ORDER[computeStatus(a.qty, a.threshold)]
         const sb = STATUS_ORDER[computeStatus(b.qty, b.threshold)]
         if (sa !== sb) { cmp = (sortDir === 'asc' ? 1 : -1) * (sa - sb); return cmp }
-        // Same status group: most recent purchase first (always desc)
-        const aDate = a.last_purchased_at ?? ''
-        const bDate = b.last_purchased_at ?? ''
-        return bDate.localeCompare(aDate)
+        // Same status group — alert items: fewest first (most urgent); in-stock: most first
+        const aIsAlert = sa < 2
+        return aIsAlert ? a.qty - b.qty : b.qty - a.qty
       }
     }
     return sortDir === 'asc' ? cmp : -cmp
@@ -158,48 +144,40 @@ export function SupplyTable({
       ),
     },
     {
-      // Combined: status badge + threshold hint + qty number + ± adjust buttons
+      // qty number + ± adjust buttons, then Low: X threshold below
       key: 'qty',
       header: 'Stock',
       sortable: true,
       className: 'w-28 md:w-44',
-      render: (item: Supply) => {
-        const status = computeStatus(item.qty, item.threshold)
-        return (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant={STATUS_VARIANT[status]} className="text-xs">
-                {STATUS_LABEL[status]}
-              </Badge>
-              <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {isOwner && (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="hidden md:inline-flex h-7 w-7 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
-                  disabled={item.qty <= 0}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-              )}
-              <span className="text-sm font-bold text-foreground">{item.qty}</span>
-              {isOwner && (
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="hidden md:inline-flex h-7 w-7 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
+      render: (item: Supply) => (
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            {isOwner && (
+              <Button
+                size="icon"
+                variant="outline"
+                className="hidden md:inline-flex h-7 w-7 shrink-0"
+                onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
+                disabled={item.qty <= 0}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+            )}
+            <span className="text-sm font-bold text-foreground">{item.qty}</span>
+            {isOwner && (
+              <Button
+                size="icon"
+                variant="outline"
+                className="hidden md:inline-flex h-7 w-7 shrink-0"
+                onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            )}
           </div>
-        )
-      },
+          <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
+        </div>
+      ),
     },
     {
       key: 'actions',
