@@ -29,15 +29,15 @@ const STATUS_ORDER: Record<SupplyStatus, number> = {
   in_stock:     2,
 }
 
-type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at' | 'status'
+// 'status' removed — embedded in combined 'qty' (Stock) column
+type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at'
 
 export const SUPPLY_COLUMN_CONFIG: ColumnConfig[] = [
-  { key: 'name',             label: 'Item' },
-  { key: 'store',            label: 'Supplier' },
-  { key: 'linked_product',   label: 'Used For' },
+  { key: 'name',              label: 'Item' },
+  { key: 'store',             label: 'Supplier' },
+  { key: 'linked_product',    label: 'Used For' },
   { key: 'last_purchased_at', label: 'Last Purchase' },
-  { key: 'status',           label: 'Status' },
-  { key: 'qty',              label: 'Qty' },
+  { key: 'qty',               label: 'Stock' },   // combined status + qty
 ]
 
 interface SupplyTableProps {
@@ -69,7 +69,9 @@ export function SupplyTable({
 }: SupplyTableProps) {
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
-  const [sortKey, setSortKey] = useState<SortKey>('qty')
+
+  // Default: most recently purchased first
+  const [sortKey, setSortKey] = useState<SortKey>('last_purchased_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const handleSort = (key: string) => {
@@ -86,7 +88,6 @@ export function SupplyTable({
       case 'linked_product':    cmp = (productNames[a.linked_product_id ?? ''] ?? '').localeCompare(productNames[b.linked_product_id ?? ''] ?? ''); break
       case 'qty':               cmp = a.qty - b.qty; break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
-      case 'status':            cmp = STATUS_ORDER[computeStatus(a.qty, a.threshold)] - STATUS_ORDER[computeStatus(b.qty, b.threshold)]; break
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -98,7 +99,6 @@ export function SupplyTable({
       key: 'name',
       header: 'Item',
       sortable: true,
-      // No width class — fills all remaining space after fixed columns
       render: (item: Supply) => (
         <p className="text-sm font-semibold text-foreground truncate" title={item.name}>{item.name}</p>
       ),
@@ -107,7 +107,6 @@ export function SupplyTable({
       key: 'store',
       header: 'Supplier',
       sortable: true,
-      // Hidden on mobile (<md), fills remaining space alongside name on tablet+
       className: 'hidden md:table-cell',
       render: (item: Supply) => (
         <span className="text-sm text-muted-foreground block truncate" title={item.store ?? undefined}>
@@ -119,7 +118,6 @@ export function SupplyTable({
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
-      // Desktop only (lg+), fixed narrow width with truncation
       className: 'hidden lg:table-cell w-24',
       render: (item: Supply) => {
         const junctionNames =
@@ -141,7 +139,6 @@ export function SupplyTable({
       key: 'last_purchased_at',
       header: 'Last Purchase',
       sortable: true,
-      // Desktop only (lg+), fixed width — wide enough for the header text
       className: 'hidden lg:table-cell w-32',
       render: (item: Supply) => (
         <span className="text-sm text-foreground">
@@ -150,63 +147,52 @@ export function SupplyTable({
       ),
     },
     {
-      key: 'status',
-      header: 'Status',
+      // Combined status badge + qty number + ± buttons.
+      // Row background (rowClassName) already signals low/out visually;
+      // the badge here adds an explicit label for clarity.
+      key: 'qty',
+      header: 'Stock',
       sortable: true,
-      // Fixed width: enough for "In Stock" badge + "Low: X" line
-      className: 'w-28',
+      // Mobile: narrower — no buttons shown; tablet+: wider to fit ± buttons
+      className: 'w-28 md:w-44',
       render: (item: Supply) => {
         const status = computeStatus(item.qty, item.threshold)
         return (
-          <div className="space-y-1">
-            <Badge variant={STATUS_VARIANT[status]} className="text-xs">
+          <div className="flex flex-col gap-1">
+            <Badge variant={STATUS_VARIANT[status]} className="text-xs w-fit">
               {STATUS_LABEL[status]}
             </Badge>
-            {item.threshold > 0 && (
-              <p className="text-xs text-muted-foreground">Low: {item.threshold}</p>
-            )}
+            <div className="flex items-center gap-1.5">
+              {isOwner && (
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="hidden md:inline-flex h-7 w-7 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
+                  disabled={item.qty <= 0}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+              )}
+              <span className="text-sm font-bold text-foreground">{item.qty}</span>
+              {isOwner && (
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="hidden md:inline-flex h-7 w-7 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
         )
       },
     },
     {
-      key: 'qty',
-      header: 'Qty',
-      sortable: true,
-      // Mobile: narrow (just the number). Tablet+: full width with buttons.
-      className: 'w-16 md:w-36',
-      render: (item: Supply) => (
-        <div className="flex items-center gap-1.5">
-          {isOwner && (
-            <Button
-              size="icon"
-              variant="outline"
-              // Hidden on mobile — only the number shows, saving column width
-              className="hidden md:inline-flex h-7 w-7 shrink-0"
-              onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
-              disabled={item.qty <= 0}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-          )}
-          <span className="w-8 text-center text-sm font-bold text-foreground">{item.qty}</span>
-          {isOwner && (
-            <Button
-              size="icon"
-              variant="outline"
-              className="hidden md:inline-flex h-7 w-7 shrink-0"
-              onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      ),
-    },
-    {
       key: 'actions',
       header: '',
-      // Fixed narrow width for the single delete button
       className: 'w-16',
       render: (item: Supply) => (
         <div className="flex items-center gap-1 justify-end">

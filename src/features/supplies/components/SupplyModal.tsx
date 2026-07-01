@@ -232,7 +232,9 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
               {histLoading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : purchaseHistory.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No purchase history yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  No expense records found for this item. Log supply purchases in Expenses (category: Supplies, select this item) to track history here.
+                </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border border-border">
                   <table className="w-full text-xs">
