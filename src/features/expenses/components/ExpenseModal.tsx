@@ -18,11 +18,13 @@ import type { Supply } from '@/features/supplies/types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// 'maintenance' intentionally excluded — maintenance expenses are created
+// automatically from Maintenance Log (Settings → Maintenance Log) when a
+// cost is entered. Existing maintenance expense records still display correctly.
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
-  { value: 'gasoline',    label: 'Gasoline'    },
-  { value: 'supplies',    label: 'Supplies'    },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'other',       label: 'Other'       },
+  { value: 'gasoline', label: 'Gasoline' },
+  { value: 'supplies', label: 'Supplies' },
+  { value: 'other',    label: 'Other'    },
 ]
 
 const PAYMENT_METHODS: { value: ExpensePaymentMethod; label: string }[] = [
