@@ -5,7 +5,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
@@ -57,7 +57,7 @@ export function SupplyTable({
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
 
-  // Default: low/out-of-stock items first, then in-stock
+  // Default: low/out-of-stock items first, then in-stock by most qty
   const [sortKey, setSortKey] = useState<SortKey>('status')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -89,12 +89,12 @@ export function SupplyTable({
 
   const hasLowStock = items.some((i) => computeStatus(i.qty, i.threshold) !== 'in_stock')
 
+  // ── Tablet/desktop DataTable columns ──────────────────────────────────────
   const columns = [
     {
       key: 'name',
       header: 'Item',
       sortable: true,
-      // No width class — fills remaining space. Text wraps, no truncation.
       render: (item: Supply) => (
         <p className="text-sm font-semibold text-foreground">{item.name}</p>
       ),
@@ -103,7 +103,6 @@ export function SupplyTable({
       key: 'store',
       header: 'Supplier',
       sortable: true,
-      // Hidden on mobile; no truncation — text wraps naturally
       className: 'hidden md:table-cell',
       render: (item: Supply) => (
         <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
@@ -113,7 +112,6 @@ export function SupplyTable({
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
-      // Desktop only; each linked product gets its own line — no comma-join, no truncation
       className: 'hidden lg:table-cell w-36',
       render: (item: Supply) => {
         const junctionNames =
@@ -148,7 +146,7 @@ export function SupplyTable({
       key: 'qty',
       header: 'Stock',
       sortable: true,
-      className: 'w-28 md:w-44',
+      className: 'w-44',
       render: (item: Supply) => (
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
@@ -156,7 +154,7 @@ export function SupplyTable({
               <Button
                 size="icon"
                 variant="outline"
-                className="hidden md:inline-flex h-7 w-7 shrink-0"
+                className="h-7 w-7 shrink-0"
                 onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
                 disabled={item.qty <= 0}
               >
@@ -168,7 +166,7 @@ export function SupplyTable({
               <Button
                 size="icon"
                 variant="outline"
-                className="hidden md:inline-flex h-7 w-7 shrink-0"
+                className="h-7 w-7 shrink-0"
                 onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
               >
                 <Plus className="h-3 w-3" />
@@ -202,6 +200,14 @@ export function SupplyTable({
 
   if (isLoading) return <LoadingSkeleton rows={4} />
 
+  const emptyNode = (
+    <EmptyState
+      icon={<Package className="h-8 w-8" />}
+      title="No items yet"
+      description="Add an item, then log purchases via Expenses → Supplies."
+    />
+  )
+
   return (
     <div className="space-y-4">
       {hasLowStock && (
@@ -211,35 +217,105 @@ export function SupplyTable({
         </div>
       )}
 
-      <DataTable
-        tableId="supplies"
-        fitViewport
-        columns={columns}
-        data={sorted}
-        rowKey={(item) => item.id}
-        onRowClick={isOwner ? onEditClick : undefined}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={handleSort}
-        hiddenKeys={hiddenKeys}
-        columnWidths={columnWidths}
-        onColumnResize={onColumnResize}
-        externalColumnOrder={columnOrder}
-        onColumnReorder={onColumnReorder}
-        rowClassName={(item) => {
-          const status = computeStatus(item.qty, item.threshold)
-          if (status === 'out_of_stock') return 'bg-destructive/5'
-          if (status === 'low_stock') return 'bg-yellow-50 dark:bg-yellow-950/20'
-          return ''
-        }}
-        emptyState={
-          <EmptyState
-            icon={<Package className="h-8 w-8" />}
-            title="No items yet"
-            description="Add an item, then log purchases via Expenses → Supplies."
-          />
-        }
-      />
+      {/* ── Mobile card list (< md) ─────────────────────────────────────── */}
+      <div className="md:hidden">
+        {sorted.length === 0 ? emptyNode : (
+          <div className="space-y-2">
+            {sorted.map((item) => {
+              const status = computeStatus(item.qty, item.threshold)
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    'rounded-lg border border-border px-4 py-3',
+                    isOwner && 'cursor-pointer active:bg-accent/50',
+                    status === 'out_of_stock' && 'bg-destructive/5',
+                    status === 'low_stock'    && 'bg-yellow-50 dark:bg-yellow-950/20',
+                    status === 'in_stock'     && 'bg-card',
+                  )}
+                  onClick={isOwner ? () => onEditClick(item) : undefined}
+                >
+                  {/* Row 1: name + delete */}
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{item.name}</p>
+                      {item.store && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.store}</p>
+                      )}
+                    </div>
+                    {isOwner && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive hover:text-destructive shrink-0 -mt-0.5 -mr-1"
+                        onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Row 2: qty + ± controls + Low:X */}
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-1.5">
+                      {isOwner && (
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
+                          disabled={item.qty <= 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <span className="text-sm font-bold text-foreground min-w-[1.5rem] text-center">{item.qty}</span>
+                      {isOwner && (
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Tablet / Desktop table (≥ md) ──────────────────────────────── */}
+      <div className="hidden md:block">
+        <DataTable
+          tableId="supplies"
+          fitViewport
+          columns={columns}
+          data={sorted}
+          rowKey={(item) => item.id}
+          onRowClick={isOwner ? onEditClick : undefined}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+          hiddenKeys={hiddenKeys}
+          columnWidths={columnWidths}
+          onColumnResize={onColumnResize}
+          externalColumnOrder={columnOrder}
+          onColumnReorder={onColumnReorder}
+          rowClassName={(item) => {
+            const status = computeStatus(item.qty, item.threshold)
+            if (status === 'out_of_stock') return 'bg-destructive/5'
+            if (status === 'low_stock') return 'bg-yellow-50 dark:bg-yellow-950/20'
+            return ''
+          }}
+          emptyState={emptyNode}
+        />
+      </div>
     </div>
   )
 }
