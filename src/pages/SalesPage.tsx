@@ -56,7 +56,7 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'customer',    label: 'Customer' },                         // visible
   { key: 'order_type',  label: 'Order Type' },                      // visible
   { key: 'product',     label: 'Product',     defaultChecked: false },
-  { key: 'total',       label: 'Total' },                           // visible
+  { key: 'amount',      label: 'Amount' },                          // visible
   { key: 'payment',     label: 'Payment' },                         // visible
   { key: 'status',      label: 'Status' },                          // visible
   { key: 'balance_due', label: 'Balance Due' },                     // visible
@@ -96,13 +96,17 @@ export default function SalesPage() {
       if (filterValues.order_type && filterValues.order_type !== s.order_type) return false
       return true
     })
-    .filter((s) =>
-      search.length >= 3
-        ? s.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-          s.product_name.toLowerCase().includes(search.toLowerCase()) ||
-          s.order_type.toLowerCase().includes(search.toLowerCase())
-        : true
-    )
+    .filter((s) => {
+      if (search.length < 3) return true
+      const q = search.toLowerCase()
+      const orderNo = s.id.slice(-6).toUpperCase()
+      return (
+        s.customer_name.toLowerCase().includes(q) ||
+        s.product_name.toLowerCase().includes(q) ||
+        s.order_type.toLowerCase().includes(q) ||
+        orderNo.includes(search.replace(/^#/, '').toUpperCase())
+      )
+    })
 
   const exportRows = filteredSales.map((s) => ({
     order_no:    `#${s.id.slice(-6).toUpperCase()}`,
@@ -116,7 +120,7 @@ export default function SalesPage() {
       if (s.container_enabled && s.container_qty > 0) lines.push(`Container ×${s.container_qty}`)
       return lines.join('; ')
     })(),
-    total:       formatExportAmount(s.total_amount),
+    amount:      formatExportAmount(s.total_amount),
     payment:     s.payment_mode,
     status:      s.status,
     balance_due: s.balance_due > 0 ? formatExportAmount(s.balance_due) : '',
@@ -175,7 +179,7 @@ export default function SalesPage() {
       <div className="flex items-center gap-3 mb-4">
         <SearchInput
           onSearch={setSearch}
-          placeholder="Search customer, product, order type…"
+          placeholder="Search customer, product, order #…"
           className="flex-1"
         />
         <TableOptionsButton

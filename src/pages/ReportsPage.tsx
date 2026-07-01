@@ -66,34 +66,6 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {/* View mode toggle — Payments Received vs Order Totals */}
-        <div className="ml-auto flex rounded-md border border-input overflow-hidden text-sm">
-          <button
-            type="button"
-            onClick={() => setViewMode('payments')}
-            className={cn(
-              'px-3 py-1.5 font-medium transition-colors duration-150',
-              viewMode === 'payments'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-background text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Payments Received
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('order_totals')}
-            className={cn(
-              'px-3 py-1.5 font-medium transition-colors duration-150',
-              viewMode === 'order_totals'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-background text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Order Totals
-          </button>
-        </div>
-
         {/* Daily: single date picker */}
         {mode === 'daily' && (
           <DatePickerInput
@@ -150,6 +122,34 @@ export default function ReportsPage() {
             {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         )}
+
+        {/* View mode toggle — right-aligned */}
+        <div className="ml-auto flex rounded-md border border-input overflow-hidden text-sm">
+          <button
+            type="button"
+            onClick={() => setViewMode('payments')}
+            className={cn(
+              'px-3 py-1.5 font-medium transition-colors duration-150',
+              viewMode === 'payments'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Payments
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('order_totals')}
+            className={cn(
+              'px-3 py-1.5 font-medium transition-colors duration-150',
+              viewMode === 'order_totals'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Totals
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

@@ -92,18 +92,18 @@ export function SaleTable({
 
   const columns = [
     {
-      key: 'order_no',
-      header: 'Order #',
-      render: (s: Sale) => (
-        <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
-      ),
-    },
-    {
       key: 'date',
       header: 'Date',
       sortable: true,
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(s.sale_date)}</span>
+      ),
+    },
+    {
+      key: 'order_no',
+      header: 'Order #',
+      render: (s: Sale) => (
+        <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
       ),
     },
     {
@@ -159,6 +159,15 @@ export function SaleTable({
         <span className={cn('text-sm font-medium', s.status !== 'paid' && 'text-destructive')}>
           {formatCurrency(s.total_amount)}
         </span>
+      ),
+    },
+    {
+      key: 'balance_due',
+      header: 'Balance Due',
+      render: (s: Sale) => s.balance_due > 0 ? (
+        <span className="text-xs font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
       ),
     },
     {
