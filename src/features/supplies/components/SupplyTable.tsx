@@ -88,7 +88,15 @@ export function SupplyTable({
       case 'linked_product':    cmp = (productNames[a.linked_product_id ?? ''] ?? '').localeCompare(productNames[b.linked_product_id ?? ''] ?? ''); break
       case 'qty':               cmp = a.qty - b.qty; break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
-      case 'status':            cmp = STATUS_ORDER[computeStatus(a.qty, a.threshold)] - STATUS_ORDER[computeStatus(b.qty, b.threshold)]; break
+      case 'status': {
+        const sa = STATUS_ORDER[computeStatus(a.qty, a.threshold)]
+        const sb = STATUS_ORDER[computeStatus(b.qty, b.threshold)]
+        if (sa !== sb) { cmp = (sortDir === 'asc' ? 1 : -1) * (sa - sb); return cmp }
+        // Same status group: most recent purchase first (always desc)
+        const aDate = a.last_purchased_at ?? ''
+        const bDate = b.last_purchased_at ?? ''
+        return bDate.localeCompare(aDate)
+      }
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -163,9 +171,7 @@ export function SupplyTable({
               <Badge variant={STATUS_VARIANT[status]} className="text-xs">
                 {STATUS_LABEL[status]}
               </Badge>
-              {item.threshold > 0 && (
-                <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
-              )}
+              <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {isOwner && (
