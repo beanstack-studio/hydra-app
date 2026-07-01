@@ -85,7 +85,7 @@ export default function ExpensesPage() {
   const [isPaying, setIsPaying] = useState(false)
 
   const { data, isLoading, error, addExpense, updateExpense, deleteExpense, markExpensePaid, getReceiptUrl } = useExpenses()
-  const { data: supplies } = useSupplies()
+  const { data: supplies, adjustQty } = useSupplies()
 
   const openEdit = (expense: Expense) => {
     setEditingExpense(expense)
@@ -119,12 +119,20 @@ export default function ExpensesPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (withInventory = false) => {
     if (!deletingExpense) return
     setIsDeleting(true)
     try {
+      if (withInventory && matchedSupply && (deletingExpense.qty ?? 0) > 0) {
+        const newQty = Math.max(0, matchedSupply.qty - (deletingExpense.qty ?? 0))
+        await adjustQty(matchedSupply.id, newQty)
+      }
       await deleteExpense(deletingExpense.id)
-      toast({ title: 'Expense deleted' })
+      const msg =
+        withInventory && matchedSupply && (deletingExpense.qty ?? 0) > 0
+          ? `Expense deleted · ${matchedSupply.name} inventory reduced by ${deletingExpense.qty}`
+          : 'Expense deleted'
+      toast({ title: msg })
       setDeletingExpense(null)
     } catch (e) {
       toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
@@ -175,6 +183,19 @@ export default function ExpensesPage() {
           e.category.toLowerCase().includes(expenseSearch.toLowerCase())
         : true
     )
+
+  // Find a matching supply item for the expense being deleted (bidirectional name match)
+  const matchedSupply = (() => {
+    if (!deletingExpense || deletingExpense.category !== 'supplies' || (deletingExpense.qty ?? 0) <= 0) return null
+    const item = (deletingExpense.item ?? '').trim().toLowerCase()
+    if (!item || item === 'supplies') return null
+    return supplies.find((s) => {
+      const name = s.name.trim().toLowerCase()
+      return item.includes(name) || name.includes(item)
+    }) ?? null
+  })()
+
+  const expenseQty = deletingExpense?.qty ?? 0
 
   const expenseExportRows = visibleExpenses.map((e) => ({
     date:           formatDate(e.expense_date),
@@ -319,17 +340,62 @@ export default function ExpensesPage() {
 
       <Modal isOpen={!!deletingExpense} onClose={() => setDeletingExpense(null)} title="Delete Expense" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Delete this expense of{' '}
-            <span className="font-semibold text-foreground">{formatCurrency(deletingExpense?.amount ?? 0)}</span>?
-            This cannot be undone.
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingExpense(null)}>Cancel</Button>
-            <Button type="button" variant="destructive" className="flex-1" disabled={isDeleting} onClick={handleDelete}>
-              {isDeleting ? 'Deleting…' : 'Delete'}
-            </Button>
-          </div>
+          {matchedSupply ? (
+            /* Supply expense with a matching inventory item — offer reversal */
+            <>
+              <p className="text-sm text-muted-foreground">
+                Delete the{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(deletingExpense?.amount ?? 0)}</span>{' '}
+                expense for <span className="font-semibold text-foreground">{deletingExpense?.item}</span>?
+              </p>
+              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 space-y-0.5">
+                <p className="text-xs text-muted-foreground">Matching inventory item found</p>
+                <p className="text-sm font-medium text-foreground">{matchedSupply.name}</p>
+                <p className="text-xs text-muted-foreground">Current qty: {matchedSupply.qty}</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={isDeleting}
+                  onClick={() => { void handleDelete(true) }}
+                >
+                  {isDeleting ? 'Deleting…' : `Delete expense + remove ${expenseQty} units from inventory`}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isDeleting}
+                  onClick={() => { void handleDelete(false) }}
+                >
+                  Delete expense only
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={isDeleting}
+                  onClick={() => setDeletingExpense(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            /* Non-supply or no matching item — standard confirmation */
+            <>
+              <p className="text-sm text-muted-foreground">
+                Delete this expense of{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(deletingExpense?.amount ?? 0)}</span>?
+                This cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingExpense(null)}>Cancel</Button>
+                <Button type="button" variant="destructive" className="flex-1" disabled={isDeleting} onClick={() => { void handleDelete() }}>
+                  {isDeleting ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>
