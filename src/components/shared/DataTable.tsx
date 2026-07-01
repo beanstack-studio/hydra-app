@@ -41,6 +41,9 @@ interface DataTableProps<T> {
   // Controlled column order from useTablePrefs (for cross-device sync)
   externalColumnOrder?: string[]
   onColumnReorder?: (order: string[]) => void
+  // Forces table-fixed w-full mode so the table never exceeds the viewport.
+  // Use alongside col.className width hints (e.g. "w-28") and truncation in renders.
+  fitViewport?: boolean
 }
 
 const MIN_COL_WIDTH = 80
@@ -62,6 +65,7 @@ export function DataTable<T>({
   tableId,
   externalColumnOrder,
   onColumnReorder,
+  fitViewport = false,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0)
 
@@ -214,6 +218,7 @@ export function DataTable<T>({
 
   const effectiveWidths = { ...(columnWidths ?? {}), ...dragWidths }
   const hasWidths = Object.keys(effectiveWidths).length > 0
+  const isFixed = hasWidths || fitViewport
 
   const totalPages = Math.ceil(data.length / pageSize)
   const start = page * pageSize
@@ -224,7 +229,7 @@ export function DataTable<T>({
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-border overflow-x-auto">
-        <table className={cn('text-sm', hasWidths ? 'table-fixed w-full' : 'w-max min-w-full')}>
+        <table className={cn('text-sm', isFixed ? 'table-fixed w-full' : 'w-max min-w-full')}>
           {hasWidths && (
             <colgroup>
               {orderedVisibleCols.map((col) => (
@@ -247,7 +252,7 @@ export function DataTable<T>({
                   }}
                   className={cn(
                     'px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap relative',
-                    hasWidths && 'overflow-hidden',
+                    isFixed && 'overflow-hidden',
                     col.sortable && 'cursor-pointer select-none hover:text-foreground transition-colors duration-150',
                     col.className,
                     dragColKey === col.key && 'opacity-40',
@@ -309,7 +314,7 @@ export function DataTable<T>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {orderedVisibleCols.map((col) => (
-                  <td key={col.key} className={cn('px-4 py-3 text-foreground', hasWidths && 'overflow-hidden', col.className)}>
+                  <td key={col.key} className={cn('px-4 py-3 text-foreground', isFixed && 'overflow-hidden', col.className)}>
                     {col.render(row)}
                   </td>
                 ))}

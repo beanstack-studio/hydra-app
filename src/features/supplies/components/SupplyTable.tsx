@@ -98,22 +98,29 @@ export function SupplyTable({
       key: 'name',
       header: 'Item',
       sortable: true,
+      // No width class — fills all remaining space after fixed columns
       render: (item: Supply) => (
-        <p className="text-sm font-semibold text-foreground">{item.name}</p>
+        <p className="text-sm font-semibold text-foreground truncate" title={item.name}>{item.name}</p>
       ),
     },
     {
       key: 'store',
       header: 'Supplier',
       sortable: true,
+      // Hidden on mobile (<md), fills remaining space alongside name on tablet+
+      className: 'hidden md:table-cell',
       render: (item: Supply) => (
-        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
+        <span className="text-sm text-muted-foreground block truncate" title={item.store ?? undefined}>
+          {item.store ?? '—'}
+        </span>
       ),
     },
     {
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
+      // Desktop only (lg+), fixed narrow width with truncation
+      className: 'hidden lg:table-cell w-24',
       render: (item: Supply) => {
         const junctionNames =
           item.supply_product_links && item.supply_product_links.length > 0
@@ -121,13 +128,12 @@ export function SupplyTable({
             : item.linked_product_id
             ? [productNames[item.linked_product_id]].filter(Boolean)
             : []
-        if (junctionNames.length === 0) return <span className="text-sm text-muted-foreground">—</span>
+        const displayText = junctionNames.join(', ')
+        if (!displayText) return <span className="text-sm text-muted-foreground">—</span>
         return (
-          <div className="flex flex-col gap-0.5">
-            {junctionNames.map((name, i) => (
-              <span key={i} className="text-sm text-muted-foreground">{name}</span>
-            ))}
-          </div>
+          <span className="text-sm text-muted-foreground block truncate" title={displayText}>
+            {displayText}
+          </span>
         )
       },
     },
@@ -135,6 +141,8 @@ export function SupplyTable({
       key: 'last_purchased_at',
       header: 'Last Purchase',
       sortable: true,
+      // Desktop only (lg+), fixed width — wide enough for the header text
+      className: 'hidden lg:table-cell w-32',
       render: (item: Supply) => (
         <span className="text-sm text-foreground">
           {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
@@ -145,6 +153,8 @@ export function SupplyTable({
       key: 'status',
       header: 'Status',
       sortable: true,
+      // Fixed width: enough for "In Stock" badge + "Low: X" line
+      className: 'w-28',
       render: (item: Supply) => {
         const status = computeStatus(item.qty, item.threshold)
         return (
@@ -163,13 +173,16 @@ export function SupplyTable({
       key: 'qty',
       header: 'Qty',
       sortable: true,
+      // Mobile: narrow (just the number). Tablet+: full width with buttons.
+      className: 'w-16 md:w-36',
       render: (item: Supply) => (
         <div className="flex items-center gap-1.5">
           {isOwner && (
             <Button
               size="icon"
               variant="outline"
-              className="h-7 w-7 shrink-0"
+              // Hidden on mobile — only the number shows, saving column width
+              className="hidden md:inline-flex h-7 w-7 shrink-0"
               onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
               disabled={item.qty <= 0}
             >
@@ -181,7 +194,7 @@ export function SupplyTable({
             <Button
               size="icon"
               variant="outline"
-              className="h-7 w-7 shrink-0"
+              className="hidden md:inline-flex h-7 w-7 shrink-0"
               onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
             >
               <Plus className="h-3 w-3" />
@@ -193,6 +206,8 @@ export function SupplyTable({
     {
       key: 'actions',
       header: '',
+      // Fixed narrow width for the single delete button
+      className: 'w-16',
       render: (item: Supply) => (
         <div className="flex items-center gap-1 justify-end">
           {isOwner && (
@@ -223,6 +238,7 @@ export function SupplyTable({
 
       <DataTable
         tableId="supplies"
+        fitViewport
         columns={columns}
         data={sorted}
         rowKey={(item) => item.id}
