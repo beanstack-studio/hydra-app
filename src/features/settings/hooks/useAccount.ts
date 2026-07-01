@@ -28,7 +28,10 @@ export function useAccount() {
   }, [stationId, role])
 
   const updateEmail = useCallback(async (newEmail: string): Promise<void> => {
-    const { error } = await supabase.auth.updateUser({ email: newEmail })
+    const { error } = await supabase.auth.updateUser(
+      { email: newEmail },
+      { emailRedirectTo: `${window.location.origin}/settings?section=account` },
+    )
     if (error) throw new Error(error.message)
   }, [])
 

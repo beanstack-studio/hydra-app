@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useAuth } from '@/hooks/useAuth'
 import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import SalesPage from '@/pages/SalesPage'
 import ExpensesPage from '@/pages/ExpensesPage'
 import CustomersPage from '@/pages/CustomersPage'
@@ -49,6 +50,8 @@ export default function App() {
               : <LoginPage />
           }
         />
+        {/* Public — no AuthGuard. Handles the recovery token from the email link. */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={

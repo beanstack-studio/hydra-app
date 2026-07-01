@@ -139,7 +139,7 @@ export default function LoginPage() {
   const onForgot = hsForgot(async (data) => {
     setAuthError(null)
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/reset-password`,
     })
     if (error) {
       setAuthError(error.message)
