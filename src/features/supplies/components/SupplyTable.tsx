@@ -23,21 +23,21 @@ const STATUS_LABEL: Record<SupplyStatus, string> = {
   out_of_stock: 'Out',
 }
 
+// Lower number = shown first (out/low before in_stock)
 const STATUS_ORDER: Record<SupplyStatus, number> = {
   out_of_stock: 0,
   low_stock:    1,
   in_stock:     2,
 }
 
-// 'status' removed — embedded in combined 'qty' (Stock) column
-type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at'
+type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at' | 'status'
 
 export const SUPPLY_COLUMN_CONFIG: ColumnConfig[] = [
   { key: 'name',              label: 'Item' },
   { key: 'store',             label: 'Supplier' },
   { key: 'linked_product',    label: 'Used For' },
   { key: 'last_purchased_at', label: 'Last Purchase' },
-  { key: 'qty',               label: 'Stock' },   // combined status + qty
+  { key: 'qty',               label: 'Stock' },
 ]
 
 interface SupplyTableProps {
@@ -70,9 +70,9 @@ export function SupplyTable({
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
 
-  // Default: most recently purchased first
-  const [sortKey, setSortKey] = useState<SortKey>('last_purchased_at')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  // Default: low/out-of-stock items first, then in-stock
+  const [sortKey, setSortKey] = useState<SortKey>('status')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const handleSort = (key: string) => {
     const k = key as SortKey
@@ -88,6 +88,7 @@ export function SupplyTable({
       case 'linked_product':    cmp = (productNames[a.linked_product_id ?? ''] ?? '').localeCompare(productNames[b.linked_product_id ?? ''] ?? ''); break
       case 'qty':               cmp = a.qty - b.qty; break
       case 'last_purchased_at': cmp = (a.last_purchased_at ?? '').localeCompare(b.last_purchased_at ?? ''); break
+      case 'status':            cmp = STATUS_ORDER[computeStatus(a.qty, a.threshold)] - STATUS_ORDER[computeStatus(b.qty, b.threshold)]; break
     }
     return sortDir === 'asc' ? cmp : -cmp
   })
@@ -99,26 +100,27 @@ export function SupplyTable({
       key: 'name',
       header: 'Item',
       sortable: true,
+      // No width class — fills remaining space. Text wraps, no truncation.
       render: (item: Supply) => (
-        <p className="text-sm font-semibold text-foreground truncate" title={item.name}>{item.name}</p>
+        <p className="text-sm font-semibold text-foreground">{item.name}</p>
       ),
     },
     {
       key: 'store',
       header: 'Supplier',
       sortable: true,
+      // Hidden on mobile; no truncation — text wraps naturally
       className: 'hidden md:table-cell',
       render: (item: Supply) => (
-        <span className="text-sm text-muted-foreground block truncate" title={item.store ?? undefined}>
-          {item.store ?? '—'}
-        </span>
+        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
       ),
     },
     {
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
-      className: 'hidden lg:table-cell w-24',
+      // Desktop only; each linked product gets its own line — no comma-join, no truncation
+      className: 'hidden lg:table-cell w-36',
       render: (item: Supply) => {
         const junctionNames =
           item.supply_product_links && item.supply_product_links.length > 0
@@ -126,12 +128,13 @@ export function SupplyTable({
             : item.linked_product_id
             ? [productNames[item.linked_product_id]].filter(Boolean)
             : []
-        const displayText = junctionNames.join(', ')
-        if (!displayText) return <span className="text-sm text-muted-foreground">—</span>
+        if (junctionNames.length === 0) return <span className="text-sm text-muted-foreground">—</span>
         return (
-          <span className="text-sm text-muted-foreground block truncate" title={displayText}>
-            {displayText}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            {junctionNames.map((name, i) => (
+              <span key={i} className="text-sm text-muted-foreground">{name}</span>
+            ))}
+          </div>
         )
       },
     },
@@ -147,21 +150,23 @@ export function SupplyTable({
       ),
     },
     {
-      // Combined status badge + qty number + ± buttons.
-      // Row background (rowClassName) already signals low/out visually;
-      // the badge here adds an explicit label for clarity.
+      // Combined: status badge + threshold hint + qty number + ± adjust buttons
       key: 'qty',
       header: 'Stock',
       sortable: true,
-      // Mobile: narrower — no buttons shown; tablet+: wider to fit ± buttons
       className: 'w-28 md:w-44',
       render: (item: Supply) => {
         const status = computeStatus(item.qty, item.threshold)
         return (
           <div className="flex flex-col gap-1">
-            <Badge variant={STATUS_VARIANT[status]} className="text-xs w-fit">
-              {STATUS_LABEL[status]}
-            </Badge>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant={STATUS_VARIANT[status]} className="text-xs">
+                {STATUS_LABEL[status]}
+              </Badge>
+              {item.threshold > 0 && (
+                <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               {isOwner && (
                 <Button

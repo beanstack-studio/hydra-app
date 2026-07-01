@@ -314,7 +314,7 @@ export function DataTable<T>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {orderedVisibleCols.map((col) => (
-                  <td key={col.key} className={cn('px-4 py-3 text-foreground', isFixed && 'overflow-hidden', col.className)}>
+                  <td key={col.key} className={cn('px-4 py-3 text-foreground', hasWidths && 'overflow-hidden', col.className)}>
                     {col.render(row)}
                   </td>
                 ))}
