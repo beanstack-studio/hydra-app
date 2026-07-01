@@ -1,40 +1,41 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import type { RestockHistory } from '../types'
+import type { Expense } from '@/features/expenses/types'
 
-interface UseRestockHistoryReturn {
-  data: RestockHistory[]
+interface UseSupplyPurchaseHistoryReturn {
+  data: Expense[]
   isLoading: boolean
   error: string | null
 }
 
-export function useRestockHistory(supplyId: string | null): UseRestockHistoryReturn {
+export function useSupplyPurchaseHistory(supplyName: string | null): UseSupplyPurchaseHistoryReturn {
   const stationId = useAuthStore((s) => s.stationId)
-  const [data, setData] = useState<RestockHistory[]>([])
+  const [data, setData] = useState<Expense[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
-    if (!stationId || !supplyId) { setData([]); return }
+    if (!stationId || !supplyName) { setData([]); return }
     setIsLoading(true)
     setError(null)
     try {
       const { data: rows, error: e } = await supabase
-        .from('restock_history')
+        .from('expenses')
         .select('*')
         .eq('station_id', stationId)
-        .eq('supply_id', supplyId)
-        .order('restocked_at', { ascending: false })
-        .limit(20)
+        .eq('category', 'supplies')
+        .ilike('item', `%${supplyName}%`)
+        .order('expense_date', { ascending: false })
+        .limit(10)
       if (e) throw new Error(e.message)
-      setData((rows ?? []) as RestockHistory[])
+      setData((rows ?? []) as Expense[])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load history')
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, supplyId])
+  }, [stationId, supplyName])
 
   useEffect(() => {
     void fetchData()

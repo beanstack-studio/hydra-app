@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/shared/SearchInput'
 import { SupplyTable } from '@/features/supplies/components/SupplyTable'
 import { SupplyModal } from '@/features/supplies/components/SupplyModal'
-import { RestockModal } from '@/features/supplies/components/RestockModal'
 import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useToast } from '@/hooks/use-toast'
@@ -38,12 +37,11 @@ export default function InventoryPage() {
   const isOwner = role === 'owner' || role === 'super_admin'
   const { toast } = useToast()
 
-  const { data: supplies, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty, restockSupply } = useSupplies()
+  const { data: supplies, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty } = useSupplies()
   const { data: settings } = useSettings()
-  const [supplyModalOpen,  setSupplyModalOpen]  = useState(false)
-  const [editingSupply,    setEditingSupply]    = useState<Supply | null>(null)
-  const [restockingSupply, setRestockingSupply] = useState<Supply | null>(null)
-  const [search,           setSearch]           = useState('')
+  const [supplyModalOpen, setSupplyModalOpen] = useState(false)
+  const [editingSupply,   setEditingSupply]   = useState<Supply | null>(null)
+  const [search,          setSearch]          = useState('')
 
   const products = settings?.products ?? []
 
@@ -163,7 +161,6 @@ export default function InventoryPage() {
         onEditClick={(item) => { setEditingSupply(item); setSupplyModalOpen(true) }}
         onDeleteClick={handleDeleteSupply}
         onQuickAdjust={handleQuickAdjust}
-        onRestockClick={setRestockingSupply}
         hiddenKeys={hiddenKeys}
         columnWidths={columnWidths}
         onColumnResize={onColumnResize}
@@ -179,21 +176,6 @@ export default function InventoryPage() {
         products={products}
         onAdd={async (input: SupplyInput) => { await addSupply(input) }}
         onUpdate={async (id, input) => { await updateSupply(id, input) }}
-      />
-
-      <RestockModal
-        isOpen={!!restockingSupply}
-        onClose={() => setRestockingSupply(null)}
-        supply={restockingSupply}
-        onRestock={async (id, qtyAdded, opts) => {
-          try {
-            await restockSupply(id, qtyAdded, opts)
-            toast({ title: 'Restocked successfully' })
-          } catch (e) {
-            toast({ title: 'Restock failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
-            throw e
-          }
-        }}
       />
     </div>
   )

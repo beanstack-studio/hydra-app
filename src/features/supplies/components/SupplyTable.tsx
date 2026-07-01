@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Minus, Plus, PackagePlus, Trash2 } from 'lucide-react'
+import { Package, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
@@ -41,17 +41,16 @@ export const SUPPLY_COLUMN_CONFIG: ColumnConfig[] = [
 ]
 
 interface SupplyTableProps {
-  items:           Supply[]
-  isLoading:       boolean
-  productNames:    Record<string, string>
-  onEditClick:     (item: Supply) => void
-  onDeleteClick:   (item: Supply) => void
-  onQuickAdjust:   (item: Supply, delta: number) => void
-  onRestockClick:  (item: Supply) => void
-  hiddenKeys?:     Set<string>
-  columnWidths?:   Record<string, number>
+  items:         Supply[]
+  isLoading:     boolean
+  productNames:  Record<string, string>
+  onEditClick:   (item: Supply) => void
+  onDeleteClick: (item: Supply) => void
+  onQuickAdjust: (item: Supply, delta: number) => void
+  hiddenKeys?:   Set<string>
+  columnWidths?: Record<string, number>
   onColumnResize?: (key: string, width: number) => void
-  columnOrder?:    string[]
+  columnOrder?: string[]
   onColumnReorder?: (order: string[]) => void
 }
 
@@ -62,7 +61,6 @@ export function SupplyTable({
   onEditClick,
   onDeleteClick,
   onQuickAdjust,
-  onRestockClick,
   hiddenKeys,
   columnWidths,
   onColumnResize,
@@ -197,17 +195,6 @@ export function SupplyTable({
       header: '',
       render: (item: Supply) => (
         <div className="flex items-center gap-1 justify-end">
-          {isOwner && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              title="Restock"
-              onClick={(e) => { e.stopPropagation(); onRestockClick(item) }}
-            >
-              <PackagePlus className="h-3.5 w-3.5" />
-            </Button>
-          )}
           {isOwner && (
             <Button
               size="icon"

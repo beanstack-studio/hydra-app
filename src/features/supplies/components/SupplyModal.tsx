@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
+import { useSupplyPurchaseHistory } from '../hooks/useSupplyPurchaseHistory'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import type { Expense } from '@/features/expenses/types'
 import type { Supply, SupplyInput, SupplyProductLink } from '../types'
 import type { Product } from '@/features/settings/types'
 
@@ -31,9 +34,21 @@ const EMPTY_LINK: SupplyProductLink = { product_id: '', units_per_sale: 1 }
 
 const selectClass = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
+function computePricePerUnit(row: Expense): number | null {
+  if (row.price_per_unit != null) return row.price_per_unit
+  if (row.qty && row.qty > 0) return row.price / row.qty
+  return null
+}
+
 export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate }: SupplyModalProps) {
   const { toast } = useToast()
   const [linkRows, setLinkRows] = useState<SupplyProductLink[]>([{ ...EMPTY_LINK }])
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  // Purchase history — only fetched when editing an existing supply
+  const { data: purchaseHistory, isLoading: histLoading } = useSupplyPurchaseHistory(
+    isOpen && supply ? supply.name : null
+  )
 
   const {
     register,
@@ -61,6 +76,7 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
       reset({ name: '', threshold: 0 })
       setLinkRows([{ ...EMPTY_LINK }])
     }
+    setHistoryOpen(false)
   }, [supply, isOpen, reset])
 
   const updateLink = (i: number, field: keyof SupplyProductLink, value: string | number) => {
@@ -195,6 +211,61 @@ export function SupplyModal({ isOpen, onClose, supply, products, onAdd, onUpdate
         </div>
 
       </form>
+
+      {/* Purchase History — only shown when editing an existing supply */}
+      {supply && (
+        <div className="mt-5 border-t border-border pt-4">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-sm font-medium text-foreground"
+            onClick={() => setHistoryOpen((o) => !o)}
+          >
+            <span>Purchase History</span>
+            {historyOpen
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            }
+          </button>
+
+          {historyOpen && (
+            <div className="mt-3">
+              {histLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : purchaseHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No purchase history yet.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/60">
+                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Date</th>
+                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Supplier</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Qty</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Price/unit</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseHistory.map((row) => {
+                        const pricePerUnit = computePricePerUnit(row)
+                        return (
+                          <tr key={row.id} className="border-b border-border last:border-0">
+                            <td className="px-3 py-2 text-foreground whitespace-nowrap">{formatDate(row.expense_date)}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{row.supplier ?? '—'}</td>
+                            <td className="px-3 py-2 text-right text-foreground">{row.qty ?? '—'}</td>
+                            <td className="px-3 py-2 text-right text-foreground">{pricePerUnit != null ? formatCurrency(pricePerUnit) : '—'}</td>
+                            <td className="px-3 py-2 text-right font-medium text-foreground">{formatCurrency(row.price)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   )
 }

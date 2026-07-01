@@ -9,13 +9,6 @@ function computeStatus(qty: number, threshold: number): SupplyStatus {
   return 'in_stock'
 }
 
-interface RestockOpts {
-  supplier?: string
-  pricePerUnit?: number | null
-  purchaseDate: string
-  logAsExpense: boolean
-}
-
 interface UseSuppliesReturn {
   data: Supply[]
   isLoading: boolean
@@ -25,7 +18,6 @@ interface UseSuppliesReturn {
   deleteSupply: (id: string) => Promise<void>
   adjustQty: (id: string, newQty: number) => Promise<void>
   deductForSale: (productId: string, qtySold: number) => Promise<void>
-  restockSupply: (id: string, qtyAdded: number, opts: RestockOpts) => Promise<void>
 }
 
 export function useSupplies(): UseSuppliesReturn {
@@ -171,58 +163,7 @@ export function useSupplies(): UseSuppliesReturn {
     await fetchData()
   }, [stationId, data, fetchData])
 
-  const restockSupply = useCallback(async (id: string, qtyAdded: number, opts: RestockOpts) => {
-    if (!stationId) return
-    const { supplier, pricePerUnit, purchaseDate, logAsExpense } = opts
-
-    const supply = data.find((s) => s.id === id)
-    const currentQty = supply?.qty ?? 0
-
-    // 1. Update the supply row
-    const updateFields: Record<string, unknown> = { qty: currentQty + qtyAdded, last_purchased_at: purchaseDate }
-    if (supplier)       updateFields.store          = supplier
-    if (pricePerUnit)   updateFields.price_per_unit = pricePerUnit
-
-    const { error: supplyErr } = await supabase.from('supplies').update(updateFields).eq('id', id)
-    if (supplyErr) throw new Error(supplyErr.message)
-
-    // 2. Log to restock_history if supplier + price provided
-    if (supplier && pricePerUnit) {
-      const { error: histErr } = await supabase.from('restock_history').insert({
-        station_id:     stationId,
-        supply_id:      id,
-        supplier,
-        price_per_unit: pricePerUnit,
-        qty_added:      qtyAdded,
-        restocked_at:   purchaseDate,
-      })
-      if (histErr) throw new Error(histErr.message)
-    }
-
-    // 3. Optionally log as expense
-    if (logAsExpense && pricePerUnit && supply) {
-      const totalCost = pricePerUnit * qtyAdded
-      const { error: expErr } = await supabase.from('expenses').insert({
-        station_id:    stationId,
-        category:      'supplies',
-        item:          supply.name,
-        price:         totalCost,
-        amount:        totalCost,
-        qty:           qtyAdded,
-        price_per_unit: pricePerUnit,
-        expense_date:  purchaseDate,
-        frequency:     'one_off',
-        supplier:      supplier ?? null,
-        supply_id:     id,
-        supply_name:   supply.name,
-      })
-      if (expErr) throw new Error(expErr.message)
-    }
-
-    await fetchData()
-  }, [stationId, data, fetchData])
-
-  return { data, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty, deductForSale, restockSupply }
+  return { data, isLoading, error, addSupply, updateSupply, deleteSupply, adjustQty, deductForSale }
 }
 
 export { computeStatus }
