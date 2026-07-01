@@ -147,7 +147,7 @@ export default function ReportsPage() {
                 : 'bg-background text-muted-foreground hover:text-foreground'
             )}
           >
-            Totals
+            Orders
           </button>
         </div>
       </div>

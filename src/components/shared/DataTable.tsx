@@ -198,9 +198,12 @@ export function DataTable<T>({
         ...[...nonActionCols].sort((a, b) => {
           const ai = effectiveColumnOrder.indexOf(a.key)
           const bi = effectiveColumnOrder.indexOf(b.key)
+          // Both not in saved order → keep natural definition order (stable)
           if (ai === -1 && bi === -1) return 0
-          if (ai === -1) return 1
-          if (bi === -1) return -1
+          // One not in saved order → put it BEFORE the saved-order column
+          // so newly added columns appear at their natural position, not buried at the end
+          if (ai === -1) return -1
+          if (bi === -1) return 1
           return ai - bi
         }),
         ...actionsCols,
