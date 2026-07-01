@@ -92,6 +92,13 @@ export function SaleTable({
 
   const columns = [
     {
+      key: 'order_no',
+      header: 'Order #',
+      render: (s: Sale) => (
+        <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
+      ),
+    },
+    {
       key: 'date',
       header: 'Date',
       sortable: true,

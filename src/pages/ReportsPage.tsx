@@ -27,8 +27,8 @@ export default function ReportsPage() {
 
   const {
     data, isLoading, error,
-    mode, month, year, selectedDate, weekStart, weekEnd,
-    setMode, setMonth, setYear, setSelectedDate,
+    mode, month, year, selectedDate, weekStart, weekEnd, viewMode,
+    setMode, setMonth, setYear, setSelectedDate, setViewMode,
     goToPrevWeek, goToNextWeek,
   } = useReports()
 
@@ -64,6 +64,34 @@ export default function ReportsPage() {
               {MODE_LABELS[m]}
             </button>
           ))}
+        </div>
+
+        {/* View mode toggle — Payments Received vs Order Totals */}
+        <div className="ml-auto flex rounded-md border border-input overflow-hidden text-sm">
+          <button
+            type="button"
+            onClick={() => setViewMode('payments')}
+            className={cn(
+              'px-3 py-1.5 font-medium transition-colors duration-150',
+              viewMode === 'payments'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Payments Received
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('order_totals')}
+            className={cn(
+              'px-3 py-1.5 font-medium transition-colors duration-150',
+              viewMode === 'order_totals'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Order Totals
+          </button>
         </div>
 
         {/* Daily: single date picker */}
@@ -130,7 +158,10 @@ export default function ReportsPage() {
         <div className="space-y-6">
           {/* Summary stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <StatCard label="Total Income" value={formatCurrency(data?.totalSalesAmount ?? 0)} />
+            <StatCard
+              label={viewMode === 'payments' ? 'Payments Received' : 'Order Totals'}
+              value={formatCurrency(data?.totalSalesAmount ?? 0)}
+            />
             <StatCard label="Total Expenses" value={formatCurrency(data?.totalExpensesAmount ?? 0)} />
             <StatCard
               label="Net Profit"
@@ -140,7 +171,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Sales vs Expenses daily chart */}
-          <SalesChart data={data?.dailyPoints ?? []} />
+          <SalesChart data={data?.dailyPoints ?? []} viewMode={viewMode} />
 
           {/* Donut charts side by side on tablet+ */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

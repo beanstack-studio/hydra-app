@@ -33,7 +33,7 @@ export function SaleDetailModal({ sale, isOpen, onClose, onReschedule, onConfirm
       : [{ name: sale.product_name, qty: sale.qty, subtotal: sale.product_total }]
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Sale Details" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Sale #${sale.id.slice(-6).toUpperCase()}`} size="sm">
       <div className="space-y-3 text-sm">
 
         {/* Section 1: Customer + financials */}

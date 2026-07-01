@@ -31,7 +31,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden">
       <div className="flex h-[4.5rem]">
-        {navItems.map(({ to, label, icon: Icon }) => {
+        {navItems.map(({ to, icon: Icon }) => {
           const isLocked = isFree && FREE_LOCKED.has(to)
           return (
             <NavLink
@@ -57,7 +57,6 @@ export function BottomNav() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] font-medium leading-tight">{label}</span>
                 </>
               )}
             </NavLink>

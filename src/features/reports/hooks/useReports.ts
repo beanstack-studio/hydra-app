@@ -6,6 +6,7 @@ import { nowPH, PH_TZ } from '@/lib/utils'
 import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking } from '../types'
 
 export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
+export type DataViewMode = 'payments' | 'order_totals'
 
 // ── Week helpers ──────────────────────────────────────────────────────────────
 
@@ -32,11 +33,13 @@ interface UseReportsReturn {
   selectedDate: string
   weekStart: string
   weekEnd: string
+  viewMode: DataViewMode
   setMode: (m: ReportMode) => void
   setMonth: (m: number) => void
   setYear: (y: number) => void
   setSelectedDate: (d: string) => void
   setWeekStart: (d: string) => void
+  setViewMode: (v: DataViewMode) => void
   goToPrevWeek: () => void
   goToNextWeek: () => void
 }
@@ -52,6 +55,7 @@ export function useReports(): UseReportsReturn {
   const [year,         setYear]         = useState(now.getFullYear())
   const [selectedDate, setSelectedDate] = useState(todayStr)
   const [weekStart,    setWeekStart]    = useState(() => getMondayStr(todayStr))
+  const [viewMode,     setViewMode]     = useState<DataViewMode>('payments')
 
   const weekEnd = addDaysStr(weekStart, 6)
 
@@ -155,6 +159,16 @@ export function useReports(): UseReportsReturn {
         dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + amtReceived)
       }
 
+      // ── Order totals map: full sale amounts by order/sale date ───────────
+      const dailyOrderMap = new Map<string, number>()
+      for (const s of sales) {
+        const dateKey = s.sale_date as string
+        dailyOrderMap.set(dateKey, (dailyOrderMap.get(dateKey) ?? 0) + (s.total_amount as number))
+      }
+      const totalOrderAmount = sales.reduce((sum, s) => sum + (s.total_amount as number), 0)
+
+      const activeSalesMap = viewMode === 'payments' ? dailySalesMap : dailyOrderMap
+
       // ── Daily expenses map ───────────────────────────────────────────────
       const dailyExpMap = new Map<string, number>()
       for (const e of expenses) {
@@ -169,17 +183,17 @@ export function useReports(): UseReportsReturn {
           const dateKey = addDaysStr(weekStart, i)
           return {
             date:     dateKey,
-            sales:    dailySalesMap.get(dateKey) ?? 0,
+            sales:    activeSalesMap.get(dateKey) ?? 0,
             expenses: dailyExpMap.get(dateKey) ?? 0,
           }
         })
       } else {
-        const allDates = new Set([...dailySalesMap.keys(), ...dailyExpMap.keys()])
+        const allDates = new Set([...activeSalesMap.keys(), ...dailyExpMap.keys()])
         dailyPoints = Array.from(allDates)
           .sort()
           .map((date) => ({
             date,
-            sales:    dailySalesMap.get(date) ?? 0,
+            sales:    activeSalesMap.get(date) ?? 0,
             expenses: dailyExpMap.get(date) ?? 0,
           }))
       }
@@ -283,15 +297,16 @@ export function useReports(): UseReportsReturn {
       const fallbackTotal = sales
         .filter((s) => !paidSaleIds.has(s.id as string) && (s.payment_mode as string) !== 'utang' && ((s.amount_received as number) ?? 0) > 0)
         .reduce((s, r) => s + ((r.amount_received as number) ?? 0), 0)
-      const totalSalesAmount = paymentsTotal + fallbackTotal
+      const paymentsReceivedTotal = paymentsTotal + fallbackTotal
+      const activeTotalSales = viewMode === 'payments' ? paymentsReceivedTotal : totalOrderAmount
 
       setData({
         dailyPoints,
         expenseSummary,
         productSales,
-        totalSalesAmount,
+        totalSalesAmount: activeTotalSales,
         totalExpensesAmount,
-        netProfit: totalSalesAmount - totalExpensesAmount,
+        netProfit: activeTotalSales - totalExpensesAmount,
         topProducts,
         topCustomers,
         topSupplies,
@@ -301,14 +316,14 @@ export function useReports(): UseReportsReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, mode, month, year, selectedDate, weekStart, weekEnd])
+  }, [stationId, mode, month, year, selectedDate, weekStart, weekEnd, viewMode])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
   return {
     data, isLoading, error,
-    mode, month, year, selectedDate, weekStart, weekEnd,
-    setMode, setMonth, setYear, setSelectedDate, setWeekStart,
+    mode, month, year, selectedDate, weekStart, weekEnd, viewMode,
+    setMode, setMonth, setYear, setSelectedDate, setWeekStart, setViewMode,
     goToPrevWeek, goToNextWeek,
   }
 }

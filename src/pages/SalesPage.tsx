@@ -51,6 +51,7 @@ const SALE_FILTER_GROUPS: FilterGroup[] = [
 ]
 
 const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
+  { key: 'order_no',    label: 'Order #' },                          // visible
   { key: 'date',        label: 'Date' },                              // visible
   { key: 'customer',    label: 'Customer' },                         // visible
   { key: 'order_type',  label: 'Order Type' },                      // visible
@@ -104,6 +105,7 @@ export default function SalesPage() {
     )
 
   const exportRows = filteredSales.map((s) => ({
+    order_no:    `#${s.id.slice(-6).toUpperCase()}`,
     date:        formatDate(s.sale_date),
     customer:    s.customer_name,
     order_type:  s.order_type,
