@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer utilities {
+  /* Always adds 0.5rem above the home indicator; on Android/desktop env() = 0 so it's just 8px */
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
   }
 }
 

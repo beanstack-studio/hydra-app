@@ -6,7 +6,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { computeStatus } from '../hooks/useSupplies'
 import type { Supply, SupplyStatus } from '../types'
@@ -35,6 +35,7 @@ type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at'
 export const SUPPLY_COLUMN_CONFIG: ColumnConfig[] = [
   { key: 'name',              label: 'Item' },
   { key: 'store',             label: 'Supplier' },
+  { key: 'status',            label: 'Status' },
   { key: 'linked_product',    label: 'Used For' },
   { key: 'last_purchased_at', label: 'Last Purchase' },
   { key: 'qty',               label: 'Stock' },
@@ -102,60 +103,34 @@ export function SupplyTable({
 
   const hasLowStock = items.some((i) => computeStatus(i.qty, i.threshold) !== 'in_stock')
 
-  // ── Tablet/desktop DataTable columns ──────────────────────────────────────
   const columns = [
     {
       key: 'name',
       header: 'Item',
       sortable: true,
       render: (item: Supply) => (
-        <p className="text-sm font-semibold text-foreground">{item.name}</p>
+        <p className="text-sm font-semibold text-foreground whitespace-nowrap">{item.name}</p>
       ),
     },
     {
       key: 'store',
       header: 'Supplier',
       sortable: true,
-      className: 'hidden md:table-cell',
       render: (item: Supply) => (
-        <span className="text-sm text-muted-foreground">{item.store ?? '—'}</span>
+        <span className="text-sm text-muted-foreground whitespace-nowrap">{item.store ?? '—'}</span>
       ),
     },
     {
-      key: 'linked_product',
-      header: 'Used For',
+      key: 'status',
+      header: 'Status',
       sortable: true,
-      className: 'hidden lg:table-cell w-36',
+      className: 'w-24',
       render: (item: Supply) => {
-        const junctionNames =
-          item.supply_product_links && item.supply_product_links.length > 0
-            ? item.supply_product_links.map((l) => productNames[l.product_id]).filter(Boolean)
-            : item.linked_product_id
-            ? [productNames[item.linked_product_id]].filter(Boolean)
-            : []
-        if (junctionNames.length === 0) return <span className="text-sm text-muted-foreground">—</span>
-        return (
-          <div className="flex flex-col gap-0.5">
-            {junctionNames.map((name, i) => (
-              <span key={i} className="text-sm text-muted-foreground">{name}</span>
-            ))}
-          </div>
-        )
+        const status = computeStatus(item.qty, item.threshold)
+        return <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABELS[status]}</Badge>
       },
     },
     {
-      key: 'last_purchased_at',
-      header: 'Last Purchase',
-      sortable: true,
-      className: 'hidden lg:table-cell w-32',
-      render: (item: Supply) => (
-        <span className="text-sm text-foreground">
-          {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
-        </span>
-      ),
-    },
-    {
-      // qty number + ± adjust buttons, then Low: X threshold below
       key: 'qty',
       header: 'Stock',
       sortable: true,
@@ -191,11 +166,44 @@ export function SupplyTable({
       ),
     },
     {
+      key: 'linked_product',
+      header: 'Used For',
+      sortable: true,
+      className: 'hidden lg:table-cell w-36',
+      render: (item: Supply) => {
+        const junctionNames =
+          item.supply_product_links && item.supply_product_links.length > 0
+            ? item.supply_product_links.map((l) => productNames[l.product_id]).filter(Boolean)
+            : item.linked_product_id
+            ? [productNames[item.linked_product_id]].filter(Boolean)
+            : []
+        if (junctionNames.length === 0) return <span className="text-sm text-muted-foreground">—</span>
+        return (
+          <div className="flex flex-col gap-0.5">
+            {junctionNames.map((name, i) => (
+              <span key={i} className="text-sm text-muted-foreground">{name}</span>
+            ))}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'last_purchased_at',
+      header: 'Last Purchase',
+      sortable: true,
+      className: 'hidden lg:table-cell w-32',
+      render: (item: Supply) => (
+        <span className="text-sm text-foreground whitespace-nowrap">
+          {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
+        </span>
+      ),
+    },
+    {
       key: 'actions',
       header: '',
-      className: 'w-16',
+      className: 'w-12',
       render: (item: Supply) => (
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex items-center justify-end">
           {isOwner && (
             <Button
               size="icon"
@@ -230,107 +238,28 @@ export function SupplyTable({
         </div>
       )}
 
-      {/* ── Mobile table rows (< md) ────────────────────────────────────── */}
-      <div className="md:hidden">
-        {sorted.length === 0 ? emptyNode : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            {sorted.map((item) => {
-              const status = computeStatus(item.qty, item.threshold)
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    'border-b border-border last:border-b-0 px-4 py-3',
-                    isOwner && 'cursor-pointer active:bg-accent/50',
-                    status === 'out_of_stock' && 'bg-destructive/5',
-                    status === 'low_stock'    && 'bg-yellow-50 dark:bg-yellow-950/20',
-                  )}
-                  onClick={isOwner ? () => onEditClick(item) : undefined}
-                >
-                  {/* Row 1: name + supplier + status badge + delete */}
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{item.name}</p>
-                      {item.store && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{item.store}</p>
-                      )}
-                    </div>
-                    <Badge variant={STATUS_VARIANT[status]} className="shrink-0 mt-0.5">
-                      {STATUS_LABELS[status]}
-                    </Badge>
-                    {isOwner && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-destructive hover:text-destructive shrink-0 -mt-0.5 -mr-1"
-                        onClick={(e) => { e.stopPropagation(); onDeleteClick(item) }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Row 2: qty ± controls + Low:X */}
-                  <div className="flex items-center gap-3 mt-2">
-                    <div className="flex items-center gap-1.5">
-                      {isOwner && (
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, -1) }}
-                          disabled={item.qty <= 0}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <span className="text-sm font-bold text-foreground min-w-[1.5rem] text-center">{item.qty}</span>
-                      {isOwner && (
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-7 w-7 shrink-0"
-                          onClick={(e) => { e.stopPropagation(); onQuickAdjust(item, 1) }}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground">Low: {item.threshold}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Tablet / Desktop table (≥ md) ──────────────────────────────── */}
-      <div className="hidden md:block">
-        <DataTable
-          tableId="supplies"
-          fitViewport
-          columns={columns}
-          data={sorted}
-          rowKey={(item) => item.id}
-          onRowClick={isOwner ? onEditClick : undefined}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          hiddenKeys={hiddenKeys}
-          columnWidths={columnWidths}
-          onColumnResize={onColumnResize}
-          externalColumnOrder={columnOrder}
-          onColumnReorder={onColumnReorder}
-          rowClassName={(item) => {
-            const status = computeStatus(item.qty, item.threshold)
-            if (status === 'out_of_stock') return 'bg-destructive/5'
-            if (status === 'low_stock') return 'bg-yellow-50 dark:bg-yellow-950/20'
-            return ''
-          }}
-          emptyState={emptyNode}
-        />
-      </div>
+      <DataTable
+        tableId="supplies"
+        columns={columns}
+        data={sorted}
+        rowKey={(item) => item.id}
+        onRowClick={isOwner ? onEditClick : undefined}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+        hiddenKeys={hiddenKeys}
+        columnWidths={columnWidths}
+        onColumnResize={onColumnResize}
+        externalColumnOrder={columnOrder}
+        onColumnReorder={onColumnReorder}
+        rowClassName={(item) => {
+          const status = computeStatus(item.qty, item.threshold)
+          if (status === 'out_of_stock') return 'bg-destructive/5'
+          if (status === 'low_stock') return 'bg-yellow-50 dark:bg-yellow-950/20'
+          return ''
+        }}
+        emptyState={emptyNode}
+      />
     </div>
   )
 }
