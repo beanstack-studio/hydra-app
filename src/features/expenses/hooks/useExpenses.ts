@@ -22,6 +22,74 @@ interface UseExpensesReturn {
   getReceiptUrl: (path: string) => Promise<string>
 }
 
+/**
+ * After any supplies expense is created, edited, or deleted, re-derive
+ * supplies.store and supplies.last_purchased_at from the current expenses
+ * table so denormalized fields never go stale.
+ *
+ * Matching logic mirrors useSupplyPurchaseHistory: expense.item ILIKE
+ * '%supplyName%' so renamed supplies still find their older records.
+ */
+async function recomputeSupplyFromExpenses(
+  stationId: string,
+  itemName: string,
+): Promise<void> {
+  const trimmed = itemName.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'supplies') return
+
+  // 1. Find the supply whose name matches the expense item label
+  const { data: supplyRows, error: supplyErr } = await supabase
+    .from('supplies')
+    .select('id, name')
+    .eq('station_id', stationId)
+    .ilike('name', trimmed)
+    .limit(1)
+
+  if (supplyErr) {
+    console.error('[recomputeSupply] supply lookup failed:', supplyErr.message, { itemName: trimmed })
+    return
+  }
+
+  const supply = (supplyRows ?? [])[0] as { id: string; name: string } | undefined
+  if (!supply) {
+    console.warn('[recomputeSupply] no supply matched item:', trimmed)
+    return
+  }
+
+  // 2. Find the most-recent remaining expense that matches this supply name.
+  //    Use %name% wildcard so renamed supplies still link to older expense rows.
+  const { data: nextRows, error: nextErr } = await supabase
+    .from('expenses')
+    .select('supplier, expense_date')
+    .eq('station_id', stationId)
+    .eq('category', 'supplies')
+    .ilike('item', `%${supply.name.trim()}%`)
+    .order('expense_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (nextErr) {
+    console.error('[recomputeSupply] expense lookup failed:', nextErr.message, { supplyName: supply.name })
+    return
+  }
+
+  const next = (nextRows ?? [])[0] as { supplier: string | null; expense_date: string } | undefined
+
+  // 3. Write the freshly derived values back — null/null when no expense remains
+  const { error: updateErr } = await supabase
+    .from('supplies')
+    .update({
+      store:             next?.supplier         ?? null,
+      last_purchased_at: next?.expense_date     ?? null,
+    })
+    .eq('id', supply.id)
+    .eq('station_id', stationId)
+
+  if (updateErr) {
+    console.error('[recomputeSupply] supply update failed:', updateErr.message, { supplyId: supply.id })
+  }
+}
+
 export function useExpenses(): UseExpensesReturn {
   const stationId = useAuthStore((s) => s.stationId)
   const [data, setData] = useState<Expense[]>([])
@@ -80,7 +148,7 @@ export function useExpenses(): UseExpensesReturn {
 
       if (input.new_supply_name) {
         // Create new supply item and link it
-        const { data: newSupply } = await supabase.from('supplies').insert({
+        await supabase.from('supplies').insert({
           station_id: stationId,
           name: input.new_supply_name,
           type: 'supply',
@@ -177,8 +245,26 @@ export function useExpenses(): UseExpensesReturn {
       })
       .eq('id', id)
     if (e) throw new Error(e.message)
+
+    // Recompute supply's store + last_purchased_at whenever a supplies expense is
+    // edited (date, supplier, or item name may have changed).
+    if (resolvedCategory === 'supplies' && stationId) {
+      const oldItemName = existing?.item
+      const newItemName = itemLabel ?? oldItemName
+
+      // If the item name changed, recompute for the OLD supply first so it
+      // no longer incorrectly shows this expense's supplier/date.
+      if (oldItemName && newItemName && oldItemName !== newItemName) {
+        await recomputeSupplyFromExpenses(stationId, oldItemName)
+      }
+      // Always recompute for the current supply name.
+      if (newItemName) {
+        await recomputeSupplyFromExpenses(stationId, newItemName)
+      }
+    }
+
     await fetchData()
-  }, [fetchData, uploadReceipt, data])
+  }, [fetchData, uploadReceipt, data, stationId])
 
   const deleteExpense = useCallback(async (id: string) => {
     const existing = data.find((e) => e.id === id)
@@ -188,39 +274,10 @@ export function useExpenses(): UseExpensesReturn {
     const { error: e } = await supabase.from('expenses').delete().eq('id', id)
     if (e) throw new Error(e.message)
 
-    // When a supplies expense is deleted, re-derive the linked supply's store +
-    // last_purchased_at from the next most-recent matching expense. Without this,
-    // the supply continues to show the deleted row's supplier/date indefinitely.
+    // Recompute the linked supply's store + last_purchased_at from the next
+    // most-recent matching expense now that this row is gone.
     if (existing?.category === 'supplies' && stationId) {
-      const itemName = existing.item
-      if (itemName && itemName !== 'Supplies') {
-        const { data: supplyRows } = await supabase
-          .from('supplies')
-          .select('id, name')
-          .eq('station_id', stationId)
-          .ilike('name', itemName)
-          .limit(1)
-
-        const supply = (supplyRows ?? [])[0] as { id: string; name: string } | undefined
-
-        if (supply) {
-          const { data: nextRows } = await supabase
-            .from('expenses')
-            .select('supplier, expense_date')
-            .eq('station_id', stationId)
-            .eq('category', 'supplies')
-            .ilike('item', supply.name)
-            .order('expense_date', { ascending: false })
-            .limit(1)
-
-          const next = (nextRows ?? [])[0] as { supplier: string | null; expense_date: string } | undefined
-
-          await supabase.from('supplies').update({
-            store: next?.supplier ?? null,
-            last_purchased_at: next?.expense_date ?? null,
-          }).eq('id', supply.id)
-        }
-      }
+      await recomputeSupplyFromExpenses(stationId, existing.item)
     }
 
     await fetchData()
