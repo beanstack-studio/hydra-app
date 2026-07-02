@@ -9,7 +9,7 @@ interface UseMaintenanceReturn {
   error: string | null
   addLog: (input: MaintenanceLogInput, photos?: File[]) => Promise<void>
   updateLog: (id: string, input: Partial<MaintenanceLogInput>, photos?: File[]) => Promise<void>
-  deleteLog: (id: string) => Promise<void>
+  deleteLog: (id: string) => Promise<{ expenseDeleted: boolean }>
 }
 
 export function useMaintenance(): UseMaintenanceReturn {
@@ -202,11 +202,42 @@ export function useMaintenance(): UseMaintenanceReturn {
     await fetchData()
   }, [fetchData, uploadPhoto, stationId])
 
-  const deleteLog = useCallback(async (id: string) => {
+  const deleteLog = useCallback(async (id: string): Promise<{ expenseDeleted: boolean }> => {
+    // Fetch log first so we can find any linked expense
+    const { data: log } = await supabase
+      .from('maintenance_logs')
+      .select('item_filter, service_date, maintenance_date')
+      .eq('id', id)
+      .single()
+
+    let expenseDeleted = false
+
+    if (log && stationId) {
+      const equipment = log.item_filter as string
+      const date = (log.service_date ?? log.maintenance_date) as string
+
+      // Match on both current format ('equipment') and legacy format ('Maintenance: equipment')
+      const { data: linked } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('station_id', stationId)
+        .eq('category', 'maintenance')
+        .eq('expense_date', date)
+        .in('item', [equipment, `Maintenance: ${equipment}`])
+        .limit(1)
+        .maybeSingle()
+
+      if (linked) {
+        await supabase.from('expenses').delete().eq('id', (linked as { id: string }).id)
+        expenseDeleted = true
+      }
+    }
+
     const { error: e } = await supabase.from('maintenance_logs').delete().eq('id', id)
     if (e) throw new Error(e.message)
     await fetchData()
-  }, [fetchData])
+    return { expenseDeleted }
+  }, [stationId, fetchData])
 
   return { data, isLoading, error, addLog, updateLog, deleteLog }
 }

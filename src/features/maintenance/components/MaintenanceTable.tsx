@@ -66,8 +66,12 @@ export function MaintenanceTable() {
     if (!deletingLog) return
     setIsDeleting(true)
     try {
-      await deleteLog(deletingLog.id)
-      toast({ title: 'Log deleted' })
+      const { expenseDeleted } = await deleteLog(deletingLog.id)
+      toast({
+        title: expenseDeleted
+          ? 'Maintenance log and linked expense deleted'
+          : 'Maintenance log deleted',
+      })
       setDeletingLog(null)
     } catch (e) {
       toast({ title: 'Delete failed', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' })
