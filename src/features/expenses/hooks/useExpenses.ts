@@ -246,20 +246,30 @@ export function useExpenses(): UseExpensesReturn {
       .eq('id', id)
     if (e) throw new Error(e.message)
 
-    // Recompute supply's store + last_purchased_at whenever a supplies expense is
-    // edited (date, supplier, or item name may have changed).
-    if (resolvedCategory === 'supplies' && stationId) {
+    // Recompute supply denormalized fields for every edit that touches a
+    // supplies expense — before OR after the change.
+    if (stationId) {
+      const oldCategory = existing?.category
       const oldItemName = existing?.item
       const newItemName = itemLabel ?? oldItemName
 
-      // If the item name changed, recompute for the OLD supply first so it
-      // no longer incorrectly shows this expense's supplier/date.
-      if (oldItemName && newItemName && oldItemName !== newItemName) {
+      // Case 3a — category changed FROM 'supplies': treat like a delete so the
+      // old supply's store/last_purchased_at are re-derived without this row.
+      if (oldCategory === 'supplies' && resolvedCategory !== 'supplies' && oldItemName) {
         await recomputeSupplyFromExpenses(stationId, oldItemName)
       }
-      // Always recompute for the current supply name.
-      if (newItemName) {
-        await recomputeSupplyFromExpenses(stationId, newItemName)
+
+      // Cases 1, 2, 3b — expense is (or became) a supplies expense.
+      if (resolvedCategory === 'supplies') {
+        // Case 2 / 3b — item name changed: recompute the OLD supply first so it
+        // no longer reflects this expense's supplier/date.
+        if (oldItemName && newItemName && oldItemName !== newItemName) {
+          await recomputeSupplyFromExpenses(stationId, oldItemName)
+        }
+        // Case 1 — always recompute the current (new) supply name.
+        if (newItemName) {
+          await recomputeSupplyFromExpenses(stationId, newItemName)
+        }
       }
     }
 
