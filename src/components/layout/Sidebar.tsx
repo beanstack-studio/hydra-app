@@ -13,8 +13,6 @@ import {
   User,
   X,
   Lock,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -87,7 +85,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   // Full-width highlight for main nav items
   function mainNavClass(isActive: boolean) {
     return cn(
-      'w-full flex items-center transition-all duration-150',
+      'w-full flex items-center text-sm font-medium transition-all duration-150',
       collapsed ? 'justify-center py-2.5' : 'gap-3 px-4 py-2.5',
       isActive
         ? 'bg-white/15 text-white'
@@ -157,17 +155,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </button>
           </>
         )}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onToggle() }}
-          className="h-7 w-7 rounded-md flex items-center justify-center text-white/60 hover:bg-white/15 hover:text-white transition-colors duration-150 shrink-0"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed
-            ? <PanelLeftOpen className="h-4 w-4" />
-            : <PanelLeftClose className="h-4 w-4" />
-          }
-        </button>
       </div>
 
       {/* Navigation */}
