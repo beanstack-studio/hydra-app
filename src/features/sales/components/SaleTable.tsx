@@ -202,9 +202,6 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
-      // sticky on mobile/tablet so the button stays visible when table scrolls horizontally;
-      // reverted to static on desktop (lg:) where table fits without overflow.
-      className: 'sticky right-0 z-10 bg-card w-10 lg:static lg:bg-transparent',
       render: (s: Sale) => onDelete ? (
         <div className="flex justify-end">
           <Button
