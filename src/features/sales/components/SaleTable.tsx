@@ -202,17 +202,20 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
-      className: 'sticky right-0 z-10 bg-card w-10',
+      // sticky on mobile/tablet so the button stays visible when table scrolls horizontally;
+      // reverted to static on desktop (lg:) where table fits without overflow.
+      className: 'sticky right-0 z-10 bg-card w-10 lg:static lg:bg-transparent',
       render: (s: Sale) => onDelete ? (
         <div className="flex justify-end">
-          <button
-            type="button"
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-destructive hover:text-destructive"
             title="Delete sale"
             onClick={(e) => { e.stopPropagation(); onDelete(s) }}
-            className="text-muted-foreground hover:text-destructive transition-colors duration-150 p-1"
           >
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       ) : null,
     },

@@ -19,14 +19,7 @@ import type { FilterGroup } from '@/components/shared/FilterButton'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import { useAuthStore } from '@/stores/authStore'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Modal } from '@/components/shared/Modal'
 import type { Sale, SaleInsert } from '@/features/sales/types'
 
 const SALE_FILTER_GROUPS: FilterGroup[] = [
@@ -240,26 +233,29 @@ export default function SalesPage() {
         stationSettings={settings?.stationSettings ?? null}
       />
 
-      {/* Delete confirm dialog */}
-      <Dialog open={!!deletingSale} onOpenChange={(open) => { if (!open) setDeletingSale(null) }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Delete Sale</DialogTitle>
-            <DialogDescription>
-              Delete {deletingSale?.customer_name}&apos;s sale of {formatCurrency(deletingSale?.total_amount ?? 0)}?
-              This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingSale(null)} disabled={isDeleting}>
+      {/* Delete confirm modal */}
+      <Modal isOpen={!!deletingSale} onClose={() => setDeletingSale(null)} title="Delete Sale" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Delete{' '}
+            {deletingSale?.customer_name
+              ? <span className="font-semibold text-foreground">{deletingSale.customer_name}&apos;s</span>
+              : 'this'
+            }{' '}
+            sale of{' '}
+            <span className="font-semibold text-foreground">{formatCurrency(deletingSale?.total_amount ?? 0)}</span>?
+            {' '}This cannot be undone.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setDeletingSale(null)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteSale} disabled={isDeleting}>
+            <Button type="button" variant="destructive" className="flex-1" onClick={handleDeleteSale} disabled={isDeleting}>
               {isDeleting ? 'Deleting…' : 'Delete'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </Modal>
 
       {/* Record payment modal */}
       <RecordPaymentModal
