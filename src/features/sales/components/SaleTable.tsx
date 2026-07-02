@@ -202,6 +202,7 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
+      className: 'sticky right-0 z-10 bg-card w-10',
       render: (s: Sale) => onDelete ? (
         <div className="flex justify-end">
           <button

@@ -46,8 +46,6 @@ async function recomputeSupplyFromExpenses(
   const trimmed = itemName.trim()
   if (!trimmed || trimmed.toLowerCase() === 'supplies') return
 
-  console.log('[recomputeSupply] ▶ start', { station: stationId.slice(-8), item: trimmed })
-
   // 1. Find the supply whose name matches the expense item label
   const { data: supplyRows, error: supplyErr } = await supabase
     .from('supplies')
@@ -57,18 +55,14 @@ async function recomputeSupplyFromExpenses(
     .limit(1)
 
   if (supplyErr) {
-    console.error('[recomputeSupply] ✗ supply lookup failed:', supplyErr.message, { itemName: trimmed })
     throw new Error(`[recomputeSupply] supply lookup: ${supplyErr.message}`)
   }
 
   const supply = (supplyRows ?? [])[0] as { id: string; name: string } | undefined
   if (!supply) {
     // No matching supply row — this item may not have an inventory entry yet.
-    console.warn('[recomputeSupply] ✗ no supply matched item:', trimmed, { station: stationId.slice(-8) })
     return
   }
-
-  console.log('[recomputeSupply] ✔ supply found', { id: supply.id.slice(-8), name: supply.name })
 
   // 2. Find the most-recent remaining expense that matches this supply name.
   //    Use %name% wildcard so renamed supplies still find their older records.
@@ -83,20 +77,12 @@ async function recomputeSupplyFromExpenses(
     .limit(1)
 
   if (nextErr) {
-    console.error('[recomputeSupply] ✗ expense lookup failed:', nextErr.message, { supplyName: supply.name })
     throw new Error(`[recomputeSupply] expense lookup: ${nextErr.message}`)
   }
 
   const next = (nextRows ?? [])[0] as
     | { id: string; supplier: string | null; expense_date: string }
     | undefined
-
-  console.log(
-    '[recomputeSupply] ✔ most-recent expense:',
-    next
-      ? { id: next.id.slice(-8), supplier: next.supplier, expense_date: next.expense_date }
-      : 'none — will null out supply store',
-  )
 
   // 3. Write the freshly derived values back — null/null when no expense remains.
   //    Use .select() so we get back the written rows; this is the only way to
@@ -113,24 +99,14 @@ async function recomputeSupplyFromExpenses(
     .select('id, store, last_purchased_at')
 
   if (updateErr) {
-    console.error('[recomputeSupply] ✗ supply update failed:', updateErr.message, { supplyId: supply.id })
     throw new Error(`[recomputeSupply] supply update: ${updateErr.message}`)
   }
 
   if (!written?.length) {
     // This means .eq('station_id', stationId) didn't match — supply row exists
     // but with a different station_id (data inconsistency) or was deleted.
-    console.error('[recomputeSupply] ✗ supply update matched 0 rows', {
-      supplyId: supply.id.slice(-8),
-      station: stationId.slice(-8),
-    })
     throw new Error(`[recomputeSupply] supply update matched 0 rows for id=${supply.id}`)
   }
-
-  console.log('[recomputeSupply] ✔ done', {
-    store: written[0].store,
-    last_purchased_at: written[0].last_purchased_at,
-  })
 }
 
 export function useExpenses(): UseExpensesReturn {
