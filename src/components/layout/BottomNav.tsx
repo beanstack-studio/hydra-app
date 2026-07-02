@@ -30,7 +30,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden">
-      <div className="flex h-[4.5rem]">
+      <div className="flex">
         {navItems.map(({ to, icon: Icon }) => {
           const isLocked = isFree && FREE_LOCKED.has(to)
           return (
@@ -39,7 +39,7 @@ export function BottomNav() {
               to={to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-1 flex-col items-center justify-center gap-0.5 relative transition-all duration-150',
+                  'flex flex-1 flex-col items-center justify-center relative py-4 transition-all duration-150',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )
               }
@@ -50,7 +50,7 @@ export function BottomNav() {
                     <span className="absolute top-0 left-3 right-3 h-0.5 rounded-full bg-primary" />
                   )}
                   <div className="relative">
-                    <Icon className={cn('h-5 w-5 shrink-0', isActive && 'scale-110')} />
+                    <Icon className={cn('h-6 w-6 shrink-0', isActive && 'scale-110')} />
                     {isLocked && (
                       <span className="absolute -top-1.5 -right-2 text-[7px] font-bold bg-amber-500 text-white rounded px-0.5 leading-tight">
                         PRO

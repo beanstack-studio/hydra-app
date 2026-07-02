@@ -66,8 +66,24 @@ function RoleViewToggle() {
 export function AppShell() {
   const [pendingReminders, setPendingReminders] = useState<Reminder[]>([])
   const [hasUpdate, setHasUpdate] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(
+    () => localStorage.getItem('sidebar-collapsed') === 'true'
+  )
   const plan   = usePlan()
   const isFree = plan === 'free'
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar-collapsed', String(next))
+      return next
+    })
+  }
+
+  const contentClass = cn(
+    'flex flex-1 flex-col min-w-0 lg:transition-all lg:duration-300',
+    sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
+  )
 
   useEffect(() => {
     if (isFree) {
@@ -100,8 +116,8 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-60 min-w-0">
+      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      <div className={contentClass}>
         <DevBanner />
         <RoleViewToggle />
         {hasUpdate && (
