@@ -124,7 +124,12 @@ export function SupplyTable({
       key: 'status',
       header: 'Status',
       sortable: true,
-      className: 'w-24',
+      // INTENTIONAL mobile exception: the status badge is hidden on mobile (<md) because
+      // row highlight colors (red tint = out of stock, yellow tint = low stock) already
+      // communicate status visually, and the column wastes scarce horizontal scroll space.
+      // Table Options checkboxes are unaffected — this is a deliberate layout rule,
+      // not a user-configurable visibility setting. Do NOT remove the hidden class to "fix" it.
+      className: 'hidden md:table-cell w-24',
       render: (item: Supply) => {
         const status = computeStatus(item.qty, item.threshold)
         return <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABELS[status]}</Badge>

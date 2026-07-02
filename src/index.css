@@ -3,17 +3,19 @@
 @tailwind utilities;
 
 @layer utilities {
-  /* Bottom nav container: safe-area inset + 1.5rem breathing room above the home indicator.
-     Without viewport-fit=cover env() was always 0; now it reflects the real inset. */
+  /* Bottom nav safe-area spacer: pure env() so the nav content sits above the
+     home indicator on notched iPhones. No extra constant — the NavLink's own
+     py-[14px] provides the visual buffer from the screen edge on non-notched
+     devices (where env() = 0). Matches Facebook iOS bottom nav proportions. */
   .pb-safe {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* Main content bottom padding: clears the fixed bottom nav on all devices.
-     Base 7rem (~nav content height + headroom) plus safe-area so content is
-     never hidden behind the taller nav on notched phones. */
+  /* Main content bottom padding: clears the fixed bottom nav (56px content area)
+     on all devices. 5rem base gives 24px headroom above the nav; safe-area
+     component ensures content never hides behind the taller nav on iPhones. */
   .pb-nav {
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }
 
