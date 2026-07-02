@@ -29,6 +29,15 @@ interface UseExpensesReturn {
  *
  * Matching logic mirrors useSupplyPurchaseHistory: expense.item ILIKE
  * '%supplyName%' so renamed supplies still find their older records.
+ *
+ * Throws on any DB failure so callers can catch and surface the error
+ * rather than silently leaving the supply in a stale state.
+ *
+ * IMPORTANT: The supply UPDATE uses .select() instead of the default
+ * return=minimal mode. PostgREST returns HTTP 204 with {data:null,
+ * error:null} even when 0 rows match — checking error alone cannot
+ * detect a silent station_id mismatch or deleted row. .select() gives
+ * us back the written rows so we can verify the write actually landed.
  */
 async function recomputeSupplyFromExpenses(
   stationId: string,
@@ -36,6 +45,8 @@ async function recomputeSupplyFromExpenses(
 ): Promise<void> {
   const trimmed = itemName.trim()
   if (!trimmed || trimmed.toLowerCase() === 'supplies') return
+
+  console.log('[recomputeSupply] ▶ start', { station: stationId.slice(-8), item: trimmed })
 
   // 1. Find the supply whose name matches the expense item label
   const { data: supplyRows, error: supplyErr } = await supabase
@@ -46,21 +57,24 @@ async function recomputeSupplyFromExpenses(
     .limit(1)
 
   if (supplyErr) {
-    console.error('[recomputeSupply] supply lookup failed:', supplyErr.message, { itemName: trimmed })
-    return
+    console.error('[recomputeSupply] ✗ supply lookup failed:', supplyErr.message, { itemName: trimmed })
+    throw new Error(`[recomputeSupply] supply lookup: ${supplyErr.message}`)
   }
 
   const supply = (supplyRows ?? [])[0] as { id: string; name: string } | undefined
   if (!supply) {
-    console.warn('[recomputeSupply] no supply matched item:', trimmed)
+    // No matching supply row — this item may not have an inventory entry yet.
+    console.warn('[recomputeSupply] ✗ no supply matched item:', trimmed, { station: stationId.slice(-8) })
     return
   }
 
+  console.log('[recomputeSupply] ✔ supply found', { id: supply.id.slice(-8), name: supply.name })
+
   // 2. Find the most-recent remaining expense that matches this supply name.
-  //    Use %name% wildcard so renamed supplies still link to older expense rows.
+  //    Use %name% wildcard so renamed supplies still find their older records.
   const { data: nextRows, error: nextErr } = await supabase
     .from('expenses')
-    .select('supplier, expense_date')
+    .select('id, supplier, expense_date')
     .eq('station_id', stationId)
     .eq('category', 'supplies')
     .ilike('item', `%${supply.name.trim()}%`)
@@ -69,25 +83,54 @@ async function recomputeSupplyFromExpenses(
     .limit(1)
 
   if (nextErr) {
-    console.error('[recomputeSupply] expense lookup failed:', nextErr.message, { supplyName: supply.name })
-    return
+    console.error('[recomputeSupply] ✗ expense lookup failed:', nextErr.message, { supplyName: supply.name })
+    throw new Error(`[recomputeSupply] expense lookup: ${nextErr.message}`)
   }
 
-  const next = (nextRows ?? [])[0] as { supplier: string | null; expense_date: string } | undefined
+  const next = (nextRows ?? [])[0] as
+    | { id: string; supplier: string | null; expense_date: string }
+    | undefined
 
-  // 3. Write the freshly derived values back — null/null when no expense remains
-  const { error: updateErr } = await supabase
+  console.log(
+    '[recomputeSupply] ✔ most-recent expense:',
+    next
+      ? { id: next.id.slice(-8), supplier: next.supplier, expense_date: next.expense_date }
+      : 'none — will null out supply store',
+  )
+
+  // 3. Write the freshly derived values back — null/null when no expense remains.
+  //    Use .select() so we get back the written rows; this is the only way to
+  //    detect a 0-row match (PostgREST returns error:null regardless of row count
+  //    when using the default return=minimal header).
+  const { data: written, error: updateErr } = await supabase
     .from('supplies')
     .update({
-      store:             next?.supplier         ?? null,
-      last_purchased_at: next?.expense_date     ?? null,
+      store:             next?.supplier     ?? null,
+      last_purchased_at: next?.expense_date ?? null,
     })
     .eq('id', supply.id)
     .eq('station_id', stationId)
+    .select('id, store, last_purchased_at')
 
   if (updateErr) {
-    console.error('[recomputeSupply] supply update failed:', updateErr.message, { supplyId: supply.id })
+    console.error('[recomputeSupply] ✗ supply update failed:', updateErr.message, { supplyId: supply.id })
+    throw new Error(`[recomputeSupply] supply update: ${updateErr.message}`)
   }
+
+  if (!written?.length) {
+    // This means .eq('station_id', stationId) didn't match — supply row exists
+    // but with a different station_id (data inconsistency) or was deleted.
+    console.error('[recomputeSupply] ✗ supply update matched 0 rows', {
+      supplyId: supply.id.slice(-8),
+      station: stationId.slice(-8),
+    })
+    throw new Error(`[recomputeSupply] supply update matched 0 rows for id=${supply.id}`)
+  }
+
+  console.log('[recomputeSupply] ✔ done', {
+    store: written[0].store,
+    last_purchased_at: written[0].last_purchased_at,
+  })
 }
 
 export function useExpenses(): UseExpensesReturn {
@@ -248,28 +291,35 @@ export function useExpenses(): UseExpensesReturn {
 
     // Recompute supply denormalized fields for every edit that touches a
     // supplies expense — before OR after the change.
+    // Wrapped in try/catch: the expense write already succeeded above; a
+    // recompute failure must not roll it back or show "Save failed" to the user.
     if (stationId) {
       const oldCategory = existing?.category
       const oldItemName = existing?.item
       const newItemName = itemLabel ?? oldItemName
 
-      // Case 3a — category changed FROM 'supplies': treat like a delete so the
-      // old supply's store/last_purchased_at are re-derived without this row.
-      if (oldCategory === 'supplies' && resolvedCategory !== 'supplies' && oldItemName) {
-        await recomputeSupplyFromExpenses(stationId, oldItemName)
-      }
-
-      // Cases 1, 2, 3b — expense is (or became) a supplies expense.
-      if (resolvedCategory === 'supplies') {
-        // Case 2 / 3b — item name changed: recompute the OLD supply first so it
-        // no longer reflects this expense's supplier/date.
-        if (oldItemName && newItemName && oldItemName !== newItemName) {
+      try {
+        // Case 3a — category changed FROM 'supplies': treat like a delete so the
+        // old supply's store/last_purchased_at are re-derived without this row.
+        if (oldCategory === 'supplies' && resolvedCategory !== 'supplies' && oldItemName) {
           await recomputeSupplyFromExpenses(stationId, oldItemName)
         }
-        // Case 1 — always recompute the current (new) supply name.
-        if (newItemName) {
-          await recomputeSupplyFromExpenses(stationId, newItemName)
+
+        // Cases 1, 2, 3b — expense is (or became) a supplies expense.
+        if (resolvedCategory === 'supplies') {
+          // Case 2 / 3b — item name changed: recompute the OLD supply first so it
+          // no longer reflects this expense's supplier/date.
+          if (oldItemName && newItemName && oldItemName !== newItemName) {
+            await recomputeSupplyFromExpenses(stationId, oldItemName)
+          }
+          // Case 1 — always recompute the current (new) supply name.
+          if (newItemName) {
+            await recomputeSupplyFromExpenses(stationId, newItemName)
+          }
         }
+      } catch (recomputeErr) {
+        // Log clearly — the inventory may be out of sync until corrected.
+        console.error('[updateExpense] supply recompute failed (expense was saved):', recomputeErr)
       }
     }
 
@@ -287,7 +337,11 @@ export function useExpenses(): UseExpensesReturn {
     // Recompute the linked supply's store + last_purchased_at from the next
     // most-recent matching expense now that this row is gone.
     if (existing?.category === 'supplies' && stationId) {
-      await recomputeSupplyFromExpenses(stationId, existing.item)
+      try {
+        await recomputeSupplyFromExpenses(stationId, existing.item)
+      } catch (recomputeErr) {
+        console.error('[deleteExpense] supply recompute failed (expense was deleted):', recomputeErr)
+      }
     }
 
     await fetchData()
