@@ -30,7 +30,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden">
-      <div className="flex">
+      <div className="flex pb-safe">
         {navItems.map(({ to, icon: Icon }) => {
           const isLocked = isFree && FREE_LOCKED.has(to)
           return (

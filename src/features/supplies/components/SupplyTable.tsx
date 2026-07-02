@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Package, Minus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/DataTable'
 import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -15,6 +16,18 @@ const STATUS_ORDER: Record<SupplyStatus, number> = {
   out_of_stock: 0,
   low_stock:    1,
   in_stock:     2,
+}
+
+const STATUS_VARIANT: Record<SupplyStatus, 'success' | 'outline' | 'destructive'> = {
+  in_stock:     'success',
+  low_stock:    'outline',
+  out_of_stock: 'destructive',
+}
+
+const STATUS_LABELS: Record<SupplyStatus, string> = {
+  in_stock:     'In Stock',
+  low_stock:    'Low',
+  out_of_stock: 'Out',
 }
 
 type SortKey = 'name' | 'store' | 'linked_product' | 'qty' | 'last_purchased_at' | 'status'
@@ -217,25 +230,24 @@ export function SupplyTable({
         </div>
       )}
 
-      {/* ── Mobile card list (< md) ─────────────────────────────────────── */}
+      {/* ── Mobile table rows (< md) ────────────────────────────────────── */}
       <div className="md:hidden">
         {sorted.length === 0 ? emptyNode : (
-          <div className="space-y-2">
+          <div className="rounded-lg border border-border overflow-hidden">
             {sorted.map((item) => {
               const status = computeStatus(item.qty, item.threshold)
               return (
                 <div
                   key={item.id}
                   className={cn(
-                    'rounded-lg border border-border px-4 py-3',
+                    'border-b border-border last:border-b-0 px-4 py-3',
                     isOwner && 'cursor-pointer active:bg-accent/50',
                     status === 'out_of_stock' && 'bg-destructive/5',
                     status === 'low_stock'    && 'bg-yellow-50 dark:bg-yellow-950/20',
-                    status === 'in_stock'     && 'bg-card',
                   )}
                   onClick={isOwner ? () => onEditClick(item) : undefined}
                 >
-                  {/* Row 1: name + delete */}
+                  {/* Row 1: name + supplier + status badge + delete */}
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground">{item.name}</p>
@@ -243,6 +255,9 @@ export function SupplyTable({
                         <p className="text-xs text-muted-foreground mt-0.5">{item.store}</p>
                       )}
                     </div>
+                    <Badge variant={STATUS_VARIANT[status]} className="shrink-0 mt-0.5">
+                      {STATUS_LABELS[status]}
+                    </Badge>
                     {isOwner && (
                       <Button
                         size="icon"
@@ -255,7 +270,7 @@ export function SupplyTable({
                     )}
                   </div>
 
-                  {/* Row 2: qty + ± controls + Low:X */}
+                  {/* Row 2: qty ± controls + Low:X */}
                   <div className="flex items-center gap-3 mt-2">
                     <div className="flex items-center gap-1.5">
                       {isOwner && (
