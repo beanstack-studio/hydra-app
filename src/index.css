@@ -3,9 +3,17 @@
 @tailwind utilities;
 
 @layer utilities {
-  /* Always adds 0.5rem above the home indicator; on Android/desktop env() = 0 so it's just 8px */
+  /* Bottom nav container: safe-area inset + 1.5rem breathing room above the home indicator.
+     Without viewport-fit=cover env() was always 0; now it reflects the real inset. */
   .pb-safe {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  }
+
+  /* Main content bottom padding: clears the fixed bottom nav on all devices.
+     Base 7rem (~nav content height + headroom) plus safe-area so content is
+     never hidden behind the taller nav on notched phones. */
+  .pb-nav {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
   }
 }
 

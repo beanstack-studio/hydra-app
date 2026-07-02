@@ -169,7 +169,7 @@ export function SupplyTable({
       key: 'linked_product',
       header: 'Used For',
       sortable: true,
-      className: 'hidden lg:table-cell w-36',
+      className: 'w-36',
       render: (item: Supply) => {
         const junctionNames =
           item.supply_product_links && item.supply_product_links.length > 0
@@ -191,7 +191,7 @@ export function SupplyTable({
       key: 'last_purchased_at',
       header: 'Last Purchase',
       sortable: true,
-      className: 'hidden lg:table-cell w-32',
+      className: 'w-32',
       render: (item: Supply) => (
         <span className="text-sm text-foreground whitespace-nowrap">
           {item.last_purchased_at ? formatDate(item.last_purchased_at) : '—'}
