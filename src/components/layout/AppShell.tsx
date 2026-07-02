@@ -81,7 +81,7 @@ export function AppShell() {
   }
 
   const contentClass = cn(
-    'flex flex-1 flex-col min-w-0 lg:transition-all lg:duration-300',
+    'flex flex-1 flex-col min-w-0 transition-[margin-left] duration-300 ease-in-out',
     sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-60'
   )
 

@@ -107,7 +107,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   }
 
   const asideClass = cn(
-    'hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 z-40 lg:transition-all lg:duration-300',
+    'hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 z-40',
+    'overflow-hidden select-none',
+    'transition-[width] duration-300 ease-in-out',
     collapsed ? 'lg:w-16' : 'lg:w-60',
     onSettingsPage ? SIDEBAR_SUB_BG : SIDEBAR_BG,
     'border-r', BORDER
@@ -125,7 +127,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   )
 
   return (
-    <aside className={asideClass}>
+    <aside className={asideClass} onDoubleClick={onToggle}>
 
       {/* Station header */}
       <div className={headerClass}>
@@ -157,13 +159,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         )}
         <button
           type="button"
-          onClick={onToggle}
-          className="h-7 w-7 rounded-md flex items-center justify-center text-white/40 hover:bg-white/12 hover:text-white/80 transition-colors duration-150 shrink-0"
+          onClick={(e) => { e.stopPropagation(); onToggle() }}
+          className="h-7 w-7 rounded-md flex items-center justify-center text-white/60 hover:bg-white/15 hover:text-white transition-colors duration-150 shrink-0"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed
-            ? <PanelLeftOpen className="h-3.5 w-3.5" />
-            : <PanelLeftClose className="h-3.5 w-3.5" />
+            ? <PanelLeftOpen className="h-4 w-4" />
+            : <PanelLeftClose className="h-4 w-4" />
           }
         </button>
       </div>
