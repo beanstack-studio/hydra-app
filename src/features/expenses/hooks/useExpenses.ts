@@ -187,8 +187,44 @@ export function useExpenses(): UseExpensesReturn {
     }
     const { error: e } = await supabase.from('expenses').delete().eq('id', id)
     if (e) throw new Error(e.message)
+
+    // When a supplies expense is deleted, re-derive the linked supply's store +
+    // last_purchased_at from the next most-recent matching expense. Without this,
+    // the supply continues to show the deleted row's supplier/date indefinitely.
+    if (existing?.category === 'supplies' && stationId) {
+      const itemName = existing.item
+      if (itemName && itemName !== 'Supplies') {
+        const { data: supplyRows } = await supabase
+          .from('supplies')
+          .select('id, name')
+          .eq('station_id', stationId)
+          .ilike('name', itemName)
+          .limit(1)
+
+        const supply = (supplyRows ?? [])[0] as { id: string; name: string } | undefined
+
+        if (supply) {
+          const { data: nextRows } = await supabase
+            .from('expenses')
+            .select('supplier, expense_date')
+            .eq('station_id', stationId)
+            .eq('category', 'supplies')
+            .ilike('item', supply.name)
+            .order('expense_date', { ascending: false })
+            .limit(1)
+
+          const next = (nextRows ?? [])[0] as { supplier: string | null; expense_date: string } | undefined
+
+          await supabase.from('supplies').update({
+            store: next?.supplier ?? null,
+            last_purchased_at: next?.expense_date ?? null,
+          }).eq('id', supply.id)
+        }
+      }
+    }
+
     await fetchData()
-  }, [fetchData, data])
+  }, [fetchData, data, stationId])
 
   const markExpensePaid = useCallback(async (id: string, paymentMethod: ExpensePaymentMethod) => {
     const { error: e } = await supabase.from('expenses').update({ payment_method: paymentMethod }).eq('id', id)
