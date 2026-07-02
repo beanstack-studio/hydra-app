@@ -202,6 +202,10 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
+      // sticky right so the delete button stays visible when the table overflows horizontally on mobile/tablet.
+      // bg-card + group-hover:bg-accent/70 matches the natural cell background and the row hover color exactly.
+      // lg:static + lg:bg-transparent reverts to normal flow on desktop where the table fits without overflow.
+      className: 'sticky right-0 z-10 bg-card group-hover:bg-accent/70 w-10 lg:static lg:bg-transparent',
       render: (s: Sale) => onDelete ? (
         <div className="flex justify-end">
           <Button

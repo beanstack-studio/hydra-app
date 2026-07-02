@@ -308,7 +308,7 @@ export function DataTable<T>({
               <tr
                 key={rowKey(row)}
                 className={cn(
-                  'border-b border-border last:border-0 transition-colors duration-150',
+                  'group border-b border-border last:border-0 transition-colors duration-150',
                   onRowClick && 'cursor-pointer hover:bg-accent/70',
                   rowClassName?.(row)
                 )}
