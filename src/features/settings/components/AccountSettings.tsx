@@ -90,7 +90,7 @@ export function AccountSettings() {
     }
     try {
       await updateEmail(newEmail)
-      toast({ title: 'Confirmation sent', description: `Check ${newEmail} to confirm the change.` })
+      toast({ title: `Confirmation email sent to ${newEmail}` })
       emailForm.reset()
       setEditingEmail(false)
     } catch (e) {
@@ -107,7 +107,7 @@ export function AccountSettings() {
     }
     try {
       await updatePassword(password)
-      toast({ title: 'Password updated' })
+      toast({ title: 'Password updated successfully' })
       passwordForm.reset()
       setEditingPassword(false)
     } catch (e) {
