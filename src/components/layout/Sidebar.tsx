@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ShoppingCart,
@@ -11,8 +12,9 @@ import {
   Wrench,
   CreditCard,
   User,
-  X,
   Lock,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -40,12 +42,10 @@ const STORE_MENU = [
   { id: 'maintenance', label: 'Maintenance Log',     icon: Wrench,     freeLocked: true  },
 ]
 
-// Visible to all roles
 const USER_MENU = [
   { id: 'account', label: 'My Account', icon: User, freeLocked: false },
 ]
 
-// Owner-only
 const ACCOUNT_MENU = [
   { id: 'team', label: 'Team Members',   icon: Users,       freeLocked: true  },
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard,  freeLocked: false },
@@ -82,6 +82,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     ? new URLSearchParams(location.search).get('section')
     : null
 
+  // Auto-expand settings submenu when user is on a settings page
+  const [settingsOpen, setSettingsOpen] = useState(() => onSettingsPage)
+  useEffect(() => {
+    if (onSettingsPage) setSettingsOpen(true)
+  }, [onSettingsPage])
+
   // Full-width highlight for main nav items
   function mainNavClass(isActive: boolean) {
     return cn(
@@ -93,11 +99,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     )
   }
 
-  // Settings sub-menu items
+  // Settings submenu items
   function subNavClass(isActive: boolean) {
     return cn(
-      'w-full flex items-center transition-all duration-150',
-      collapsed ? 'justify-center py-2' : 'gap-3 px-4 py-2 text-[13px] font-medium',
+      'w-full flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium rounded transition-all duration-150',
       isActive
         ? 'bg-white/10 text-white/95'
         : 'text-white/50 hover:bg-white/6 hover:text-white/85'
@@ -116,7 +121,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const headerClass = cn(
     'flex h-16 items-center border-b shrink-0',
     BORDER,
-    collapsed ? 'justify-center px-0 gap-0' : 'gap-2.5 px-4'
+    collapsed ? 'justify-center' : 'gap-2.5 px-4'
   )
 
   const footerInnerClass = cn(
@@ -124,57 +129,86 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     collapsed ? 'justify-center' : 'gap-2.5 px-1'
   )
 
+  // When collapsed: clicking Settings navigates directly; when expanded: toggles submenu
+  const handleSettingsClick = () => {
+    if (collapsed) {
+      navigate('/settings?section=business')
+    } else {
+      setSettingsOpen((v) => !v)
+    }
+  }
+
   return (
     <aside className={asideClass} onDoubleClick={onToggle}>
 
-      {/* Station header */}
+      {/* Station header — logo always visible, name only when expanded */}
       <div className={headerClass}>
+        {stationPhotoUrl ? (
+          <img
+            src={stationPhotoUrl}
+            alt={stationName}
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <Building2 className="h-4 w-4 text-white/70" />
+          </div>
+        )}
         {!collapsed && (
-          <>
-            {stationPhotoUrl ? (
-              <img src={stationPhotoUrl} alt={stationName} className="h-8 w-8 rounded-full object-cover shrink-0" />
-            ) : (
-              <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-                <Building2 className="h-4 w-4 text-white/70" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-white truncate leading-tight">{stationName}</p>
-              <p className="text-[10px] text-white/45 mt-0.5">{planLabel} Plan</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate(onSettingsPage ? '/sales' : '/settings?section=business')}
-              className="h-7 w-7 rounded-md flex items-center justify-center text-white/40 hover:bg-white/12 hover:text-white/80 transition-colors duration-150 shrink-0"
-              title={onSettingsPage ? 'Back to main menu' : 'Settings'}
-            >
-              {onSettingsPage
-                ? <X className="h-3.5 w-3.5" />
-                : <Settings className="h-3.5 w-3.5" />
-              }
-            </button>
-          </>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white truncate leading-tight">{stationName}</p>
+            <p className="text-[10px] text-white/45 mt-0.5">{planLabel} Plan</p>
+          </div>
         )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-0.5">
-        {onSettingsPage ? (
-          <div
-            key="settings-nav"
-            className="animate-in fade-in-0 zoom-in-95 duration-200 origin-top-right"
-          >
-            {!collapsed && (
-              <div className={cn('flex items-center gap-2 px-4 py-2 mb-1 border-b', BORDER)}>
-                <Settings className="h-3 w-3 text-white/40 shrink-0" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Settings</span>
-              </div>
-            )}
-            {!collapsed && (
-              <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                Store
-              </p>
-            )}
+
+        {/* Main nav items */}
+        {navItems.map(({ to, label, icon: Icon }) => {
+          const isLocked = isFree && FREE_LOCKED_ROUTES.has(to)
+          return (
+            <button
+              key={to}
+              type="button"
+              onClick={() => navigate(to)}
+              className={mainNavClass(location.pathname.startsWith(to))}
+              title={collapsed ? label : undefined}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" />
+              {!collapsed && label}
+              {!collapsed && isLocked && (
+                <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
+                  <Lock className="h-2.5 w-2.5" />PRO
+                </span>
+              )}
+            </button>
+          )
+        })}
+
+        {/* Settings — collapsible parent */}
+        <button
+          type="button"
+          onClick={handleSettingsClick}
+          className={mainNavClass(onSettingsPage)}
+          title={collapsed ? 'Settings' : undefined}
+        >
+          <Settings className="h-[18px] w-[18px] shrink-0" />
+          {!collapsed && 'Settings'}
+          {!collapsed && (
+            settingsOpen
+              ? <ChevronDown className="h-3.5 w-3.5 ml-auto shrink-0 opacity-60" />
+              : <ChevronRight className="h-3.5 w-3.5 ml-auto shrink-0 opacity-60" />
+          )}
+        </button>
+
+        {/* Settings submenu — only when expanded and open */}
+        {!collapsed && settingsOpen && (
+          <div className="ml-4 border-l border-white/10 space-y-0.5 pb-1">
+            <p className="pl-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+              Store
+            </p>
             {STORE_MENU.map(({ id, label, icon: Icon, freeLocked }) => {
               const locked = isFree && freeLocked
               return (
@@ -183,11 +217,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   type="button"
                   onClick={() => navigate(`/settings?section=${id}`)}
                   className={subNavClass(activeSection === id)}
-                  title={collapsed ? label : undefined}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && label}
-                  {!collapsed && locked && (
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {label}
+                  {locked && (
                     <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
                       <Lock className="h-2.5 w-2.5" />PRO
                     </span>
@@ -196,21 +229,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               )
             })}
 
-            {!collapsed && (
-              <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
-                Account
-              </p>
-            )}
+            <p className="pl-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+              Account
+            </p>
             {USER_MENU.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => navigate(`/settings?section=${id}`)}
                 className={subNavClass(activeSection === id)}
-                title={collapsed ? label : undefined}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                {!collapsed && label}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                {label}
               </button>
             ))}
             {isOwner && ACCOUNT_MENU.map(({ id, label, icon: Icon, freeLocked }) => {
@@ -221,11 +251,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   type="button"
                   onClick={() => navigate(`/settings?section=${id}`)}
                   className={subNavClass(activeSection === id)}
-                  title={collapsed ? label : undefined}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && label}
-                  {!collapsed && locked && (
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {label}
+                  {locked && (
                     <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
                       <Lock className="h-2.5 w-2.5" />PRO
                     </span>
@@ -234,27 +263,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               )
             })}
           </div>
-        ) : (
-          navItems.map(({ to, label, icon: Icon }) => {
-            const isLocked = isFree && FREE_LOCKED_ROUTES.has(to)
-            return (
-              <button
-                key={to}
-                type="button"
-                onClick={() => navigate(to)}
-                className={mainNavClass(location.pathname.startsWith(to))}
-                title={collapsed ? label : undefined}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                {!collapsed && label}
-                {!collapsed && isLocked && (
-                  <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
-                    <Lock className="h-2.5 w-2.5" />PRO
-                  </span>
-                )}
-              </button>
-            )
-          })
         )}
       </nav>
 
