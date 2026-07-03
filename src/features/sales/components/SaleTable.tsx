@@ -33,14 +33,16 @@ const paymentLabel: Record<PaymentMode, string> = {
 }
 
 export const SALE_COLUMN_CONFIG: ColumnConfig[] = [
-  { key: 'date',       label: 'Date' },
-  { key: 'customer',   label: 'Customer' },
-  { key: 'order_type', label: 'Type' },
-  { key: 'product',    label: 'Product' },
-  { key: 'payment',    label: 'Payment' },
-  { key: 'amount',     label: 'Amount' },
-  { key: 'status',     label: 'Status' },
-  { key: 'remarks',    label: 'Remarks' },
+  { key: 'date',        label: 'Date' },
+  { key: 'order_no',    label: 'Order #' },
+  { key: 'customer',    label: 'Customer' },
+  { key: 'order_type',  label: 'Type' },
+  { key: 'product',     label: 'Product' },
+  { key: 'payment',     label: 'Payment' },
+  { key: 'amount',      label: 'Amount' },
+  { key: 'balance_due', label: 'Balance Due' },
+  { key: 'status',      label: 'Status' },
+  { key: 'remarks',     label: 'Remarks' },
 ]
 
 interface SaleTableProps {
@@ -100,11 +102,8 @@ export function SaleTable({
       ),
     },
     {
-      // INTENTIONAL mobile/tablet exception: hidden on mobile (<md) to keep the visible column count low
-      // enough that the actions (delete) column is visible without scrolling. Shows on tablet (md:) and desktop.
       key: 'order_no',
       header: 'Order #',
-      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
       ),
@@ -120,20 +119,16 @@ export function SaleTable({
       ),
     },
     {
-      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'order_type',
       header: 'Type',
       sortable: true,
-      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{orderTypeLabel[s.order_type]}</span>
       ),
     },
     {
-      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'product',
       header: 'Product',
-      className: 'hidden md:table-cell',
       render: (s: Sale) => {
         const productLines: string[] = s.items && s.items.length > 0
           ? s.items.map((item) => `${item.product_name} ×${item.qty}`)
@@ -151,11 +146,9 @@ export function SaleTable({
       },
     },
     {
-      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'payment',
       header: 'Payment',
       sortable: true,
-      className: 'hidden lg:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{paymentLabel[s.payment_mode]}</span>
       ),
@@ -171,10 +164,8 @@ export function SaleTable({
       ),
     },
     {
-      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'balance_due',
       header: 'Balance Due',
-      className: 'hidden lg:table-cell',
       render: (s: Sale) => s.balance_due > 0 ? (
         <span className="text-xs font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
       ) : (
@@ -182,11 +173,9 @@ export function SaleTable({
       ),
     },
     {
-      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'status',
       header: 'Status',
       sortable: true,
-      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <div className="flex items-center gap-2">
           <Badge variant={statusVariant[s.status]}>
@@ -206,10 +195,8 @@ export function SaleTable({
       ),
     },
     {
-      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'remarks',
       header: 'Remarks',
-      className: 'hidden lg:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{s.remarks ?? '—'}</span>
       ),

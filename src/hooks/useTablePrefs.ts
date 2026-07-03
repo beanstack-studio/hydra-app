@@ -32,11 +32,12 @@ function lsSet(key: string, v: unknown) {
   try { localStorage.setItem(key, JSON.stringify(v)) } catch {}
 }
 
-export function useTablePrefs(tableId: string, defaultHiddenKeys: string[] = []): TablePrefs {
+export function useTablePrefs(tableId: string, defaultHiddenKeys: string[] | (() => string[]) = []): TablePrefs {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     const r = localStorage.getItem(`table-hidden-${tableId}`)
     if (r) try { return new Set(JSON.parse(r) as string[]) } catch {}
-    return new Set(defaultHiddenKeys)
+    const defaults = typeof defaultHiddenKeys === 'function' ? defaultHiddenKeys() : defaultHiddenKeys
+    return new Set(defaults)
   })
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
     lsGet(`table-widths-${tableId}`, {})

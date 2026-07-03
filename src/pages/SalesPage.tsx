@@ -59,7 +59,15 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
 export default function SalesPage() {
   const { toast } = useToast()
   const role = useAuthStore((s) => s.role)
-  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues, setFilterValues } = useTablePrefs('sales', ['product', 'remarks'])
+  // Mobile default: show Date, Customer, Amount, Status, Actions only — rest hidden.
+  // Desktop/tablet default: keep product and remarks hidden (same as before).
+  // Only applied when there is no saved preference; user can always toggle via Table Options.
+  const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues, setFilterValues } = useTablePrefs('sales', () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return ['order_no', 'order_type', 'product', 'payment', 'balance_due', 'remarks']
+    }
+    return ['product', 'remarks']
+  })
   const [isSaleModalOpen,   setIsSaleModalOpen]   = useState(false)
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
