@@ -60,23 +60,22 @@ export function useTeamSettings(): UseTeamSettingsReturn {
   const fetchAll = useCallback(async () => {
     if (!stationId) { setIsLoading(false); return }
 
-    const [staffResult, usersResult] = await Promise.all([
+    const [staffResult, emailsResult] = await Promise.all([
       supabase
         .from('staff')
         .select('id, full_name, phone, email, pay_type, pay_rate, created_at')
         .eq('station_id', stationId)
         .order('created_at'),
-      supabase
-        .from('users')
-        .select('email')
-        .eq('station_id', stationId)
-        .not('email', 'is', null),
+      // users table RLS only allows reading your own row, so a direct SELECT
+      // would return nothing for staff in the owner's station. Use the
+      // SECURITY DEFINER RPC which bypasses RLS and returns staff emails only.
+      supabase.rpc('get_station_staff_emails'),
     ])
 
     setStaff((staffResult.data ?? []) as StaffMember[])
 
     const emailSet = new Set(
-      ((usersResult.data ?? []) as Array<{ email: string }>)
+      ((emailsResult.data ?? []) as Array<{ email: string }>)
         .map((u) => u.email.toLowerCase()),
     )
     setActiveEmails(emailSet)
