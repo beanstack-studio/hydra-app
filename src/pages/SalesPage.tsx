@@ -17,7 +17,6 @@ import { useToast } from '@/hooks/use-toast'
 import { formatDate, formatCurrency, formatExportAmount } from '@/lib/utils'
 import type { FilterGroup } from '@/components/shared/FilterButton'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
-import { useAuthStore } from '@/stores/authStore'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
 import { Modal } from '@/components/shared/Modal'
 import type { Sale, SaleInsert } from '@/features/sales/types'
@@ -59,7 +58,6 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
 
 export default function SalesPage() {
   const { toast } = useToast()
-  const role = useAuthStore((s) => s.role)
   // Mobile default: show Date, Customer, Amount, Status, Actions only — rest hidden.
   // Desktop/tablet default: keep product and remarks hidden (same as before).
   // Only applied when there is no saved preference; user can always toggle via Table Options.
@@ -213,7 +211,7 @@ export default function SalesPage() {
             setSelectedSale(null)
             setPayingSale(sale)
           }}
-          onDelete={role !== 'staff' ? setDeletingSale : undefined}
+          onDelete={setDeletingSale}
           hiddenKeys={hiddenKeys}
           columnWidths={columnWidths}
           onColumnResize={onColumnResize}

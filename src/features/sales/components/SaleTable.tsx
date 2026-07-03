@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleStatus, OrderType, PaymentMode } from '../types'
 
 type SaleSortKey = 'date' | 'customer' | 'amount' | 'order_type' | 'payment' | 'status'
@@ -68,6 +69,8 @@ export function SaleTable({
   columnOrder,
   onColumnReorder,
 }: SaleTableProps) {
+  const role    = useAuthStore((s) => s.role)
+  const isOwner = role === 'owner' || role === 'super_admin'
   const [sortKey, setSortKey] = useState<SaleSortKey>('date')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -204,19 +207,22 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
-      render: (s: Sale) => onDelete ? (
-        <div className="flex justify-end">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            title="Delete sale"
-            onClick={(e) => { e.stopPropagation(); onDelete(s) }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+      className: 'w-12',
+      render: (s: Sale) => (
+        <div className="flex items-center justify-end">
+          {isOwner && onDelete && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              title="Delete sale"
+              onClick={(e) => { e.stopPropagation(); onDelete(s) }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-      ) : null,
+      ),
     },
   ]
 
