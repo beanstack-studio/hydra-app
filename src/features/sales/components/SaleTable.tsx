@@ -100,8 +100,11 @@ export function SaleTable({
       ),
     },
     {
+      // INTENTIONAL mobile/tablet exception: hidden on mobile (<md) to keep the visible column count low
+      // enough that the actions (delete) column is visible without scrolling. Shows on tablet (md:) and desktop.
       key: 'order_no',
       header: 'Order #',
+      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
       ),
@@ -117,16 +120,20 @@ export function SaleTable({
       ),
     },
     {
+      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'order_type',
       header: 'Type',
       sortable: true,
+      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{orderTypeLabel[s.order_type]}</span>
       ),
     },
     {
+      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'product',
       header: 'Product',
+      className: 'hidden md:table-cell',
       render: (s: Sale) => {
         const productLines: string[] = s.items && s.items.length > 0
           ? s.items.map((item) => `${item.product_name} ×${item.qty}`)
@@ -144,9 +151,11 @@ export function SaleTable({
       },
     },
     {
+      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'payment',
       header: 'Payment',
       sortable: true,
+      className: 'hidden lg:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{paymentLabel[s.payment_mode]}</span>
       ),
@@ -162,8 +171,10 @@ export function SaleTable({
       ),
     },
     {
+      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'balance_due',
       header: 'Balance Due',
+      className: 'hidden lg:table-cell',
       render: (s: Sale) => s.balance_due > 0 ? (
         <span className="text-xs font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
       ) : (
@@ -171,9 +182,11 @@ export function SaleTable({
       ),
     },
     {
+      // INTENTIONAL mobile exception: hidden on mobile (<md). Shows on tablet (md:) and desktop.
       key: 'status',
       header: 'Status',
       sortable: true,
+      className: 'hidden md:table-cell',
       render: (s: Sale) => (
         <div className="flex items-center gap-2">
           <Badge variant={statusVariant[s.status]}>
@@ -193,8 +206,10 @@ export function SaleTable({
       ),
     },
     {
+      // INTENTIONAL mobile/tablet exception: hidden on mobile and tablet (<lg). Desktop only.
       key: 'remarks',
       header: 'Remarks',
+      className: 'hidden lg:table-cell',
       render: (s: Sale) => (
         <span className="text-xs text-muted-foreground">{s.remarks ?? '—'}</span>
       ),
@@ -202,10 +217,6 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
-      // sticky right so the delete button stays visible when the table overflows horizontally on mobile/tablet.
-      // bg-card + group-hover:bg-accent/70 matches the natural cell background and the row hover color exactly.
-      // lg:static + lg:bg-transparent reverts to normal flow on desktop where the table fits without overflow.
-      className: 'sticky right-0 z-10 bg-card group-hover:bg-accent/70 w-10 lg:static lg:bg-transparent',
       render: (s: Sale) => onDelete ? (
         <div className="flex justify-end">
           <Button
