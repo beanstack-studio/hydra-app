@@ -48,6 +48,7 @@ interface UseTeamSettingsReturn {
   editMember: (id: string, input: MemberInput) => Promise<void>
   removeMember: (id: string) => Promise<void>
   sendInvite: (email: string, fullName: string) => Promise<void>
+  revokeAccess: (staffId: string) => Promise<void>
 }
 
 export function useTeamSettings(): UseTeamSettingsReturn {
@@ -155,5 +156,31 @@ export function useTeamSettings(): UseTeamSettingsReturn {
     await fetchAll()
   }, [stationId, fetchAll])
 
-  return { staff, activeEmails, isLoading, addMember, editMember, removeMember, sendInvite }
+  const revokeAccess = useCallback(async (staffId: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Not authenticated')
+
+    const { data, error } = await supabase.functions.invoke('revoke-staff-access', {
+      body: { staff_id: staffId },
+    })
+
+    if (error) {
+      let message = error.message
+      const ctx = (error as unknown as { context?: Response }).context
+      if (ctx) {
+        try {
+          const body = await ctx.json() as { error?: string }
+          if (body.error) message = body.error
+        } catch { /* ignore */ }
+      }
+      throw new Error(message)
+    }
+    if ((data as { error?: string } | null)?.error) {
+      throw new Error((data as { error: string }).error)
+    }
+
+    await fetchAll()
+  }, [fetchAll])
+
+  return { staff, activeEmails, isLoading, addMember, editMember, removeMember, sendInvite, revokeAccess }
 }

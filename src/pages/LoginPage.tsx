@@ -44,7 +44,6 @@ const recoverSchema = z.object({
 })
 
 const inviteSchema = z.object({
-  temp_code: z.string().min(1, 'Enter the verification code from your invite email'),
   password: z.string()
     .min(8, 'At least 8 characters')
     .regex(/\d/, 'Must include at least one number'),
@@ -59,6 +58,7 @@ type SignUpSchema  = z.infer<typeof signUpSchema>
 type ForgotSchema  = z.infer<typeof forgotSchema>
 type RecoverSchema = z.infer<typeof recoverSchema>
 type InviteSchema  = z.infer<typeof inviteSchema>
+
 
 export default function LoginPage() {
   const isPasswordRecovery  = useAuthStore((s) => s.isPasswordRecovery)
@@ -157,23 +157,14 @@ export default function LoginPage() {
   const onInviteSetup = hsInvite(async (data) => {
     setAuthError(null)
 
-    // 1. Verify the code matches the invitation record
-    const { data: valid, error: verifyErr } = await supabase.rpc('verify_invite_code', {
-      p_code: data.temp_code.trim().toUpperCase(),
-    })
-    if (verifyErr || !valid) {
-      setAuthError('Incorrect verification code. Check your invite email and try again.')
-      return
-    }
-
-    // 2. Set the permanent password
+    // Set the permanent password
     const { error: updateErr } = await supabase.auth.updateUser({ password: data.password })
     if (updateErr) {
       setAuthError(updateErr.message)
       return
     }
 
-    // 3. Show success screen, then reload so loadSession runs accept_invitation()
+    // Show success screen, then reload so loadSession runs accept_invitation()
     setInviteSuccess(true)
     setTimeout(() => {
       window.location.href = '/'
@@ -521,26 +512,8 @@ export default function LoginPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground mb-1">Set up your password</p>
                     <p className="text-xs text-muted-foreground">
-                      Enter the verification code from your invite email, then choose a password.
+                      Choose a password to access your station.
                     </p>
-                  </div>
-
-                  {/* Verification code */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="inv-code">Verification Code</Label>
-                    <Input
-                      id="inv-code"
-                      type="text"
-                      placeholder="e.g. ABC123"
-                      autoFocus
-                      autoComplete="off"
-                      className="tracking-widest uppercase font-mono"
-                      {...regInvite('temp_code')}
-                    />
-                    {inviteErrors.temp_code && (
-                      <p className="text-xs text-destructive">{inviteErrors.temp_code.message}</p>
-                    )}
-                    <p className="text-[11px] text-muted-foreground">Check your invite email. Code uses uppercase letters and numbers — no O, I, or L.</p>
                   </div>
 
                   {/* New password */}
@@ -551,6 +524,7 @@ export default function LoginPage() {
                         id="inv-pw"
                         type={showInvitePw ? 'text' : 'password'}
                         placeholder="8+ characters"
+                        autoFocus
                         className="pr-10"
                         {...regInvite('password')}
                       />
@@ -597,7 +571,7 @@ export default function LoginPage() {
                   {authError && <p className="text-sm text-destructive">{authError}</p>}
 
                   <Button type="submit" className="w-full" disabled={inviteSubmitting}>
-                    {inviteSubmitting ? 'Verifying…' : 'Set Password & Log In'}
+                    {inviteSubmitting ? 'Saving…' : 'Set Password & Log In'}
                   </Button>
                 </form>
               )
