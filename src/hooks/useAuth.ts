@@ -96,12 +96,22 @@ export function useAuth() {
       if (accepted?.station_id && !accepted.error) {
         stationId = accepted.station_id
         role = 'staff'
-        // Do NOT call refreshSession() here — it rotates the refresh token and
-        // TOKEN_REFRESHED fires a second loadSession. That second run hits
-        // accept_invitation() again (idempotent), triggering a second refresh,
-        // which uses the already-rotated token → 400 "Invalid Refresh Token".
-        // station_id is already resolved above; the JWT hook will stamp the
-        // claim on the next natural token rotation.
+        // Refresh the JWT so the Postgres JWT hook stamps station_id into
+        // app_metadata, enabling JWT-based RLS for all subsequent queries.
+        //
+        // This is safe because:
+        //   1. The stale owner self-invite was deleted (migration 20260703000000)
+        //   2. accept_invitation() now bails early for users with role='owner'
+        //   So this block is only reached by genuine staff first sign-ins.
+        //
+        // TOKEN_REFRESHED fires a second loadSession. On that run the JWT
+        // already has station_id (hook ran) OR users-by-id finds the newly
+        // created users row — either resolves stationId without reaching
+        // accept_invitation() again, so there is no second refreshSession().
+        const { data: refreshed } = await supabase.auth.refreshSession()
+        if (refreshed?.session?.user.app_metadata?.station_id) {
+          stationId = refreshed.session.user.app_metadata.station_id as string
+        }
       }
     }
 

@@ -108,6 +108,15 @@ Deno.serve(async (req) => {
     // auth.users cascade may not reach public.users depending on FK config
     await adminClient.from('users').delete().eq('id', usersRow.id)
 
+    // ── Clear email from staff roster ──────────────────────────────────────────
+    // Nulling the email lets the owner re-invite via a new address, and prevents
+    // the stale email from matching activeEmails and showing "Has access" badge.
+    await adminClient
+      .from('staff')
+      .update({ email: null })
+      .eq('id', staff_id)
+      .eq('station_id', stationId)
+
     return new Response(JSON.stringify({ ok: true }), { headers: JSON_HEADERS })
 
   } catch (err) {
