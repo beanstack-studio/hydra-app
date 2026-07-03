@@ -33,7 +33,7 @@ export default function ReportsPage() {
   } = useReports()
 
   const now         = nowPH()
-  const todayStr    = formatInTimeZone(now, PH_TZ, 'yyyy-MM-dd')
+  const todayStr    = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
   const currentYear = now.getFullYear()
   const yearOptions = [currentYear - 1, currentYear]
 

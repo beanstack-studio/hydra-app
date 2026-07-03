@@ -15,7 +15,7 @@ import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatDate, formatExportAmount, formatPhone, nowPH, PH_TZ, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, formatExportAmount, formatPhone, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 const ORDER_HISTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
@@ -149,7 +149,7 @@ export default function CustomerProfilePage() {
     if (selectedIds.size === 0 || bulkAmountInput <= 0) return
     setIsBulkPaying(true)
     try {
-      const paidAt = formatInTimeZone(nowPH(), PH_TZ, 'yyyy-MM-dd')
+      const paidAt = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
       const cappedAmount = Math.min(bulkAmountInput, bulkTotal)
 
       // Pre-compute how many orders will be fully settled (for toast message)

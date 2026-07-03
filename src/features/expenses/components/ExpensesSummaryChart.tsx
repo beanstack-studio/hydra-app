@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
+import { formatInTimeZone } from 'date-fns-tz'
 import { subMonths } from 'date-fns'
 import { formatCurrency, PH_TZ, cn } from '@/lib/utils'
 import type { Expense } from '../types'
@@ -56,10 +56,9 @@ interface ExpensesSummaryChartProps {
 export function ExpensesSummaryChart({ expenses }: ExpensesSummaryChartProps) {
   const [period, setPeriod] = useState<Period>('this_month')
 
-  const now = toZonedTime(new Date(), PH_TZ)
-  const thisMonthStr = formatInTimeZone(now, PH_TZ, 'yyyy-MM')
-  const lastMonthStr = formatInTimeZone(subMonths(now, 1), PH_TZ, 'yyyy-MM')
-  const thisYearStr  = formatInTimeZone(now, PH_TZ, 'yyyy')
+  const thisMonthStr = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM')
+  const lastMonthStr = formatInTimeZone(subMonths(new Date(), 1), PH_TZ, 'yyyy-MM')
+  const thisYearStr  = formatInTimeZone(new Date(), PH_TZ, 'yyyy')
 
   const filtered = expenses.filter((e) => {
     if (period === 'this_month') return e.expense_date.startsWith(thisMonthStr)

@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleStatus, OrderType, PaymentMode } from '../types'
 import { deriveStatus } from '../types'
 
-type SaleSortKey = 'date' | 'customer' | 'amount' | 'order_type' | 'payment' | 'status'
+type SaleSortKey = 'date' | 'order_no' | 'customer' | 'amount' | 'balance_due' | 'order_type' | 'payment' | 'status'
 type SortDir = 'asc' | 'desc'
 
 const statusOrder: Record<SaleStatus, number> = { unpaid: 0, partial: 1, paid: 2 }
@@ -87,12 +87,14 @@ export function SaleTable({
 
   const sorted = [...sales].sort((a, b) => {
     let cmp = 0
-    if (sortKey === 'date')       cmp = a.sale_date.localeCompare(b.sale_date)
-    if (sortKey === 'customer')   cmp = a.customer_name.localeCompare(b.customer_name)
-    if (sortKey === 'amount')     cmp = a.total_amount - b.total_amount
-    if (sortKey === 'order_type') cmp = a.order_type.localeCompare(b.order_type)
-    if (sortKey === 'payment')    cmp = a.payment_mode.localeCompare(b.payment_mode)
-    if (sortKey === 'status')     cmp = statusOrder[deriveStatus(a.balance_due, a.total_amount)] - statusOrder[deriveStatus(b.balance_due, b.total_amount)]
+    if (sortKey === 'date')        cmp = a.sale_date.localeCompare(b.sale_date)
+    if (sortKey === 'order_no')    cmp = a.id.slice(-6).localeCompare(b.id.slice(-6))
+    if (sortKey === 'customer')    cmp = a.customer_name.localeCompare(b.customer_name)
+    if (sortKey === 'amount')      cmp = a.total_amount - b.total_amount
+    if (sortKey === 'balance_due') cmp = a.balance_due - b.balance_due
+    if (sortKey === 'order_type')  cmp = a.order_type.localeCompare(b.order_type)
+    if (sortKey === 'payment')     cmp = a.payment_mode.localeCompare(b.payment_mode)
+    if (sortKey === 'status')      cmp = statusOrder[deriveStatus(a.balance_due, a.total_amount)] - statusOrder[deriveStatus(b.balance_due, b.total_amount)]
     return sortDir === 'asc' ? cmp : -cmp
   })
 
@@ -108,6 +110,7 @@ export function SaleTable({
     {
       key: 'order_no',
       header: 'Order #',
+      sortable: true,
       render: (s: Sale) => (
         <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">#{s.id.slice(-6).toUpperCase()}</span>
       ),
@@ -170,6 +173,7 @@ export function SaleTable({
     {
       key: 'balance_due',
       header: 'Balance Due',
+      sortable: true,
       render: (s: Sale) => s.balance_due > 0 ? (
         <span className="text-sm font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
       ) : (

@@ -10,7 +10,7 @@ import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { PayrollRunModal } from './PayrollRunModal'
 import { PayrollDetailModal } from './PayrollDetailModal'
-import { formatDate, formatCurrency, cn, nowPH, PH_TZ } from '@/lib/utils'
+import { formatDate, formatCurrency, cn, PH_TZ } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import type { StaffMember } from '@/features/settings/hooks/useTeamSettings'
@@ -42,7 +42,7 @@ type SortDir = 'asc' | 'desc'
 export function PayrollRunTab({ staff, payrollRuns, isLoading, onRun, onPayRun, onDelete }: PayrollRunTabProps) {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
-  const todayPH = formatInTimeZone(nowPH(), PH_TZ, 'yyyy-MM-dd')
+  const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
 
   const [isRunModalOpen,  setIsRunModalOpen]  = useState(false)
   const [detailRun,       setDetailRun]       = useState<PayrollRun | null>(null)

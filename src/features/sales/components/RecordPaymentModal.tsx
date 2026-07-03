@@ -9,7 +9,7 @@ import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { formatCurrency, nowPH, PH_TZ } from '@/lib/utils'
+import { formatCurrency, PH_TZ } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import type { Sale, PaymentMode } from '../types'
 
@@ -53,7 +53,7 @@ export function RecordPaymentModal({ sale, isOpen, onClose, onRecord }: RecordPa
   useEffect(() => {
     if (sale && isOpen) {
       reset({
-        paid_at:      formatInTimeZone(nowPH(), PH_TZ, 'yyyy-MM-dd'),
+        paid_at:      formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd'),
         amount:       0,
         payment_mode: '',
         remarks:      '',

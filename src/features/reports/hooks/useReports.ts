@@ -45,9 +45,9 @@ export function useReports(): UseReportsReturn {
   const stationId = useAuthStore((s) => s.stationId)
 
   const now = nowPH()
-  const todayStr = formatInTimeZone(now, PH_TZ, 'yyyy-MM-dd')
+  const todayStr = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
 
-  const [mode,         setMode]         = useState<ReportMode>('monthly')
+  const [mode,         setMode]         = useState<ReportMode>('daily')
   const [month,        setMonth]        = useState(now.getMonth() + 1)
   const [year,         setYear]         = useState(now.getFullYear())
   const [selectedDate, setSelectedDate] = useState(todayStr)
@@ -84,7 +84,7 @@ export function useReports(): UseReportsReturn {
       } else if (mode === 'ytd') {
         startDate = `${year}-01-01`
         endDate = year === currentYear
-          ? formatInTimeZone(todayPH, PH_TZ, 'yyyy-MM-dd')
+          ? formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
           : `${year}-12-31`
         billsMaxMonth = year === currentYear ? todayPH.getMonth() + 1 : 12
       } else {
