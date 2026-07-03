@@ -6,7 +6,6 @@ import { nowPH, PH_TZ } from '@/lib/utils'
 import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking } from '../types'
 
 export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
-export type DataViewMode = 'payments' | 'order_totals'
 
 // ── Week helpers ──────────────────────────────────────────────────────────────
 
@@ -33,13 +32,11 @@ interface UseReportsReturn {
   selectedDate: string
   weekStart: string
   weekEnd: string
-  viewMode: DataViewMode
   setMode: (m: ReportMode) => void
   setMonth: (m: number) => void
   setYear: (y: number) => void
   setSelectedDate: (d: string) => void
   setWeekStart: (d: string) => void
-  setViewMode: (v: DataViewMode) => void
   goToPrevWeek: () => void
   goToNextWeek: () => void
 }
@@ -55,7 +52,6 @@ export function useReports(): UseReportsReturn {
   const [year,         setYear]         = useState(now.getFullYear())
   const [selectedDate, setSelectedDate] = useState(todayStr)
   const [weekStart,    setWeekStart]    = useState(() => getMondayStr(todayStr))
-  const [viewMode,     setViewMode]     = useState<DataViewMode>('payments')
 
   const weekEnd = addDaysStr(weekStart, 6)
 
@@ -109,16 +105,10 @@ export function useReports(): UseReportsReturn {
         billsQuery = billsQuery.lte('month', billsMaxMonth)
       }
 
-      const [paymentsRes, salesRes, expensesRes, billsRes] = await Promise.all([
-        supabase
-          .from('sale_payments')
-          .select('paid_at, amount, sale_id')
-          .eq('station_id', stationId)
-          .gte('paid_at', startDate)
-          .lte('paid_at', endDate),
+      const [salesRes, expensesRes, billsRes] = await Promise.all([
         supabase
           .from('sales')
-          .select('id, sale_date, total_amount, status, product_name, qty, customer_name, items, amount_received, payment_mode')
+          .select('id, sale_date, total_amount, status, balance_due, product_name, qty, customer_name, items, amount_received, payment_mode')
           .eq('station_id', stationId)
           .gte('sale_date', startDate)
           .lte('sale_date', endDate),
@@ -131,43 +121,19 @@ export function useReports(): UseReportsReturn {
         includeBills ? billsQuery : Promise.resolve({ data: [], error: null }),
       ])
 
-      const payments = paymentsRes.data ?? []
       const sales    = salesRes.data    ?? []
       const expenses = expensesRes.data ?? []
       const bills    = billsRes.data    ?? []
 
-      const queryError = paymentsRes.error?.message || salesRes.error?.message || expensesRes.error?.message
+      const queryError = salesRes.error?.message || expensesRes.error?.message
       if (queryError) setError(`Could not load all data: ${queryError}`)
 
-      // ── Sales with a sale_payments record (new flow after addSale fix) ───
-      const paidSaleIds = new Set(payments.map((p) => p.sale_id as string))
-
-      // ── Daily income map: payments received + fallback for pre-fix sales ─
-      const dailySalesMap = new Map<string, number>()
-      // Primary: explicit sale_payments records
-      for (const p of payments) {
-        const dateKey = p.paid_at as string  // stored as YYYY-MM-DD
-        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + (p.amount as number))
-      }
-      // Fallback: sales with amount_received > 0 but no sale_payments record yet
-      for (const s of sales) {
-        if (paidSaleIds.has(s.id as string)) continue
-        if ((s.payment_mode as string) === 'utang') continue
-        const amtReceived = (s.amount_received as number) ?? 0
-        if (amtReceived <= 0) continue
-        const dateKey = s.sale_date as string
-        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) ?? 0) + amtReceived)
-      }
-
-      // ── Order totals map: full sale amounts by order/sale date ───────────
+      // ── Daily sales map: full order totals by sale/order date ─────────────
       const dailyOrderMap = new Map<string, number>()
       for (const s of sales) {
         const dateKey = s.sale_date as string
         dailyOrderMap.set(dateKey, (dailyOrderMap.get(dateKey) ?? 0) + (s.total_amount as number))
       }
-      const totalOrderAmount = sales.reduce((sum, s) => sum + (s.total_amount as number), 0)
-
-      const activeSalesMap = viewMode === 'payments' ? dailySalesMap : dailyOrderMap
 
       // ── Daily expenses map ───────────────────────────────────────────────
       const dailyExpMap = new Map<string, number>()
@@ -183,17 +149,17 @@ export function useReports(): UseReportsReturn {
           const dateKey = addDaysStr(weekStart, i)
           return {
             date:     dateKey,
-            sales:    activeSalesMap.get(dateKey) ?? 0,
+            sales:    dailyOrderMap.get(dateKey) ?? 0,
             expenses: dailyExpMap.get(dateKey) ?? 0,
           }
         })
       } else {
-        const allDates = new Set([...activeSalesMap.keys(), ...dailyExpMap.keys()])
+        const allDates = new Set([...dailyOrderMap.keys(), ...dailyExpMap.keys()])
         dailyPoints = Array.from(allDates)
           .sort()
           .map((date) => ({
             date,
-            sales:    activeSalesMap.get(date) ?? 0,
+            sales:    dailyOrderMap.get(date) ?? 0,
             expenses: dailyExpMap.get(date) ?? 0,
           }))
       }
@@ -290,23 +256,27 @@ export function useReports(): UseReportsReturn {
         .slice(0, 5)
 
       // ── Totals ───────────────────────────────────────────────────────────
+      const totalSalesAmount = sales.reduce((sum, s) => sum + (s.total_amount as number), 0)
       const totalExpensesAmount =
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
-      const paymentsTotal = payments.reduce((s, p) => s + (p.amount as number), 0)
-      const fallbackTotal = sales
-        .filter((s) => !paidSaleIds.has(s.id as string) && (s.payment_mode as string) !== 'utang' && ((s.amount_received as number) ?? 0) > 0)
-        .reduce((s, r) => s + ((r.amount_received as number) ?? 0), 0)
-      const paymentsReceivedTotal = paymentsTotal + fallbackTotal
-      const activeTotalSales = viewMode === 'payments' ? paymentsReceivedTotal : totalOrderAmount
+
+      // ── Outstanding: current balance_due for partial/unpaid sales in range
+      const outstandingAmount = sales
+        .filter((s) => {
+          const status = s.status as string
+          return status === 'partial' || status === 'unpaid'
+        })
+        .reduce((sum, s) => sum + ((s.balance_due as number) ?? 0), 0)
 
       setData({
         dailyPoints,
         expenseSummary,
         productSales,
-        totalSalesAmount: activeTotalSales,
+        totalSalesAmount,
         totalExpensesAmount,
-        netProfit: activeTotalSales - totalExpensesAmount,
+        netProfit: totalSalesAmount - totalExpensesAmount,
+        outstandingAmount,
         topProducts,
         topCustomers,
         topSupplies,
@@ -316,14 +286,14 @@ export function useReports(): UseReportsReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, mode, month, year, selectedDate, weekStart, weekEnd, viewMode])
+  }, [stationId, mode, month, year, selectedDate, weekStart, weekEnd])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
   return {
     data, isLoading, error,
-    mode, month, year, selectedDate, weekStart, weekEnd, viewMode,
-    setMode, setMonth, setYear, setSelectedDate, setWeekStart, setViewMode,
+    mode, month, year, selectedDate, weekStart, weekEnd,
+    setMode, setMonth, setYear, setSelectedDate, setWeekStart,
     goToPrevWeek, goToNextWeek,
   }
 }

@@ -46,6 +46,7 @@ export interface ReportsData {
   totalSalesAmount: number
   totalExpensesAmount: number
   netProfit: number
+  outstandingAmount: number
   topProducts: ProductRanking[]
   topCustomers: CustomerRanking[]
   topSupplies: SupplyRanking[]

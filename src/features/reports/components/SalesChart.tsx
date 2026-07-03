@@ -1,11 +1,9 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import type { DailyPoint } from '../types'
-import type { DataViewMode } from '../hooks/useReports'
 
 interface SalesVsExpensesChartProps {
   data: DailyPoint[]
-  viewMode?: DataViewMode
 }
 
 interface TooltipPayload {
@@ -34,7 +32,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   )
 }
 
-export function SalesChart({ data, viewMode = 'payments' }: SalesVsExpensesChartProps) {
+export function SalesChart({ data }: SalesVsExpensesChartProps) {
   const chartData = data.map((d) => ({
     date: d.date.slice(5),
     sales: d.sales,
@@ -55,9 +53,7 @@ export function SalesChart({ data, viewMode = 'payments' }: SalesVsExpensesChart
         Sales vs Expenses
       </p>
       <p className="text-xs text-muted-foreground/70 mb-4">
-        {viewMode === 'payments'
-          ? 'Payments Received: actual cash collected by payment date'
-          : 'Order Totals: full sale amounts by order date'}
+        Order totals by sale date — includes paid, partial, and unpaid sales
       </p>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={chartData} barGap={2} barCategoryGap="30%">
