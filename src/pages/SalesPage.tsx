@@ -54,6 +54,7 @@ const SALES_EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'status',      label: 'Status' },                          // visible
   { key: 'balance_due', label: 'Balance Due' },                     // visible
   { key: 'remarks',     label: 'Remarks',     defaultChecked: false },
+  { key: 'actions',     label: 'Delete' },
 ]
 
 export default function SalesPage() {

@@ -189,8 +189,7 @@ export function DataTable<T>({
   }, [columnWidths, onColumnResize])
 
   // ── Ordered visible columns ───────────────────────────────────────────────
-  // 'actions' is never hidden regardless of persisted hiddenKeys
-  const visibleCols = columns.filter((c) => c.key === 'actions' || !hiddenKeys?.has(c.key))
+  const visibleCols = columns.filter((c) => !hiddenKeys?.has(c.key))
   const nonActionCols = visibleCols.filter((c) => c.key !== 'actions')
   const actionsCols   = visibleCols.filter((c) => c.key === 'actions')
 
