@@ -132,7 +132,11 @@ export function MaintenanceTable() {
             </thead>
             <tbody>
               {sorted.map((log) => (
-                <tr key={log.id} className="border-b border-border last:border-0 transition-colors duration-150">
+                <tr
+                  key={log.id}
+                  className="border-b border-border last:border-0 transition-colors duration-150 cursor-pointer hover:bg-accent/30"
+                  onClick={() => { setEditingLog(log); setIsFormOpen(true) }}
+                >
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium">{log.item_filter}</p>
                   </td>
@@ -150,7 +154,7 @@ export function MaintenanceTable() {
                   <td className="px-4 py-3">
                     <span className="text-xs text-muted-foreground">{log.technician ?? '—'}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         size="icon" variant="ghost" className="h-8 w-8"
