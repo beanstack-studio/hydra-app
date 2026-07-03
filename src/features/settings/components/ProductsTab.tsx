@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Package, ImagePlus } from 'lucide-react'
+import { Plus, Trash2, Package, ImagePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -424,15 +424,6 @@ export function ProductsTab({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7"
-                  onClick={(e) => { e.stopPropagation(); openEditProduct(p) }}
-                  aria-label="Edit"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
                   className="h-7 w-7 text-destructive hover:text-destructive"
                   onClick={(e) => { e.stopPropagation(); setDeletingProduct(p) }}
                   aria-label="Delete"
@@ -478,6 +469,7 @@ export function ProductsTab({
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onRowClick={isOwner ? openEditProduct : undefined}
           />
         )}
       </div>
@@ -496,6 +488,7 @@ export function ProductsTab({
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onRowClick={isOwner ? openEditProduct : undefined}
           />
         )}
       </div>
@@ -514,6 +507,7 @@ export function ProductsTab({
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onRowClick={isOwner ? openEditProduct : undefined}
           />
         )}
       </div>

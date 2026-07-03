@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
@@ -116,15 +116,13 @@ export function OpenHoursSettings({ stationSettings, onUpdateSettings }: OpenHou
   if (!isEditing) {
     return (
       <div className="space-y-3 w-full">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Open Hours</h2>
-          <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
-            Edit
-          </Button>
-        </div>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Open Hours</h2>
 
-        <div className="rounded-lg border border-border bg-card divide-y divide-border">
+        <button
+          type="button"
+          className="w-full text-left rounded-lg border border-border bg-card divide-y divide-border cursor-pointer hover:border-primary/50 transition-colors duration-150"
+          onClick={() => setIsEditing(true)}
+        >
           {DAY_ORDER.map((day) => {
             const d = currentHours[day]
             return (
@@ -140,7 +138,7 @@ export function OpenHoursSettings({ stationSettings, onUpdateSettings }: OpenHou
               </div>
             )
           })}
-        </div>
+        </button>
       </div>
     )
   }

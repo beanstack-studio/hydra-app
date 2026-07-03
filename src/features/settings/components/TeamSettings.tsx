@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, UserPlus, Users, ChevronUp, ChevronDown, ArrowUpDown, ShieldCheck } from 'lucide-react'
+import { Trash2, UserPlus, Users, ChevronUp, ChevronDown, ArrowUpDown, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -126,14 +126,21 @@ export function TeamSettings() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                   Access
                 </th>
-                <th className="px-4 py-3" />
+                {isOwner && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody>
               {sorted.map((s) => {
                 const hasAccess = !!s.email && activeEmails.has(s.email.toLowerCase())
                 return (
-                  <tr key={s.id} className="border-b border-border last:border-0 transition-colors duration-150">
+                  <tr
+                    key={s.id}
+                    className={cn(
+                      'border-b border-border last:border-0 transition-colors duration-150',
+                      isOwner && 'cursor-pointer hover:bg-accent/30',
+                    )}
+                    onClick={isOwner ? () => openEdit(s) : undefined}
+                  >
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium">{s.full_name}</p>
                       {s.phone && (
@@ -164,16 +171,9 @@ export function TeamSettings() {
                         <span className="text-[11px] text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {isOwner && (
+                    {isOwner && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon" variant="ghost" className="h-8 w-8"
-                            onClick={() => openEdit(s)}
-                            aria-label={`Edit ${s.full_name}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
                           <Button
                             size="icon" variant="ghost"
                             className="h-8 w-8 text-destructive hover:text-destructive"
@@ -183,8 +183,8 @@ export function TeamSettings() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

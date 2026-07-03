@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Wrench, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
+import { Plus, Trash2, Wrench, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/shared/Modal'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -127,15 +127,18 @@ export function MaintenanceTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Technician
                 </th>
-                <th className="px-4 py-3" />
+                {isOwner && <th className="px-4 py-3" />}
               </tr>
             </thead>
             <tbody>
               {sorted.map((log) => (
                 <tr
                   key={log.id}
-                  className="border-b border-border last:border-0 transition-colors duration-150 cursor-pointer hover:bg-accent/30"
-                  onClick={() => { setEditingLog(log); setIsFormOpen(true) }}
+                  className={cn(
+                    'border-b border-border last:border-0 transition-colors duration-150',
+                    isOwner && 'cursor-pointer hover:bg-accent/30',
+                  )}
+                  onClick={isOwner ? () => { setEditingLog(log); setIsFormOpen(true) } : undefined}
                 >
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium">{log.item_filter}</p>
@@ -154,15 +157,9 @@ export function MaintenanceTable() {
                   <td className="px-4 py-3">
                     <span className="text-xs text-muted-foreground">{log.technician ?? '—'}</span>
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="icon" variant="ghost" className="h-8 w-8"
-                        onClick={() => { setEditingLog(log); setIsFormOpen(true) }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {isOwner && (
+                  {isOwner && (
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           size="icon" variant="ghost"
                           className="h-8 w-8 text-destructive hover:text-destructive"
@@ -170,9 +167,9 @@ export function MaintenanceTable() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </td>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
