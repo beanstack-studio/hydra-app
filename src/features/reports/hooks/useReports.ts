@@ -261,12 +261,9 @@ export function useReports(): UseReportsReturn {
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
 
-      // ── Outstanding: current balance_due for partial/unpaid sales in range
+      // ── Outstanding: current balance_due for any sale with an open balance
       const outstandingAmount = sales
-        .filter((s) => {
-          const status = s.status as string
-          return status === 'partial' || status === 'unpaid'
-        })
+        .filter((s) => ((s.balance_due as number) ?? 0) > 0)
         .reduce((sum, s) => sum + ((s.balance_due as number) ?? 0), 0)
 
       setData({

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Sale, SaleStatus, OrderType, PaymentMode } from '../types'
+import { deriveStatus } from '../types'
 
 type SaleSortKey = 'date' | 'customer' | 'amount' | 'order_type' | 'payment' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -91,7 +92,7 @@ export function SaleTable({
     if (sortKey === 'amount')     cmp = a.total_amount - b.total_amount
     if (sortKey === 'order_type') cmp = a.order_type.localeCompare(b.order_type)
     if (sortKey === 'payment')    cmp = a.payment_mode.localeCompare(b.payment_mode)
-    if (sortKey === 'status')     cmp = statusOrder[a.status] - statusOrder[b.status]
+    if (sortKey === 'status')     cmp = statusOrder[deriveStatus(a.balance_due, a.total_amount)] - statusOrder[deriveStatus(b.balance_due, b.total_amount)]
     return sortDir === 'asc' ? cmp : -cmp
   })
 
@@ -170,32 +171,35 @@ export function SaleTable({
       key: 'balance_due',
       header: 'Balance Due',
       render: (s: Sale) => s.balance_due > 0 ? (
-        <span className="text-xs font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
+        <span className="text-sm font-medium text-destructive">{formatCurrency(s.balance_due)}</span>
       ) : (
-        <span className="text-xs text-muted-foreground">—</span>
+        <span className="text-sm text-muted-foreground">—</span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (s: Sale) => (
-        <div className="flex items-center gap-2">
-          <Badge variant={statusVariant[s.status]}>
-            {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-          </Badge>
-          {s.status !== 'paid' && onPay && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-xs"
-              onClick={(e) => { e.stopPropagation(); onPay(s) }}
-            >
-              Pay
-            </Button>
-          )}
-        </div>
-      ),
+      render: (s: Sale) => {
+        const ds = deriveStatus(s.balance_due, s.total_amount)
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant={statusVariant[ds]}>
+              {ds.charAt(0).toUpperCase() + ds.slice(1)}
+            </Badge>
+            {ds !== 'paid' && onPay && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={(e) => { e.stopPropagation(); onPay(s) }}
+              >
+                Pay
+              </Button>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: 'remarks',

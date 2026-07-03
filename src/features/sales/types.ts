@@ -1,6 +1,14 @@
 export type PaymentMode = 'cash' | 'gcash' | 'maya' | 'utang'
 export type OrderType = 'walk-in' | 'delivery' | 'pickup'
 export type SaleStatus = 'paid' | 'partial' | 'unpaid'
+
+/** Derive the correct display status from live balance_due / total_amount values,
+ *  ignoring the potentially-stale `status` DB column. */
+export function deriveStatus(balanceDue: number, totalAmount: number): SaleStatus {
+  if (balanceDue <= 0) return 'paid'
+  if (balanceDue >= totalAmount) return 'unpaid'
+  return 'partial'
+}
 export type CustomerType = 'walk_in' | 'regular' | 'retailer' | 'one_time'
 
 export interface CartItem {

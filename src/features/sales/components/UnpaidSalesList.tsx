@@ -9,6 +9,7 @@ import { SaleDetailModal } from './SaleDetailModal'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { useUnpaidSales } from '../hooks/useUnpaidSales'
 import type { Sale, PaymentMode } from '../types'
+import { deriveStatus } from '../types'
 
 type UnpaidSortKey = 'customer' | 'date' | 'balance'
 type SortDir = 'asc' | 'desc'
@@ -93,9 +94,14 @@ export function UnpaidSalesList() {
               <div className="min-w-0 mr-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-foreground truncate">{sale.customer_name}</p>
-                  <Badge variant={sale.status === 'partial' ? 'outline' : 'destructive'}>
-                    {sale.status === 'partial' ? 'Partial' : 'Unpaid'}
-                  </Badge>
+                  {(() => {
+                    const ds = deriveStatus(sale.balance_due, sale.total_amount)
+                    return (
+                      <Badge variant={ds === 'partial' ? 'outline' : 'destructive'}>
+                        {ds === 'partial' ? 'Partial' : 'Unpaid'}
+                      </Badge>
+                    )
+                  })()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {sale.product_name} ×{sale.qty} · {formatDate(sale.sale_date)}
