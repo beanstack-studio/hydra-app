@@ -17,9 +17,11 @@ import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfil
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useTablePrefs } from '@/hooks/useTablePrefs'
 
 const ORDER_HISTORY_EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'date',        label: 'Date' },
+  { key: 'order_no',    label: 'Order #' },
   { key: 'product',     label: 'Product',     defaultChecked: false },
   { key: 'qty',         label: 'Qty',         defaultChecked: false },
   { key: 'order_type',  label: 'Order Type' },
@@ -181,9 +183,12 @@ export default function CustomerProfilePage() {
     }
   }
 
+  const { hiddenKeys, toggleColumn } = useTablePrefs('customer-order-history', [])
+
   // ── Export rows ───────────────────────────────────────────────────────────
   const orderHistoryExportRows = sortedSales.map((s) => ({
     date:        formatDate(s.sale_date),
+    order_no:    `#${s.id.slice(-6).toUpperCase()}`,
     product:     s.product_name,
     qty:         s.qty,
     order_type:  ORDER_TYPE_LABEL[s.order_type] ?? s.order_type,
@@ -218,6 +223,15 @@ export default function CustomerProfilePage() {
       sortable: true,
       render: (sale) => (
         <p className="text-sm font-medium whitespace-nowrap">{formatDate(sale.sale_date)}</p>
+      ),
+    },
+    {
+      key: 'order_no',
+      header: 'Order #',
+      render: (sale) => (
+        <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+          #{sale.id.slice(-6).toUpperCase()}
+        </span>
       ),
     },
     {
@@ -422,6 +436,8 @@ export default function CustomerProfilePage() {
                   </label>
                 )}
                 <TableOptionsButton
+                  hiddenKeys={hiddenKeys}
+                  onToggleColumn={toggleColumn}
                   exportColumns={ORDER_HISTORY_EXPORT_COLUMNS}
                   exportRows={orderHistoryExportRows}
                   exportFilename={`hydra-orders-${customer?.name ?? 'customer'}`}
@@ -435,6 +451,7 @@ export default function CustomerProfilePage() {
               columns={activeColumns}
               data={sortedSales}
               rowKey={(sale) => sale.id}
+              hiddenKeys={hiddenKeys}
               sortKey={sortKey}
               sortDir={sortDir}
               onSort={handleSort}

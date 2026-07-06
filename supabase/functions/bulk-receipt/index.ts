@@ -177,8 +177,10 @@ Deno.serve(async (req) => {
     const total = sale.total_amount as number
     grandTotal += total
 
-    // Date on its own line, then item summary below (wrapped at word boundaries)
-    entries.push({ type: 0, content: saleDate, bold: 0, align: 0, format: 0 })
+    const orderNo = `#${(sale.id as string).slice(-6).toUpperCase()}`
+
+    // Date + Order # on their own lines, then item summary below (wrapped at word boundaries)
+    entries.push({ type: 0, content: `${saleDate}  ${orderNo}`, bold: 0, align: 0, format: 0 })
     for (const line of wrapText(itemSummary, 32)) {
       entries.push({ type: 0, content: line, bold: 0, align: 0, format: 0 })
     }
