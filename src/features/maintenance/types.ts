@@ -25,3 +25,13 @@ export type MaintenanceLogInput = {
   technician: string | null
   photos_urls: string | null
 }
+
+// Filter Replacement Tracker — one row per replacement event
+export interface FilterReplacement {
+  id: string
+  station_id: string
+  replaced_at: string
+  slim_count_at_replacement: number
+  round_count_at_replacement: number
+  created_at: string
+}

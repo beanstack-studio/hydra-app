@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
+import { useFilterStore } from '@/stores/filterStore'
 import { supabase } from '@/lib/supabase'
 
 const ALL_NAV_ITEMS = [
@@ -39,7 +40,7 @@ const STAFF_NAV_ITEMS = [
 const STORE_MENU = [
   { id: 'business',    label: 'Business Info',      icon: Building2,  freeLocked: false },
   { id: 'products',    label: 'Products & Pricing',  icon: Package,    freeLocked: false },
-  { id: 'maintenance', label: 'Maintenance Log',     icon: Wrench,     freeLocked: true  },
+  { id: 'maintenance', label: 'Maintenance',          icon: Wrench,     freeLocked: true  },
 ]
 
 const USER_MENU = [
@@ -76,6 +77,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const stationPhotoUrl = station?.photo_url ?? null
   const stationName     = station?.name ?? 'My Station'
   const planLabel       = station?.plan === 'free' ? 'Free' : 'Pro'
+
+  const filterZone  = useFilterStore((s) => s.zone)
+  const filterLoaded = useFilterStore((s) => s.isLoaded)
+  const showFilterBadge = filterLoaded && filterZone !== 'green'
+  const filterBadgeClass = filterZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage
@@ -194,7 +200,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           className={mainNavClass(onSettingsPage)}
           title={collapsed ? 'Settings' : undefined}
         >
-          <Settings className="h-[18px] w-[18px] shrink-0" />
+          {/* Wrap icon in relative container so we can place the collapsed badge */}
+          <div className="relative shrink-0">
+            <Settings className="h-[18px] w-[18px]" />
+            {collapsed && showFilterBadge && (
+              <span className={cn(
+                'absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-[hsl(191,72%,14%)]',
+                filterBadgeClass,
+              )} />
+            )}
+          </div>
           {!collapsed && 'Settings'}
           {!collapsed && (
             settingsOpen
@@ -211,6 +226,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </p>
             {STORE_MENU.map(({ id, label, icon: Icon, freeLocked }) => {
               const locked = isFree && freeLocked
+              const isMaintenanceItem = id === 'maintenance'
               return (
                 <button
                   key={id}
@@ -220,11 +236,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
                   {label}
-                  {locked && (
+                  {locked ? (
                     <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
                       <Lock className="h-2.5 w-2.5" />PRO
                     </span>
-                  )}
+                  ) : isMaintenanceItem && showFilterBadge ? (
+                    <span className={cn(
+                      'ml-auto h-2 w-2 rounded-full shrink-0',
+                      filterBadgeClass,
+                    )} />
+                  ) : null}
                 </button>
               )
             })}

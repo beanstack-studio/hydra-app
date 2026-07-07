@@ -13,6 +13,7 @@ import { BusinessSettings } from '@/features/settings/components/BusinessSetting
 import { ProductsTab } from '@/features/settings/components/ProductsTab'
 import { TeamSettings } from '@/features/settings/components/TeamSettings'
 import { MaintenanceTable } from '@/features/maintenance/components/MaintenanceTable'
+import { FilterTrackerCard } from '@/features/maintenance/components/FilterTrackerCard'
 import { PlanSettings } from '@/features/settings/components/PlanSettings'
 import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +33,7 @@ interface SectionDef {
 const STORE_SECTIONS: SectionDef[] = [
   { id: 'business',    label: 'Business Info',     description: 'Name, address, hours, contacts', icon: Building2 },
   { id: 'products',    label: 'Products & Pricing', description: 'Water, ice, add-ons, container', icon: Package },
-  { id: 'maintenance', label: 'Maintenance Log',    description: 'Track equipment upkeep',         icon: Wrench },
+  { id: 'maintenance', label: 'Maintenance',         description: 'Filter tracker & equipment log',  icon: Wrench },
 ]
 
 const ACCOUNT_SECTIONS: SectionDef[] = [
@@ -44,7 +45,7 @@ const ACCOUNT_SECTIONS: SectionDef[] = [
 const SECTION_LABELS: Record<Section, string> = {
   business:    'Business Info',
   products:    'Products & Pricing',
-  maintenance: 'Maintenance Log',
+  maintenance: 'Maintenance',
   team:        'Team Members',
   plan:        'Plan & Billing',
   account:     'My Account',
@@ -151,8 +152,18 @@ export default function SettingsPage() {
           />
         )
       case 'maintenance':
-        if (isFree) return <UpgradeWall title="Maintenance Log" feature="Maintenance Log" showTitle={false} />
-        return <MaintenanceTable />
+        if (isFree) return <UpgradeWall title="Maintenance" feature="Maintenance" showTitle={false} />
+        return (
+          <div className="space-y-8">
+            <FilterTrackerCard />
+            <div>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+                Equipment Maintenance Log
+              </h2>
+              <MaintenanceTable />
+            </div>
+          </div>
+        )
       case 'team':
         if (isFree) return <UpgradeWall title="Team Members" feature="Team Members" showTitle={false} />
         return <TeamSettings />
