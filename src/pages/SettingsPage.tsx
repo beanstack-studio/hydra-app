@@ -19,6 +19,7 @@ import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
+import { useFilterStore } from '@/stores/filterStore'
 
 type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
@@ -202,6 +203,13 @@ export default function SettingsPage() {
     const Icon = section.icon
     const SECTION_FREE_LOCKED = new Set(['maintenance', 'team'])
     const isLocked = isFree && SECTION_FREE_LOCKED.has(section.id)
+
+    // Filter badge — only shown on the Maintenance card when zone is yellow/red
+    const filterZone    = useFilterStore((s) => s.zone)
+    const filterLoaded  = useFilterStore((s) => s.isLoaded)
+    const showFilterBadge = section.id === 'maintenance' && !isLocked && filterLoaded && filterZone !== 'green'
+    const filterBadgeClass = filterZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+
     return (
       <button
         type="button"
@@ -219,6 +227,8 @@ export default function SettingsPage() {
           <span className="flex items-center gap-0.5 text-[9px] font-bold rounded px-1.5 py-0.5 bg-amber-100 text-amber-700 shrink-0">
             PRO
           </span>
+        ) : showFilterBadge ? (
+          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', filterBadgeClass)} />
         ) : (
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         )}

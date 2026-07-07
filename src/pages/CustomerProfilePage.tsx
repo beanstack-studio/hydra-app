@@ -341,7 +341,6 @@ export default function CustomerProfilePage() {
                 <h1 className="text-2xl font-bold text-foreground leading-tight">{customer.name}</h1>
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <Badge variant="outline">{TYPE_LABELS[customer.type]}</Badge>
-                  {customer.type === 'retailer' && <Badge variant="outline" className="text-primary border-primary/40">Retailer</Badge>}
                 </div>
               </div>
               {isOwner && (

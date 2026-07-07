@@ -7,6 +7,8 @@ import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
 const REFERENCE_COUNT = 300
+// Tick labels at even 50-unit intervals across the bar
+const BAR_TICKS = [0, 50, 100, 150, 200, 250, 300]
 
 export function FilterTrackerCard() {
   const { toast } = useToast()
@@ -22,7 +24,7 @@ export function FilterTrackerCard() {
 
   const [isMarking, setIsMarking] = useState(false)
 
-  // Progress bar: 0–100 within the viewBox (100 units = REFERENCE_COUNT refills)
+  // Progress bar: 0–100 within the SVG viewBox
   const barPercent = Math.min(100, (combinedCount / REFERENCE_COUNT) * 100)
 
   const iconBgClass = {
@@ -43,15 +45,17 @@ export function FilterTrackerCard() {
     red:    'fill-red-500',
   }[zone]
 
-  const countColorClass = zone === 'green'
-    ? 'text-foreground'
-    : zone === 'yellow'
-      ? 'text-yellow-600 dark:text-yellow-400'
-      : 'text-red-600 dark:text-red-400'
+  const countColorClass = {
+    green:  'text-foreground',
+    yellow: 'text-yellow-600 dark:text-yellow-400',
+    red:    'text-red-600 dark:text-red-400',
+  }[zone]
 
   const sinceLabel = lastReplacedAt
     ? `Since ${formatDate(lastReplacedAt)}`
     : 'Since installation'
+
+  const ytdTotal = slimYtd + roundYtd
 
   const handleReplace = async () => {
     setIsMarking(true)
@@ -69,7 +73,7 @@ export function FilterTrackerCard() {
     }
   }
 
-  if (isLoading) return <LoadingSkeleton rows={4} />
+  if (isLoading) return <LoadingSkeleton rows={3} />
 
   if (error) return (
     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -78,77 +82,67 @@ export function FilterTrackerCard() {
   )
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
 
       {/* Header */}
       <div className="flex items-center gap-2.5">
-        <div className={cn('h-8 w-8 rounded-lg flex items-center justify-center shrink-0', iconBgClass)}>
+        <div className={cn('h-7 w-7 rounded-lg flex items-center justify-center shrink-0', iconBgClass)}>
           {zone === 'green'
-            ? <Droplets className={cn('h-4 w-4', iconColorClass)} />
-            : <AlertTriangle className={cn('h-4 w-4', iconColorClass)} />
+            ? <Droplets className={cn('h-3.5 w-3.5', iconColorClass)} />
+            : <AlertTriangle className={cn('h-3.5 w-3.5', iconColorClass)} />
           }
         </div>
         <p className="text-sm font-semibold text-foreground">Filter Replacement Tracker</p>
       </div>
 
-      {/* Progress bar — SVG approach avoids inline style={{}} */}
-      <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-        <svg
-          viewBox="0 0 100 10"
-          className="h-full w-full"
-          preserveAspectRatio="none"
-          aria-hidden="true"
+      {/* Progress bar — SVG avoids inline style={{}} */}
+      <div className="space-y-1">
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <svg
+            viewBox="0 0 100 8"
+            className="h-full w-full"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <rect x="0" y="0" width={barPercent} height="8" className={fillClass} />
+          </svg>
+        </div>
+        {/* Tick labels at even 50-unit spacing */}
+        <div className="flex justify-between text-[9px] text-muted-foreground px-0.5">
+          {BAR_TICKS.map((t) => (
+            <span key={t}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Count row + button (side-by-side on md+, stacked on mobile) */}
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
+        <div className="min-w-0">
+          <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
+            {combinedCount.toLocaleString()}
+            <span className="text-sm font-normal text-muted-foreground">
+              {' '}/ {REFERENCE_COUNT} refills since last replacement
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {ytdTotal.toLocaleString()} total YTD · {sinceLabel}
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 w-full md:w-auto"
+          disabled={isMarking}
+          onClick={() => void handleReplace()}
         >
-          <rect
-            x="0"
-            y="0"
-            width={barPercent}
-            height="10"
-            className={fillClass}
-          />
-        </svg>
+          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+          {isMarking ? 'Logging…' : 'Mark as Replaced'}
+        </Button>
       </div>
-
-      {/* Zone markers */}
-      <div className="flex justify-between text-[10px] text-muted-foreground -mt-3 px-0.5">
-        <span>0</span>
-        <span className="text-yellow-500 font-medium">200</span>
-        <span className="text-orange-500 font-medium">270</span>
-        <span className="text-red-500 font-medium">300</span>
-      </div>
-
-      {/* Main count */}
-      <div>
-        <p className={cn('text-2xl font-bold', countColorClass)}>
-          {combinedCount.toLocaleString()}
-          <span className="text-base font-normal text-muted-foreground">
-            {' '}/ {REFERENCE_COUNT} refills
-          </span>
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">since last replacement</p>
-      </div>
-
-      {/* Breakdown */}
-      <div className="space-y-1 border-t border-border pt-3">
-        <p className="text-sm text-muted-foreground">
-          {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round containers since last replacement
-        </p>
-        <p className="text-sm text-muted-foreground">{sinceLabel}</p>
-        <p className="text-sm text-muted-foreground">
-          {slimYtd.toLocaleString()} Slim · {roundYtd.toLocaleString()} Round containers YTD
-        </p>
-      </div>
-
-      {/* Action */}
-      <Button
-        variant="outline"
-        className="w-full"
-        disabled={isMarking}
-        onClick={() => void handleReplace()}
-      >
-        <CheckCircle2 className="h-4 w-4 mr-2" />
-        {isMarking ? 'Logging replacement…' : 'Mark as Replaced'}
-      </Button>
 
     </div>
   )

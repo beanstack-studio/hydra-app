@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Building2 } from 'lucide-react'
+import { Outlet } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
@@ -20,44 +20,6 @@ function FilterDataLoader() {
   useFilterTracker()
   return null
 }
-
-// ── Mobile top bar — visible only on phones/tablets (< lg) ───────────────────
-function MobileHeader() {
-  const navigate     = useNavigate()
-  const station      = useAuthStore((s) => s.station)
-  const filterZone   = useFilterStore((s) => s.zone)
-  const filterLoaded = useFilterStore((s) => s.isLoaded)
-  const showBadge    = filterLoaded && filterZone !== 'green'
-  const badgeClass   = filterZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
-  const photoUrl     = station?.photo_url ?? null
-  const stationName  = station?.name ?? 'Hydra'
-
-  return (
-    <div className="lg:hidden flex h-12 items-center justify-between border-b border-border bg-card px-4 shrink-0">
-      <span className="text-sm font-bold text-foreground truncate">{stationName}</span>
-      <button
-        type="button"
-        aria-label="Go to Maintenance settings"
-        onClick={() => navigate('/settings?section=maintenance')}
-        className="relative h-8 w-8 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center shrink-0 transition-colors duration-150 hover:bg-primary/20 active:bg-primary/30"
-      >
-        {photoUrl ? (
-          <img src={photoUrl} alt={stationName} className="h-full w-full object-cover" />
-        ) : (
-          <Building2 className="h-4 w-4 text-primary" />
-        )}
-        {showBadge && (
-          <span className={cn(
-            'absolute top-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-card',
-            badgeClass,
-          )} />
-        )}
-      </button>
-    </div>
-  )
-}
-
-// ── DevBanner / RoleViewToggle — unchanged ────────────────────────────────────
 
 function DevBanner() {
   const userId = useAuthStore((s) => s.user?.id ?? '')
@@ -124,11 +86,11 @@ export function AppShell() {
   const isFree = plan === 'free'
 
   // Filter alert state — read from store (populated by FilterDataLoader)
-  const filterLoaded       = useFilterStore((s) => s.isLoaded)
-  const filterCombined     = useFilterStore((s) => s.combinedCount)
-  const filterSlim         = useFilterStore((s) => s.slimCount)
-  const filterRound        = useFilterStore((s) => s.roundCount)
-  const showFilterAlert    = filterLoaded && filterCombined >= 300 && !filterAlertDismissed
+  const filterLoaded    = useFilterStore((s) => s.isLoaded)
+  const filterCombined  = useFilterStore((s) => s.combinedCount)
+  const filterSlim      = useFilterStore((s) => s.slimCount)
+  const filterRound     = useFilterStore((s) => s.roundCount)
+  const showFilterAlert = filterLoaded && filterCombined >= 300 && !filterAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -180,7 +142,6 @@ export function AppShell() {
       <div className={contentClass}>
         <DevBanner />
         <RoleViewToggle />
-        <MobileHeader />
         {hasUpdate && (
           <div className="flex items-center justify-between bg-primary/10 border-b border-primary/20 px-4 py-2 text-sm shrink-0">
             <span className="font-medium text-primary">New version available</span>
