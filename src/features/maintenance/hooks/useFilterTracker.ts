@@ -57,16 +57,14 @@ export interface UseFilterTrackerReturn {
 
 export function useFilterTracker(): UseFilterTrackerReturn {
   const stationId = useAuthStore((s) => s.stationId)
-  const setCounts  = useFilterStore((s) => s.setCounts)
-  const stored     = useFilterStore((s) => ({
-    combinedCount:  s.combinedCount,
-    slimCount:      s.slimCount,
-    roundCount:     s.roundCount,
-    slimYtd:        s.slimYtd,
-    roundYtd:       s.roundYtd,
-    lastReplacedAt: s.lastReplacedAt,
-    zone:           s.zone,
-  }))
+  const setCounts     = useFilterStore((s) => s.setCounts)
+  const combinedCount = useFilterStore((s) => s.combinedCount)
+  const slimCount     = useFilterStore((s) => s.slimCount)
+  const roundCount    = useFilterStore((s) => s.roundCount)
+  const slimYtd       = useFilterStore((s) => s.slimYtd)
+  const roundYtd      = useFilterStore((s) => s.roundYtd)
+  const lastReplacedAt = useFilterStore((s) => s.lastReplacedAt)
+  const zone          = useFilterStore((s) => s.zone)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error,     setError]     = useState<string | null>(null)
@@ -162,5 +160,16 @@ export function useFilterTracker(): UseFilterTrackerReturn {
     await fetchData()
   }, [stationId, fetchData])
 
-  return { ...stored, isLoading, error, markAsReplaced }
+  return {
+    combinedCount,
+    slimCount,
+    roundCount,
+    slimYtd,
+    roundYtd,
+    lastReplacedAt,
+    zone,
+    isLoading,
+    error,
+    markAsReplaced,
+  }
 }
