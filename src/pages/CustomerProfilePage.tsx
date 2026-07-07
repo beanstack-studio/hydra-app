@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Phone, MessageSquare, MapPin, ShoppingCart, Pencil, CreditCard, User, Printer } from 'lucide-react'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Button } from '@/components/ui/button'
@@ -182,6 +183,47 @@ export default function CustomerProfilePage() {
       setIsBulkPaying(false)
     }
   }
+
+  // ── Debug: fetch bulk-receipt JSON and log it before opening Thermer ─────────
+  // Open Chrome DevTools → Console, enable "Preserve log", then click
+  // "Print Statement". The full raw payload Thermer receives will appear here.
+  const handlePrintStatement = async () => {
+    if (!printStatementUrl) return
+    const httpUrl = `${supabaseUrl}/functions/v1/bulk-receipt?sale_ids=${
+      paidSales.map((s) => s.id).join(',')
+    }`
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(httpUrl, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      })
+      const text = await res.text()
+      // eslint-disable-next-line no-console
+      console.group('[Hydra] Print Statement — bulk-receipt raw response')
+      // eslint-disable-next-line no-console
+      console.log('HTTP status:', res.status, res.statusText)
+      // eslint-disable-next-line no-console
+      console.log('Body:', text)
+      try {
+        // eslint-disable-next-line no-console
+        console.log('Parsed JSON (entry count):', Object.keys(JSON.parse(text) as object).length)
+        // eslint-disable-next-line no-console
+        console.log('Parsed JSON:', JSON.parse(text))
+      } catch {
+        // eslint-disable-next-line no-console
+        console.error('❌ Invalid JSON — JSON.parse failed')
+      }
+      // eslint-disable-next-line no-console
+      console.groupEnd()
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Hydra] Print Statement fetch error:', err)
+    }
+    window.location.href = printStatementUrl
+  }
+  // ── End debug ──────────────────────────────────────────────────────────────
 
   const { hiddenKeys, toggleColumn } = useTablePrefs('customer-order-history', [])
 
@@ -394,7 +436,7 @@ export default function CustomerProfilePage() {
                 size="sm"
                 variant="outline"
                 className="w-full"
-                onClick={() => { window.location.href = printStatementUrl }}
+                onClick={() => { void handlePrintStatement() }}
               >
                 <Printer className="h-3.5 w-3.5 mr-1.5" />
                 Print Statement
