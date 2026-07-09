@@ -31,6 +31,8 @@ export interface FilterReplacementLog {
   id: string
   station_id: string
   replaced_at: string
+  linked_supply_id: string | null
+  qty_deducted: number | null
   created_at: string
 }
 

@@ -75,11 +75,13 @@ export interface UseFilterReplacementReturn {
   daysElapsed: number
   cycleDays: number
   replacementDay: number
+  linkedSupplyId: string | null
+  linkedSupplyQty: number
   zone: FilterReplacementZone
   isLoading: boolean
   error: string | null
   markAsReplaced: () => Promise<void>
-  updateReplacementDay: (day: number) => Promise<void>
+  updateSettings: (day: number, supplyId: string | null, supplyQty: number) => Promise<void>
 }
 
 export function useFilterReplacement(): UseFilterReplacementReturn {
@@ -90,6 +92,8 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [daysElapsed,    setDaysElapsed]    = useState(0)
   const [cycleDays,      setCycleDays]      = useState(30)
   const [replacementDay, setReplacementDay] = useState(DEFAULT_REPLACEMENT_DAY)
+  const [linkedSupplyId,  setLinkedSupplyId]  = useState<string | null>(null)
+  const [linkedSupplyQty, setLinkedSupplyQty] = useState(1)
   const [zone,           setZone]           = useState<FilterReplacementZone>('red')
   const [isLoading,      setIsLoading]      = useState(true)
   const [error,          setError]          = useState<string | null>(null)
@@ -107,16 +111,18 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
           .limit(1),
         supabase
           .from('station_settings')
-          .select('filter_replacement_day')
+          .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty')
           .eq('station_id', stationId)
           .maybeSingle(),
       ])
 
       if (logsRes.error) throw new Error(logsRes.error.message)
-      // settingsRes failure is non-fatal — fall back to default
+      // settingsRes failure is non-fatal — fall back to defaults
 
-      const fetchedDay   = settingsRes.data?.filter_replacement_day ?? DEFAULT_REPLACEMENT_DAY
-      const fetchedLastAt = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
+      const fetchedDay      = settingsRes.data?.filter_replacement_day ?? DEFAULT_REPLACEMENT_DAY
+      const fetchedSupplyId = (settingsRes.data?.filter_replacement_supply_id as string | null | undefined) ?? null
+      const fetchedSupplyQty = (settingsRes.data?.filter_replacement_supply_qty as number | null | undefined) ?? 1
+      const fetchedLastAt   = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
       // ── Day arithmetic in PHT ─────────────────────────────────────────────
       // toZonedTime returns a Date whose .getFullYear()/.getMonth()/.getDate()
@@ -156,6 +162,8 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setDaysElapsed(elapsed)
       setCycleDays(cycle)
       setReplacementDay(fetchedDay)
+      setLinkedSupplyId(fetchedSupplyId)
+      setLinkedSupplyQty(fetchedSupplyQty ?? 1)
       setZone(computedZone)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
@@ -168,19 +176,56 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
 
   const markAsReplaced = useCallback(async () => {
     if (!stationId) return
+
+    // Deduct linked supply if configured
+    let deductedSupplyId: string | null = null
+    let actualQtyDeducted: number | null = null
+
+    if (linkedSupplyId) {
+      const { data: supplyRow } = await supabase
+        .from('supplies')
+        .select('qty')
+        .eq('id', linkedSupplyId)
+        .eq('station_id', stationId)
+        .maybeSingle()
+
+      if (supplyRow) {
+        const currentQty = (supplyRow as { qty: number }).qty
+        const newQty = Math.max(0, currentQty - linkedSupplyQty)
+        await supabase
+          .from('supplies')
+          .update({ qty: newQty })
+          .eq('id', linkedSupplyId)
+        deductedSupplyId   = linkedSupplyId
+        actualQtyDeducted  = linkedSupplyQty
+      }
+    }
+
     const { error: e } = await supabase
       .from('filter_replacement_logs')
-      .insert({ station_id: stationId, replaced_at: new Date().toISOString() })
+      .insert({
+        station_id:  stationId,
+        replaced_at: new Date().toISOString(),
+        ...(deductedSupplyId
+          ? { linked_supply_id: deductedSupplyId, qty_deducted: actualQtyDeducted }
+          : {}),
+      })
     if (e) throw new Error(e.message)
     await fetchData()
-  }, [stationId, fetchData])
+  }, [stationId, fetchData, linkedSupplyId, linkedSupplyQty])
 
-  const updateReplacementDay = useCallback(async (day: number) => {
+  const updateSettings = useCallback(async (day: number, supplyId: string | null, supplyQty: number) => {
     if (!stationId) return
     const { error: e } = await supabase
       .from('station_settings')
       .upsert(
-        { station_id: stationId, filter_replacement_day: day, updated_at: new Date().toISOString() },
+        {
+          station_id:                    stationId,
+          filter_replacement_day:        day,
+          filter_replacement_supply_id:  supplyId,
+          filter_replacement_supply_qty: supplyId ? supplyQty : null,
+          updated_at:                    new Date().toISOString(),
+        },
         { onConflict: 'station_id' }
       )
     if (e) throw new Error(e.message)
@@ -194,10 +239,12 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     daysElapsed,
     cycleDays,
     replacementDay,
+    linkedSupplyId,
+    linkedSupplyQty,
     zone,
     isLoading,
     error,
     markAsReplaced,
-    updateReplacementDay,
+    updateSettings,
   }
 }
