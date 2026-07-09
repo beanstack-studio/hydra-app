@@ -46,6 +46,7 @@ export interface StationSettings {
   business_phone: string | null
   business_address: string | null
   open_hours: OpenHours | null
+  backwash_threshold: number | null
   updated_at: string
 }
 

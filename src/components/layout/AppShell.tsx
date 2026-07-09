@@ -86,11 +86,12 @@ export function AppShell() {
   const isFree = plan === 'free'
 
   // Backwash alert state — read from store (populated by BackwashDataLoader)
-  const backwashLoaded    = useBackwashStore((s) => s.isLoaded)
-  const backwashCombined  = useBackwashStore((s) => s.combinedCount)
-  const backwashSlim      = useBackwashStore((s) => s.slimCount)
-  const backwashRound     = useBackwashStore((s) => s.roundCount)
-  const showBackwashAlert = backwashLoaded && backwashCombined >= 300 && !backwashAlertDismissed
+  const backwashLoaded     = useBackwashStore((s) => s.isLoaded)
+  const backwashCombined   = useBackwashStore((s) => s.combinedCount)
+  const backwashSlim       = useBackwashStore((s) => s.slimCount)
+  const backwashRound      = useBackwashStore((s) => s.roundCount)
+  const backwashThreshold  = useBackwashStore((s) => s.threshold)
+  const showBackwashAlert  = backwashLoaded && backwashCombined >= backwashThreshold && !backwashAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {

@@ -156,7 +156,10 @@ export default function SettingsPage() {
         if (isFree) return <UpgradeWall title="Maintenance" feature="Maintenance" showTitle={false} />
         return (
           <div className="space-y-8">
-            <BackwashCard />
+            {/* Grid: single column on mobile, 2-column on lg+ (ready for a second card) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <BackwashCard />
+            </div>
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
                 Equipment Maintenance Log

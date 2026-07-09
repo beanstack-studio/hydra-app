@@ -2,9 +2,15 @@ import { create } from 'zustand'
 
 export type BackwashZone = 'green' | 'yellow' | 'red'
 
-export function computeBackwashZone(count: number): BackwashZone {
-  if (count >= 270) return 'red'
-  if (count >= 200) return 'yellow'
+export const DEFAULT_BACKWASH_THRESHOLD = 300
+
+// Zone thresholds scale proportionally with the configured max.
+// Ratios mirror the original 200/300 (≈66.7%) and 270/300 (90%) cutoffs.
+export function computeBackwashZone(count: number, threshold: number): BackwashZone {
+  const yellowMin = Math.round(threshold * (200 / 300))
+  const redMin    = Math.round(threshold * (270 / 300))
+  if (count >= redMin) return 'red'
+  if (count >= yellowMin) return 'yellow'
   return 'green'
 }
 
@@ -15,6 +21,7 @@ interface BackwashStoreState {
   slimYtd: number
   roundYtd: number
   lastBackwashedAt: string | null
+  threshold: number
   zone: BackwashZone
   /** True once the first successful fetch has completed. Used to gate the login alert. */
   isLoaded: boolean
@@ -26,6 +33,7 @@ interface BackwashStoreState {
     roundYtd: number
     lastBackwashedAt: string | null
   }) => void
+  setThreshold: (threshold: number) => void
 }
 
 export const useBackwashStore = create<BackwashStoreState>()((set) => ({
@@ -35,8 +43,18 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
   slimYtd: 0,
   roundYtd: 0,
   lastBackwashedAt: null,
+  threshold: DEFAULT_BACKWASH_THRESHOLD,
   zone: 'green',
   isLoaded: false,
   setCounts: (data) =>
-    set({ ...data, zone: computeBackwashZone(data.combinedCount), isLoaded: true }),
+    set((state) => ({
+      ...data,
+      zone: computeBackwashZone(data.combinedCount, state.threshold),
+      isLoaded: true,
+    })),
+  setThreshold: (threshold) =>
+    set((state) => ({
+      threshold,
+      zone: computeBackwashZone(state.combinedCount, threshold),
+    })),
 }))

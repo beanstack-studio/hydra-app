@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { useBackwashStore } from '@/stores/backwashStore'
+import { useBackwashStore, DEFAULT_BACKWASH_THRESHOLD } from '@/stores/backwashStore'
 import { PH_TZ } from '@/lib/utils'
 import type { BackwashZone } from '@/stores/backwashStore'
 
@@ -49,22 +49,26 @@ export interface UseBackwashTrackerReturn {
   slimYtd: number
   roundYtd: number
   lastBackwashedAt: string | null
+  threshold: number
   zone: BackwashZone
   isLoading: boolean
   error: string | null
   markAsBackwashed: () => Promise<void>
+  updateThreshold: (threshold: number) => Promise<void>
 }
 
 export function useBackwashTracker(): UseBackwashTrackerReturn {
-  const stationId       = useAuthStore((s) => s.stationId)
-  const setCounts       = useBackwashStore((s) => s.setCounts)
-  const combinedCount   = useBackwashStore((s) => s.combinedCount)
-  const slimCount       = useBackwashStore((s) => s.slimCount)
-  const roundCount      = useBackwashStore((s) => s.roundCount)
-  const slimYtd         = useBackwashStore((s) => s.slimYtd)
-  const roundYtd        = useBackwashStore((s) => s.roundYtd)
+  const stationId        = useAuthStore((s) => s.stationId)
+  const setCounts        = useBackwashStore((s) => s.setCounts)
+  const setThreshold     = useBackwashStore((s) => s.setThreshold)
+  const combinedCount    = useBackwashStore((s) => s.combinedCount)
+  const slimCount        = useBackwashStore((s) => s.slimCount)
+  const roundCount       = useBackwashStore((s) => s.roundCount)
+  const slimYtd          = useBackwashStore((s) => s.slimYtd)
+  const roundYtd         = useBackwashStore((s) => s.roundYtd)
   const lastBackwashedAt = useBackwashStore((s) => s.lastBackwashedAt)
-  const zone            = useBackwashStore((s) => s.zone)
+  const threshold        = useBackwashStore((s) => s.threshold)
+  const zone             = useBackwashStore((s) => s.zone)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error,     setError]     = useState<string | null>(null)
@@ -73,18 +77,37 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      // 1. Get the last backwash timestamp
-      const { data: logs, error: rErr } = await supabase
-        .from('backwash_logs')
-        .select('backwashed_at')
-        .eq('station_id', stationId)
-        .order('backwashed_at', { ascending: false })
-        .limit(1)
+      // Fetch in parallel: last backwash log, all sales, and the configured threshold
+      const [logsRes, salesRes, settingsRes] = await Promise.all([
+        supabase
+          .from('backwash_logs')
+          .select('backwashed_at')
+          .eq('station_id', stationId)
+          .order('backwashed_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('sales')
+          .select('product_name, qty, sale_date, items')
+          .eq('station_id', stationId),
+        supabase
+          .from('station_settings')
+          .select('backwash_threshold')
+          .eq('station_id', stationId)
+          .maybeSingle(),
+      ])
 
-      if (rErr) throw new Error(rErr.message)
+      if (logsRes.error) throw new Error(logsRes.error.message)
+      if (salesRes.error) throw new Error(salesRes.error.message)
+      // settingsRes failure is non-fatal — fall back to default
+
+      const fetchedThreshold =
+        settingsRes.data?.backwash_threshold ?? DEFAULT_BACKWASH_THRESHOLD
+
+      // Update threshold first so setCounts can use it for zone computation
+      setThreshold(fetchedThreshold)
 
       const lastBackwashedAt =
-        (logs?.[0]?.backwashed_at as string | undefined) ?? null
+        (logsRes.data?.[0]?.backwashed_at as string | undefined) ?? null
 
       // Convert to PH date for comparison with sale_date (YYYY-MM-DD)
       // spec: "sale_date > MAX(backwashed_at)" → sales ON the backwash day don't count
@@ -92,23 +115,15 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         ? formatInTimeZone(new Date(lastBackwashedAt), PH_TZ, 'yyyy-MM-dd')
         : null
 
-      // 2. Fetch all sales for this station (lean select)
-      const { data: sales, error: sErr } = await supabase
-        .from('sales')
-        .select('product_name, qty, sale_date, items')
-        .eq('station_id', stationId)
-
-      if (sErr) throw new Error(sErr.message)
-
-      // 3. YTD start in PH timezone
+      // YTD start in PH timezone
       const phNow = toZonedTime(new Date(), PH_TZ)
       const ytdStart = `${phNow.getFullYear()}-01-01`
 
-      // 4. Accumulate counts
+      // Accumulate counts
       let slim = 0, round = 0
       let sYtd = 0, rYtd = 0
 
-      for (const sale of (sales ?? []) as SaleRow[]) {
+      for (const sale of (salesRes.data ?? []) as SaleRow[]) {
         const { slim: s, round: r } = countRefillsFromSale(sale)
         const saleDate = sale.sale_date
 
@@ -138,7 +153,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, setCounts])
+  }, [stationId, setCounts, setThreshold])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
@@ -160,6 +175,19 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     await fetchData()
   }, [stationId, fetchData])
 
+  const updateThreshold = useCallback(async (newThreshold: number) => {
+    if (!stationId) return
+    const { error: e } = await supabase
+      .from('station_settings')
+      .upsert(
+        { station_id: stationId, backwash_threshold: newThreshold, updated_at: new Date().toISOString() },
+        { onConflict: 'station_id' }
+      )
+    if (e) throw new Error(e.message)
+    // Update the store immediately so the card reflects the new threshold at once
+    setThreshold(newThreshold)
+  }, [stationId, setThreshold])
+
   return {
     combinedCount,
     slimCount,
@@ -167,9 +195,11 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     slimYtd,
     roundYtd,
     lastBackwashedAt,
+    threshold,
     zone,
     isLoading,
     error,
     markAsBackwashed,
+    updateThreshold,
   }
 }
