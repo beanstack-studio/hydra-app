@@ -8,8 +8,12 @@ import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 
-// Fixed tick labels — day-based progress, same clean-4-tick style as Backwash
-const BAR_TICKS = [0, 10, 20, 30]
+// Compute 4 evenly-spaced tick labels for the countdown bar.
+// Ticks represent "days remaining" positions (0 = empty/overdue, cycleDays = full/just replaced).
+function computeBarTicks(cycleDays: number): number[] {
+  const step = Math.round(cycleDays / 3)
+  return [0, step, step * 2, cycleDays]
+}
 
 export function FilterReplacementCard() {
   const { toast } = useToast()
@@ -18,14 +22,12 @@ export function FilterReplacementCard() {
 
   const {
     lastReplacedAt,
-    nextDueDate,
-    daysElapsed,
+    daysRemaining,
     cycleDays,
     replacementDay,
     replacementsYtd,
     supplies,
-    linkedSupplyId,
-    linkedSupplyQty,
+    linkedSupplies,
     zone,
     isLoading,
     error,
@@ -36,8 +38,12 @@ export function FilterReplacementCard() {
   const [isMarking,    setIsMarking]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Progress bar: fills based on days elapsed out of actual cycle length
-  const barPercent = Math.min(100, (daysElapsed / cycleDays) * 100)
+  // Countdown bar: full (100%) right after replacement, drains to 0% at due date.
+  const barPercent = lastReplacedAt === null
+    ? 0
+    : Math.max(0, Math.min(100, (daysRemaining / cycleDays) * 100))
+
+  const barTicks = computeBarTicks(cycleDays)
 
   const iconBgClass = {
     green:  'bg-emerald-100 dark:bg-emerald-900/30',
@@ -63,9 +69,13 @@ export function FilterReplacementCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  const nextLabel = nextDueDate
-    ? `Next replacement: ${formatDate(nextDueDate)}`
-    : ''
+  const countdownText = lastReplacedAt === null
+    ? 'No replacement recorded'
+    : daysRemaining > 0
+      ? `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} until next replacement`
+      : daysRemaining === 0
+        ? 'Due today'
+        : `${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) !== 1 ? 's' : ''} overdue`
 
   const lastLabel = lastReplacedAt
     ? `Last replaced: ${formatDate(lastReplacedAt)}`
@@ -122,7 +132,7 @@ export function FilterReplacementCard() {
           )}
         </div>
 
-        {/* Progress bar — SVG avoids inline style={{}} */}
+        {/* Countdown progress bar — SVG avoids inline style={{}} */}
         <div className="space-y-1">
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <svg
@@ -136,9 +146,9 @@ export function FilterReplacementCard() {
               )}
             </svg>
           </div>
-          {/* Fixed tick labels 0 / 10 / 20 / 30 */}
+          {/* Tick labels: days remaining (0 = empty/overdue, cycleDays = full/just replaced) */}
           <div className="flex justify-between text-[9px] text-muted-foreground px-0.5">
-            {BAR_TICKS.map((t) => (
+            {barTicks.map((t) => (
               <span key={t}>{t}</span>
             ))}
           </div>
@@ -148,12 +158,8 @@ export function FilterReplacementCard() {
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
-              {daysElapsed.toLocaleString()}
-              <span className="text-sm font-normal text-muted-foreground">
-                {' '}/ {cycleDays} days since last replacement
-              </span>
+              {countdownText}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">{nextLabel}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{lastLabel}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {replacementsYtd} replacement{replacementsYtd !== 1 ? 's' : ''} YTD
@@ -179,8 +185,7 @@ export function FilterReplacementCard() {
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           replacementDay={replacementDay}
-          linkedSupplyId={linkedSupplyId}
-          linkedSupplyQty={linkedSupplyQty}
+          linkedSupplies={linkedSupplies}
           supplies={supplies}
           onSave={updateSettings}
         />

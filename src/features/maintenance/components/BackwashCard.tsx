@@ -64,9 +64,9 @@ export function BackwashCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  const sinceLabel = lastBackwashedAt
-    ? `Since ${formatDate(lastBackwashedAt)}`
-    : 'Since installation'
+  const sinceLastLabel = lastBackwashedAt
+    ? formatDate(lastBackwashedAt)
+    : 'never'
 
   const ytdTotal = slimYtd + roundYtd
 
@@ -156,7 +156,10 @@ export function BackwashCard() {
               {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {ytdTotal.toLocaleString()} refills · {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD · {sinceLabel}
+              {ytdTotal.toLocaleString()} refills YTD · {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Since last backwash: {sinceLastLabel}
             </p>
           </div>
 

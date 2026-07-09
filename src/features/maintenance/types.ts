@@ -31,8 +31,9 @@ export interface FilterReplacementLog {
   id: string
   station_id: string
   replaced_at: string
-  linked_supply_id: string | null
-  qty_deducted: number | null
+  linked_supply_id: string | null   // legacy single-supply column (kept for compat)
+  qty_deducted: number | null       // legacy single-supply column (kept for compat)
+  supply_deductions: Array<{ supply_id: string; qty_deducted: number }> | null  // multi-supply
   created_at: string
 }
 
