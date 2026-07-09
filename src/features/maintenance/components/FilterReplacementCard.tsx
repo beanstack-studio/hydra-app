@@ -8,11 +8,14 @@ import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 
-// Compute 4 evenly-spaced tick labels for the countdown bar.
-// Ticks represent "days remaining" positions (0 = empty/overdue, cycleDays = full/just replaced).
+// Compute tick labels for the countdown bar.
+// Ticks represent "days remaining" (0 = empty/overdue → cycleDays = full/just replaced).
+// Deduplication prevents "0 0 0 1" when cycleDays is very small.
 function computeBarTicks(cycleDays: number): number[] {
-  const step = Math.round(cycleDays / 3)
-  return [0, step, step * 2, cycleDays]
+  const step = Math.max(1, Math.round(cycleDays / 3))
+  const t1   = Math.min(step,      cycleDays)
+  const t2   = Math.min(step * 2,  cycleDays)
+  return [...new Set([0, t1, t2, cycleDays])].sort((a, b) => a - b)
 }
 
 export function FilterReplacementCard() {

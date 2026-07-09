@@ -13,36 +13,20 @@ export const DEFAULT_REPLACEMENT_DAY = 1
 // Uses the JS idiom `new Date(year, month + 1, 0).getDate()`:
 //   "day 0 of the next month" = last day of the current month.
 //
-// Verified against Task 2 spec (day 31 across key months):
-//   clampReplacementDay(31, 2026, 0)  → Jan 2026 has 31 d → returns 31  ✓
-//   clampReplacementDay(31, 2026, 1)  → Feb 2026 has 28 d → returns 28  ✓ (non-leap)
-//   clampReplacementDay(31, 2024, 1)  → Feb 2024 has 29 d → returns 29  ✓ (leap)
-//   clampReplacementDay(31, 2026, 3)  → Apr 2026 has 30 d → returns 30  ✓
-//   clampReplacementDay(31, 2026, 11) → Dec 2026 has 31 d → returns 31  ✓
-//
 // Clamping is recalculated fresh each month — storing day 31 always keeps the
 // intent; Feb reverts to 28/29, then March correctly returns to 31.
 
 export function lastDayOfMonth(year: number, month: number): number {
-  // month is 0-based (Jan=0, Dec=11)
   return new Date(year, month + 1, 0).getDate()
 }
 
-export function clampReplacementDay(
-  desiredDay: number,
-  year: number,
-  month: number  // 0-based
-): number {
+export function clampReplacementDay(desiredDay: number, year: number, month: number): number {
   return Math.min(desiredDay, lastDayOfMonth(year, month))
 }
 
 // Returns the first scheduled replacement Date (local midnight) STRICTLY AFTER
 // afterDate. Checks this month first, falls back to next month.
-// Both input and output are in local-midnight format for day-diff arithmetic.
-export function getNextDueAfter(
-  replacementDay: number,
-  afterDate: Date
-): Date {
+export function getNextDueAfter(replacementDay: number, afterDate: Date): Date {
   const year  = afterDate.getFullYear()
   const month = afterDate.getMonth()
 
@@ -57,8 +41,8 @@ export function getNextDueAfter(
 }
 
 // ── Zone thresholds ───────────────────────────────────────────────────────────
-// daysRemaining > 5  → green (comfortably before due date)
-// daysRemaining 1–5  → yellow (last 5 days)
+// daysRemaining > 5  → green
+// daysRemaining 1–5  → yellow (warning window)
 // daysRemaining ≤ 0  → red (due today or overdue)
 
 export function computeFilterReplacementZone(daysRemaining: number): FilterReplacementZone {
@@ -67,7 +51,7 @@ export function computeFilterReplacementZone(daysRemaining: number): FilterRepla
   return 'green'
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface SupplyOption {
   id: string
@@ -75,6 +59,9 @@ export interface SupplyOption {
 }
 
 // One supply→qty pair for the replacement cycle setting.
+// NOTE: multi-supply JSONB persistence (migration 20260708000005) is pending
+// a `supabase db push`. Until applied, only the first entry is stored in the
+// legacy single-column pair (filter_replacement_supply_id / _qty).
 export interface FilterReplacementSupplyLink {
   supply_id: string
   qty: number
@@ -117,7 +104,6 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      // Compute PHT now before queries (needed for YTD filter and day arithmetic)
       const phNow         = toZonedTime(new Date(), PH_TZ)
       const ytdStartTz    = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
       const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
@@ -134,12 +120,13 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
           .select('*', { count: 'exact', head: true })
           .eq('station_id', stationId)
           .gte('replaced_at', ytdStartTz),
+        // Only select columns that exist in the current schema.
+        // filter_replacement_supplies (JSONB) requires migration 20260708000005.
         supabase
           .from('station_settings')
-          .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty, filter_replacement_supplies')
+          .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty')
           .eq('station_id', stationId)
           .maybeSingle(),
-        // Fetch supply names for the settings modal search — plain read, no realtime needed
         supabase
           .from('supplies')
           .select('id, name')
@@ -153,18 +140,13 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       const fetchedDay    = settingsRes.data?.filter_replacement_day ?? DEFAULT_REPLACEMENT_DAY
       const fetchedLastAt = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
-      // Read linked supplies: prefer new JSONB column, fall back to legacy single columns.
-      const rawSupplies = settingsRes.data?.filter_replacement_supplies
-      let fetchedSupplies: FilterReplacementSupplyLink[] = []
-      if (Array.isArray(rawSupplies) && rawSupplies.length > 0) {
-        fetchedSupplies = rawSupplies as FilterReplacementSupplyLink[]
-      } else {
-        const legacyId  = (settingsRes.data?.filter_replacement_supply_id as string | null | undefined) ?? null
-        const legacyQty = (settingsRes.data?.filter_replacement_supply_qty as number | null | undefined) ?? 1
-        if (legacyId) {
-          fetchedSupplies = [{ supply_id: legacyId, qty: legacyQty }]
-        }
-      }
+      // Read linked supply from legacy single columns.
+      // Once migration 20260708000005 is applied, switch to reading filter_replacement_supplies JSONB.
+      const legacyId  = (settingsRes.data?.filter_replacement_supply_id as string | null | undefined) ?? null
+      const legacyQty = (settingsRes.data?.filter_replacement_supply_qty as number | null | undefined) ?? 1
+      const fetchedSupplies: FilterReplacementSupplyLink[] = legacyId
+        ? [{ supply_id: legacyId, qty: legacyQty }]
+        : []
 
       // ── Day arithmetic in PHT ─────────────────────────────────────────────
       const MS_PER_DAY = 86_400_000
@@ -176,7 +158,6 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       let computedZone: FilterReplacementZone
 
       if (fetchedLastAt === null) {
-        // Never replaced — always overdue; compute next due from "just before today"
         const justBeforeToday = new Date(todayMidnight.getTime() - 1)
         nextDue      = getNextDueAfter(fetchedDay, justBeforeToday)
         elapsed      = 0
@@ -216,7 +197,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const markAsReplaced = useCallback(async () => {
     if (!stationId) return
 
-    // Deduct all linked supplies sequentially to avoid race conditions
+    // Deduct all linked supplies sequentially
     type SupplyDeduction = { supply_id: string; qty_deducted: number }
     const deductions: SupplyDeduction[] = []
 
@@ -231,22 +212,19 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       if (supplyRow) {
         const currentQty = (supplyRow as { qty: number }).qty
         const newQty     = Math.max(0, currentQty - link.qty)
-        await supabase
-          .from('supplies')
-          .update({ qty: newQty })
-          .eq('id', link.supply_id)
+        await supabase.from('supplies').update({ qty: newQty }).eq('id', link.supply_id)
         deductions.push({ supply_id: link.supply_id, qty_deducted: link.qty })
       }
     }
 
     const firstDeduction = deductions[0] ?? null
+    // supply_deductions JSONB column requires migration 20260708000005.
+    // Writing to legacy single columns until that migration is applied.
     const { error: e } = await supabase
       .from('filter_replacement_logs')
       .insert({
-        station_id:        stationId,
-        replaced_at:       new Date().toISOString(),
-        supply_deductions: deductions.length > 0 ? deductions : null,
-        // Backward-compat single columns (kept for existing rows / future queries)
+        station_id:  stationId,
+        replaced_at: new Date().toISOString(),
         ...(firstDeduction
           ? { linked_supply_id: firstDeduction.supply_id, qty_deducted: firstDeduction.qty_deducted }
           : {}),
@@ -258,22 +236,21 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const updateSettings = useCallback(async (day: number, newSupplies: FilterReplacementSupplyLink[]) => {
     if (!stationId) return
     const firstLink = newSupplies[0] ?? null
+    // filter_replacement_supplies JSONB column requires migration 20260708000005.
+    // Writing to legacy single columns until that migration is applied.
     const { error: e } = await supabase
       .from('station_settings')
       .upsert(
         {
-          station_id:                      stationId,
-          filter_replacement_day:          day,
-          filter_replacement_supplies:     newSupplies.length > 0 ? newSupplies : null,
-          // Backward-compat single columns
-          filter_replacement_supply_id:    firstLink?.supply_id  ?? null,
-          filter_replacement_supply_qty:   firstLink?.qty        ?? null,
-          updated_at:                      new Date().toISOString(),
+          station_id:                    stationId,
+          filter_replacement_day:        day,
+          filter_replacement_supply_id:  firstLink?.supply_id ?? null,
+          filter_replacement_supply_qty: firstLink?.qty       ?? null,
+          updated_at:                    new Date().toISOString(),
         },
         { onConflict: 'station_id' }
       )
     if (e) throw new Error(e.message)
-    // Refetch so all derived values (nextDueDate, daysRemaining, cycleDays, zone) recompute
     await fetchData()
   }, [stationId, fetchData])
 

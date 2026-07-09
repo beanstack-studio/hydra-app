@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { useBackwashTracker } from '../hooks/useBackwashTracker'
 import { BackwashSettingsModal } from './BackwashSettingsModal'
-import { formatDate, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -24,7 +24,6 @@ export function BackwashCard() {
   const {
     combinedCount, slimCount, roundCount,
     slimYtd, roundYtd, backwashYtd,
-    lastBackwashedAt,
     threshold,
     zone,
     isLoading,
@@ -63,10 +62,6 @@ export function BackwashCard() {
     yellow: 'text-yellow-600 dark:text-yellow-400',
     red:    'text-red-600 dark:text-red-400',
   }[zone]
-
-  const sinceLastLabel = lastBackwashedAt
-    ? formatDate(lastBackwashedAt)
-    : 'never'
 
   const ytdTotal = slimYtd + roundYtd
 
@@ -157,9 +152,6 @@ export function BackwashCard() {
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {ytdTotal.toLocaleString()} refills YTD · {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Since last backwash: {sinceLastLabel}
             </p>
           </div>
 
