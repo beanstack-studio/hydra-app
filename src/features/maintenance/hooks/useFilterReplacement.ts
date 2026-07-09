@@ -88,8 +88,7 @@ export interface UseFilterReplacementReturn {
 }
 
 export function useFilterReplacement(): UseFilterReplacementReturn {
-  const stationId    = useAuthStore((s) => s.stationId)
-  const setStoreZone = useFilterReplacementStore((s) => s.setZone)
+  const stationId = useAuthStore((s) => s.stationId)
 
   const [lastReplacedAt,  setLastReplacedAt]  = useState<string | null>(null)
   const [nextDueDate,     setNextDueDate]     = useState<Date | null>(null)
@@ -189,13 +188,16 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setSupplies((suppliesRes.data ?? []) as SupplyOption[])
       setLinkedSupplies(fetchedSupplies)
       setZone(computedZone)
-      setStoreZone(computedZone)
+      // Push to global store so Sidebar badge and login alert can read zone
+      // regardless of whether FilterReplacementCard is mounted.
+      // Use .getState() — the imperative Zustand API is safer in async callbacks.
+      useFilterReplacementStore.getState().setZone(computedZone)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, setStoreZone])
+  }, [stationId])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
