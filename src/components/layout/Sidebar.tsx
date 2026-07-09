@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { useBackwashStore } from '@/stores/backwashStore'
+import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 import { supabase } from '@/lib/supabase'
 
 const ALL_NAV_ITEMS = [
@@ -77,10 +78,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const stationName     = station?.name ?? 'My Station'
   const planLabel       = station?.plan === 'free' ? 'Free' : 'Pro'
 
-  const backwashZone  = useBackwashStore((s) => s.zone)
+  const backwashZone   = useBackwashStore((s) => s.zone)
   const backwashLoaded = useBackwashStore((s) => s.isLoaded)
-  const showBackwashBadge = backwashLoaded && backwashZone !== 'green'
-  const backwashBadgeClass = backwashZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+  const filterZone     = useFilterReplacementStore((s) => s.zone)
+  const filterLoaded   = useFilterReplacementStore((s) => s.isLoaded)
+
+  // Show badge if either card is in a non-green zone (and that card's data has loaded).
+  // Red wins: if either card is red, badge is red; otherwise yellow.
+  const showMaintenanceBadge =
+    (backwashLoaded && backwashZone !== 'green') || (filterLoaded && filterZone !== 'green')
+  const maintenanceBadgeClass =
+    backwashZone === 'red' || filterZone === 'red' ? 'bg-red-500' : 'bg-yellow-400'
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage
@@ -202,10 +210,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {/* Wrap icon in relative container so we can place the collapsed badge */}
           <div className="relative shrink-0">
             <Settings className="h-[18px] w-[18px]" />
-            {collapsed && showBackwashBadge && (
+            {collapsed && showMaintenanceBadge && (
               <span className={cn(
                 'absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-[hsl(191,72%,14%)]',
-                backwashBadgeClass,
+                maintenanceBadgeClass,
               )} />
             )}
           </div>
@@ -239,10 +247,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
                       <Lock className="h-2.5 w-2.5" />PRO
                     </span>
-                  ) : isMaintenanceItem && showBackwashBadge ? (
+                  ) : isMaintenanceItem && showMaintenanceBadge ? (
                     <span className={cn(
                       'ml-auto h-2 w-2 rounded-full shrink-0',
-                      backwashBadgeClass,
+                      maintenanceBadgeClass,
                     )} />
                   ) : null}
                 </button>

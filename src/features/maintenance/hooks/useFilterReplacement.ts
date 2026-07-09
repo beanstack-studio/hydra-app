@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { toZonedTime } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 import { PH_TZ } from '@/lib/utils'
 
-export type FilterReplacementZone = 'green' | 'yellow' | 'red'
+// Re-export the canonical type so existing imports from this file still work
+export type { FilterReplacementZone } from '@/stores/filterReplacementStore'
+import type { FilterReplacementZone } from '@/stores/filterReplacementStore'
 
 export const DEFAULT_REPLACEMENT_DAY = 1
 
@@ -85,7 +88,8 @@ export interface UseFilterReplacementReturn {
 }
 
 export function useFilterReplacement(): UseFilterReplacementReturn {
-  const stationId = useAuthStore((s) => s.stationId)
+  const stationId    = useAuthStore((s) => s.stationId)
+  const setStoreZone = useFilterReplacementStore((s) => s.setZone)
 
   const [lastReplacedAt,  setLastReplacedAt]  = useState<string | null>(null)
   const [nextDueDate,     setNextDueDate]     = useState<Date | null>(null)
@@ -185,12 +189,13 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setSupplies((suppliesRes.data ?? []) as SupplyOption[])
       setLinkedSupplies(fetchedSupplies)
       setZone(computedZone)
+      setStoreZone(computedZone)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
     } finally {
       setIsLoading(false)
     }
-  }, [stationId])
+  }, [stationId, setStoreZone])
 
   useEffect(() => { void fetchData() }, [fetchData])
 

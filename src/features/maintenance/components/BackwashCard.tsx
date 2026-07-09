@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { useBackwashTracker } from '../hooks/useBackwashTracker'
 import { BackwashSettingsModal } from './BackwashSettingsModal'
-import { cn } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -22,8 +22,9 @@ export function BackwashCard() {
   const isOwner = role === 'owner' || role === 'super_admin'
 
   const {
-    combinedCount, slimCount, roundCount,
-    slimYtd, roundYtd, backwashYtd,
+    combinedCount,
+    lastBackwashedAt,
+    backwashYtd,
     threshold,
     zone,
     isLoading,
@@ -63,7 +64,9 @@ export function BackwashCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  const ytdTotal = slimYtd + roundYtd
+  const lastBackwashLabel = lastBackwashedAt
+    ? `Last backwash: ${formatDate(lastBackwashedAt)}`
+    : 'Not yet backwashed'
 
   const handleBackwash = async () => {
     setIsMarking(true)
@@ -158,10 +161,10 @@ export function BackwashCard() {
               </span>
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round
+              {lastBackwashLabel}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {ytdTotal.toLocaleString()} refills YTD · {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD
+              {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD
             </p>
           </div>
 

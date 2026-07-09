@@ -5,9 +5,12 @@ import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
 import { BackwashAlertModal } from '@/components/shared/BackwashAlertModal'
+import { FilterReplacementAlertModal } from '@/components/shared/FilterReplacementAlertModal'
 import { startReminderPolling, stopReminderPolling } from '@/lib/reminders'
 import { useBackwashTracker } from '@/features/maintenance/hooks/useBackwashTracker'
+import { useFilterReplacement } from '@/features/maintenance/hooks/useFilterReplacement'
 import { useBackwashStore } from '@/stores/backwashStore'
+import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { cn } from '@/lib/utils'
@@ -15,9 +18,14 @@ import type { Reminder } from '@/lib/reminders'
 
 const SUPER_ADMIN_EMAIL = 'hello@beanstack.studio'
 
-// ── BackwashDataLoader — calls the hook for its side effect (populates backwashStore) ──
+// ── Data loaders — call hooks for their side effect (populate global stores) ──
 function BackwashDataLoader() {
   useBackwashTracker()
+  return null
+}
+
+function FilterReplacementDataLoader() {
+  useFilterReplacement()
   return null
 }
 
@@ -75,23 +83,30 @@ function RoleViewToggle() {
 // ── AppShell ──────────────────────────────────────────────────────────────────
 
 export function AppShell() {
-  const [pendingReminders,     setPendingReminders]     = useState<Reminder[]>([])
-  const [hasUpdate,            setHasUpdate]            = useState(false)
-  const [backwashAlertDismissed, setBackwashAlertDismissed] = useState(false)
-  const [sidebarCollapsed,     setSidebarCollapsed]     = useState<boolean>(
+  const [pendingReminders,        setPendingReminders]        = useState<Reminder[]>([])
+  const [hasUpdate,               setHasUpdate]               = useState(false)
+  const [backwashAlertDismissed,  setBackwashAlertDismissed]  = useState(false)
+  const [filterAlertDismissed,    setFilterAlertDismissed]    = useState(false)
+  const [sidebarCollapsed,        setSidebarCollapsed]        = useState<boolean>(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
 
   const plan   = usePlan()
   const isFree = plan === 'free'
 
-  // Backwash alert state — read from store (populated by BackwashDataLoader)
-  const backwashLoaded     = useBackwashStore((s) => s.isLoaded)
-  const backwashCombined   = useBackwashStore((s) => s.combinedCount)
-  const backwashSlim       = useBackwashStore((s) => s.slimCount)
-  const backwashRound      = useBackwashStore((s) => s.roundCount)
-  const backwashThreshold  = useBackwashStore((s) => s.threshold)
-  const showBackwashAlert  = backwashLoaded && backwashCombined >= backwashThreshold && !backwashAlertDismissed
+  // Backwash alert — fires when zone is red (≥ red threshold), not just at the hard limit
+  const backwashLoaded    = useBackwashStore((s) => s.isLoaded)
+  const backwashZone      = useBackwashStore((s) => s.zone)
+  const backwashCombined  = useBackwashStore((s) => s.combinedCount)
+  const backwashSlim      = useBackwashStore((s) => s.slimCount)
+  const backwashRound     = useBackwashStore((s) => s.roundCount)
+  const showBackwashAlert = backwashLoaded && backwashZone === 'red' && !backwashAlertDismissed
+
+  // Filter replacement alert — fires when zone is red (due today or overdue)
+  // Shown sequentially after backwash alert is dismissed, so only one modal at a time
+  const filterLoaded    = useFilterReplacementStore((s) => s.isLoaded)
+  const filterZone      = useFilterReplacementStore((s) => s.zone)
+  const showFilterAlert = !showBackwashAlert && filterLoaded && filterZone === 'red' && !filterAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -136,8 +151,9 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Loads backwash counts into backwashStore on app mount */}
+      {/* Loads maintenance data into global stores on app mount */}
       <BackwashDataLoader />
+      <FilterReplacementDataLoader />
 
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <div className={contentClass}>
@@ -169,6 +185,11 @@ export function AppShell() {
           slimCount={backwashSlim}
           roundCount={backwashRound}
           onDismiss={() => setBackwashAlertDismissed(true)}
+        />
+      )}
+      {showFilterAlert && (
+        <FilterReplacementAlertModal
+          onDismiss={() => setFilterAlertDismissed(true)}
         />
       )}
     </div>

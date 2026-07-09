@@ -72,13 +72,18 @@ export function FilterReplacementCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  const countdownText = lastReplacedAt === null
-    ? 'No replacement recorded'
-    : daysRemaining > 0
-      ? `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} until next replacement`
-      : daysRemaining === 0
-        ? 'Due today'
-        : `${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) !== 1 ? 's' : ''} overdue`
+  // Split main display line: number (bold/large) + descriptor (small/regular)
+  // mainNumber is null when there is no leading numeric value ("Due today", "No replacement recorded")
+  const mainNumber: number | null =
+    lastReplacedAt !== null && daysRemaining !== 0
+      ? daysRemaining > 0 ? daysRemaining : Math.abs(daysRemaining)
+      : null
+
+  const mainSuffix: string =
+    lastReplacedAt === null ? 'No replacement recorded'
+    : daysRemaining > 0    ? ` day${daysRemaining !== 1 ? 's' : ''} until next replacement`
+    : daysRemaining === 0  ? 'Due today'
+                           : ` day${Math.abs(daysRemaining) !== 1 ? 's' : ''} overdue`
 
   const lastLabel = lastReplacedAt
     ? `Last replaced: ${formatDate(lastReplacedAt)}`
@@ -171,7 +176,13 @@ export function FilterReplacementCard() {
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
-              {countdownText}
+              {mainNumber !== null
+                ? <>
+                    {mainNumber}
+                    <span className="text-sm font-normal text-muted-foreground">{mainSuffix}</span>
+                  </>
+                : mainSuffix
+              }
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{lastLabel}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
