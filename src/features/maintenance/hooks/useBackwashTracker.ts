@@ -48,6 +48,7 @@ export interface UseBackwashTrackerReturn {
   roundCount: number
   slimYtd: number
   roundYtd: number
+  backwashYtd: number
   lastBackwashedAt: string | null
   threshold: number
   zone: BackwashZone
@@ -66,6 +67,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
   const roundCount       = useBackwashStore((s) => s.roundCount)
   const slimYtd          = useBackwashStore((s) => s.slimYtd)
   const roundYtd         = useBackwashStore((s) => s.roundYtd)
+  const backwashYtd      = useBackwashStore((s) => s.backwashYtd)
   const lastBackwashedAt = useBackwashStore((s) => s.lastBackwashedAt)
   const threshold        = useBackwashStore((s) => s.threshold)
   const zone             = useBackwashStore((s) => s.zone)
@@ -77,14 +79,23 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      // Fetch in parallel: last backwash log, all sales, and the configured threshold
-      const [logsRes, salesRes, settingsRes] = await Promise.all([
+      // Compute PHT year before queries (needed for YTD filter)
+      const phNow = toZonedTime(new Date(), PH_TZ)
+      const ytdStartTz = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
+
+      // Fetch in parallel: last backwash log, YTD backwash count, all sales, and threshold
+      const [logsRes, ytdCountRes, salesRes, settingsRes] = await Promise.all([
         supabase
           .from('backwash_logs')
           .select('backwashed_at')
           .eq('station_id', stationId)
           .order('backwashed_at', { ascending: false })
           .limit(1),
+        supabase
+          .from('backwash_logs')
+          .select('*', { count: 'exact', head: true })
+          .eq('station_id', stationId)
+          .gte('backwashed_at', ytdStartTz),
         supabase
           .from('sales')
           .select('product_name, qty, sale_date, items')
@@ -115,8 +126,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         ? formatInTimeZone(new Date(lastBackwashedAt), PH_TZ, 'yyyy-MM-dd')
         : null
 
-      // YTD start in PH timezone
-      const phNow = toZonedTime(new Date(), PH_TZ)
+      // YTD start in PH timezone (date string for sale_date comparison)
       const ytdStart = `${phNow.getFullYear()}-01-01`
 
       // Accumulate counts
@@ -146,6 +156,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         roundCount:      round,
         slimYtd:         sYtd,
         roundYtd:        rYtd,
+        backwashYtd:     ytdCountRes.count ?? 0,
         lastBackwashedAt,
       })
     } catch (err) {
@@ -194,6 +205,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     roundCount,
     slimYtd,
     roundYtd,
+    backwashYtd,
     lastBackwashedAt,
     threshold,
     zone,

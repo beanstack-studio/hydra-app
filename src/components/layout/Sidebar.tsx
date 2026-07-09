@@ -54,9 +54,8 @@ const ACCOUNT_MENU = [
 
 const FREE_LOCKED_ROUTES = new Set(['/customers', '/inventory', '/reports'])
 
-const SIDEBAR_BG      = 'bg-[hsl(191,72%,14%)]'
-const SIDEBAR_SUB_BG  = 'bg-[hsl(191,60%,10%)]'
-const BORDER          = 'border-white/10'
+const SIDEBAR_BG = 'bg-[hsl(191,72%,14%)]'
+const BORDER     = 'border-white/10'
 
 interface SidebarProps {
   collapsed: boolean
@@ -120,7 +119,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     'overflow-hidden select-none',
     'transition-[width] duration-300 ease-in-out',
     collapsed ? 'lg:w-16' : 'lg:w-60',
-    onSettingsPage ? SIDEBAR_SUB_BG : SIDEBAR_BG,
+    SIDEBAR_BG,
     'border-r', BORDER
   )
 

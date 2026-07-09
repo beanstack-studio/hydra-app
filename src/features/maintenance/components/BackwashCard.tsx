@@ -23,7 +23,7 @@ export function BackwashCard() {
 
   const {
     combinedCount, slimCount, roundCount,
-    slimYtd, roundYtd,
+    slimYtd, roundYtd, backwashYtd,
     lastBackwashedAt,
     threshold,
     zone,
@@ -130,7 +130,9 @@ export function BackwashCard() {
               preserveAspectRatio="none"
               aria-hidden="true"
             >
-              <rect x="0" y="0" width={barPercent} height="8" className={fillClass} />
+              {barPercent > 0 && (
+                <rect x="0" y="0" width={barPercent} height="8" className={fillClass} />
+              )}
             </svg>
           </div>
           {/* 4 tick labels: 0 / ⅓ / ⅔ / max */}
@@ -154,7 +156,7 @@ export function BackwashCard() {
               {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {ytdTotal.toLocaleString()} total YTD · {sinceLabel}
+              {ytdTotal.toLocaleString()} refills · {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD · {sinceLabel}
             </p>
           </div>
 

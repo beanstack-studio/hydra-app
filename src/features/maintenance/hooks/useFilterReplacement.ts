@@ -75,6 +75,7 @@ export interface UseFilterReplacementReturn {
   daysElapsed: number
   cycleDays: number
   replacementDay: number
+  replacementsYtd: number
   linkedSupplyId: string | null
   linkedSupplyQty: number
   zone: FilterReplacementZone
@@ -92,6 +93,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [daysElapsed,    setDaysElapsed]    = useState(0)
   const [cycleDays,      setCycleDays]      = useState(30)
   const [replacementDay, setReplacementDay] = useState(DEFAULT_REPLACEMENT_DAY)
+  const [replacementsYtd, setReplacementsYtd] = useState(0)
   const [linkedSupplyId,  setLinkedSupplyId]  = useState<string | null>(null)
   const [linkedSupplyQty, setLinkedSupplyQty] = useState(1)
   const [zone,           setZone]           = useState<FilterReplacementZone>('red')
@@ -102,13 +104,23 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      const [logsRes, settingsRes] = await Promise.all([
+      // Compute PHT now before queries (needed for YTD filter and day arithmetic)
+      const phNow        = toZonedTime(new Date(), PH_TZ)
+      const ytdStartTz   = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
+      const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
+
+      const [logsRes, ytdRes, settingsRes] = await Promise.all([
         supabase
           .from('filter_replacement_logs')
           .select('replaced_at')
           .eq('station_id', stationId)
           .order('replaced_at', { ascending: false })
           .limit(1),
+        supabase
+          .from('filter_replacement_logs')
+          .select('*', { count: 'exact', head: true })
+          .eq('station_id', stationId)
+          .gte('replaced_at', ytdStartTz),
         supabase
           .from('station_settings')
           .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty')
@@ -125,12 +137,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       const fetchedLastAt   = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
       // ── Day arithmetic in PHT ─────────────────────────────────────────────
-      // toZonedTime returns a Date whose .getFullYear()/.getMonth()/.getDate()
-      // reflect PHT values. We then build local-midnight Dates using those
-      // PHT components so that subtraction gives correct PHT day counts.
-      const phNow       = toZonedTime(new Date(), PH_TZ)
-      const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
-
+      // phNow / todayMidnight computed above (before queries).
       const MS_PER_DAY = 86_400_000
 
       let nextDue: Date
@@ -162,6 +169,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setDaysElapsed(elapsed)
       setCycleDays(cycle)
       setReplacementDay(fetchedDay)
+      setReplacementsYtd(ytdRes.count ?? 0)
       setLinkedSupplyId(fetchedSupplyId)
       setLinkedSupplyQty(fetchedSupplyQty ?? 1)
       setZone(computedZone)
@@ -239,6 +247,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     daysElapsed,
     cycleDays,
     replacementDay,
+    replacementsYtd,
     linkedSupplyId,
     linkedSupplyQty,
     zone,

@@ -20,6 +20,7 @@ interface BackwashStoreState {
   roundCount: number
   slimYtd: number
   roundYtd: number
+  backwashYtd: number
   lastBackwashedAt: string | null
   threshold: number
   zone: BackwashZone
@@ -31,6 +32,7 @@ interface BackwashStoreState {
     roundCount: number
     slimYtd: number
     roundYtd: number
+    backwashYtd: number
     lastBackwashedAt: string | null
   }) => void
   setThreshold: (threshold: number) => void
@@ -42,6 +44,7 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
   roundCount: 0,
   slimYtd: 0,
   roundYtd: 0,
+  backwashYtd: 0,
   lastBackwashedAt: null,
   threshold: DEFAULT_BACKWASH_THRESHOLD,
   zone: 'green',

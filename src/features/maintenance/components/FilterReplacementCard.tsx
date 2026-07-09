@@ -23,6 +23,7 @@ export function FilterReplacementCard() {
     daysElapsed,
     cycleDays,
     replacementDay,
+    replacementsYtd,
     linkedSupplyId,
     linkedSupplyQty,
     zone,
@@ -132,7 +133,9 @@ export function FilterReplacementCard() {
               preserveAspectRatio="none"
               aria-hidden="true"
             >
-              <rect x="0" y="0" width={barPercent} height="8" className={fillClass} />
+              {barPercent > 0 && (
+                <rect x="0" y="0" width={barPercent} height="8" className={fillClass} />
+              )}
             </svg>
           </div>
           {/* Fixed tick labels 0 / 10 / 20 / 30 */}
@@ -154,6 +157,9 @@ export function FilterReplacementCard() {
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{nextLabel}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{lastLabel}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {replacementsYtd} replacement{replacementsYtd !== 1 ? 's' : ''} YTD
+            </p>
           </div>
 
           <Button
