@@ -40,13 +40,13 @@ export function BackwashCard() {
   const barTicks   = computeBarTicks(threshold)
 
   const iconBgClass = {
-    green:  'bg-emerald-100 dark:bg-emerald-900/30',
+    green:  'bg-teal-100 dark:bg-teal-900/30',
     yellow: 'bg-yellow-100 dark:bg-yellow-900/30',
     red:    'bg-red-100 dark:bg-red-900/30',
   }[zone]
 
   const iconColorClass = {
-    green:  'text-emerald-600 dark:text-emerald-400',
+    green:  'text-teal-600 dark:text-teal-400',
     yellow: 'text-yellow-600 dark:text-yellow-400',
     red:    'text-red-600 dark:text-red-400',
   }[zone]
@@ -105,14 +105,24 @@ export function BackwashCard() {
             <p className="text-sm font-semibold text-foreground">Backwash Tracker</p>
           </div>
           {isOwner && (
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-150"
-              aria-label="Backwash settings"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              {zone !== 'green' && (
+                <span className={cn(
+                  'flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none',
+                  zone === 'yellow' ? 'bg-yellow-400 text-yellow-950' : 'bg-red-500 text-white',
+                )}>
+                  !
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-150"
+                aria-label="Backwash settings"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
         </div>
 
