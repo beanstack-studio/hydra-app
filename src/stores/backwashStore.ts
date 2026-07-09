@@ -1,21 +1,21 @@
 import { create } from 'zustand'
 
-export type FilterZone = 'green' | 'yellow' | 'red'
+export type BackwashZone = 'green' | 'yellow' | 'red'
 
-export function computeFilterZone(count: number): FilterZone {
+export function computeBackwashZone(count: number): BackwashZone {
   if (count >= 270) return 'red'
   if (count >= 200) return 'yellow'
   return 'green'
 }
 
-interface FilterStoreState {
+interface BackwashStoreState {
   combinedCount: number
   slimCount: number
   roundCount: number
   slimYtd: number
   roundYtd: number
-  lastReplacedAt: string | null
-  zone: FilterZone
+  lastBackwashedAt: string | null
+  zone: BackwashZone
   /** True once the first successful fetch has completed. Used to gate the login alert. */
   isLoaded: boolean
   setCounts: (data: {
@@ -24,19 +24,19 @@ interface FilterStoreState {
     roundCount: number
     slimYtd: number
     roundYtd: number
-    lastReplacedAt: string | null
+    lastBackwashedAt: string | null
   }) => void
 }
 
-export const useFilterStore = create<FilterStoreState>()((set) => ({
+export const useBackwashStore = create<BackwashStoreState>()((set) => ({
   combinedCount: 0,
   slimCount: 0,
   roundCount: 0,
   slimYtd: 0,
   roundYtd: 0,
-  lastReplacedAt: null,
+  lastBackwashedAt: null,
   zone: 'green',
   isLoaded: false,
   setCounts: (data) =>
-    set({ ...data, zone: computeFilterZone(data.combinedCount), isLoaded: true }),
+    set({ ...data, zone: computeBackwashZone(data.combinedCount), isLoaded: true }),
 }))

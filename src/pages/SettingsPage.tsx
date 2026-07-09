@@ -13,13 +13,13 @@ import { BusinessSettings } from '@/features/settings/components/BusinessSetting
 import { ProductsTab } from '@/features/settings/components/ProductsTab'
 import { TeamSettings } from '@/features/settings/components/TeamSettings'
 import { MaintenanceTable } from '@/features/maintenance/components/MaintenanceTable'
-import { FilterTrackerCard } from '@/features/maintenance/components/FilterTrackerCard'
+import { BackwashCard } from '@/features/maintenance/components/BackwashCard'
 import { PlanSettings } from '@/features/settings/components/PlanSettings'
 import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
-import { useFilterStore } from '@/stores/filterStore'
+import { useBackwashStore } from '@/stores/backwashStore'
 
 type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
@@ -34,7 +34,7 @@ interface SectionDef {
 const STORE_SECTIONS: SectionDef[] = [
   { id: 'business',    label: 'Business Info',     description: 'Name, address, hours, contacts', icon: Building2 },
   { id: 'products',    label: 'Products & Pricing', description: 'Water, ice, add-ons, container', icon: Package },
-  { id: 'maintenance', label: 'Maintenance',         description: 'Filter tracker & equipment log',  icon: Wrench },
+  { id: 'maintenance', label: 'Maintenance',         description: 'Backwash tracker & equipment log',  icon: Wrench },
 ]
 
 const ACCOUNT_SECTIONS: SectionDef[] = [
@@ -156,7 +156,7 @@ export default function SettingsPage() {
         if (isFree) return <UpgradeWall title="Maintenance" feature="Maintenance" showTitle={false} />
         return (
           <div className="space-y-8">
-            <FilterTrackerCard />
+            <BackwashCard />
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
                 Equipment Maintenance Log
@@ -204,11 +204,11 @@ export default function SettingsPage() {
     const SECTION_FREE_LOCKED = new Set(['maintenance', 'team'])
     const isLocked = isFree && SECTION_FREE_LOCKED.has(section.id)
 
-    // Filter badge — only shown on the Maintenance card when zone is yellow/red
-    const filterZone    = useFilterStore((s) => s.zone)
-    const filterLoaded  = useFilterStore((s) => s.isLoaded)
-    const showFilterBadge = section.id === 'maintenance' && !isLocked && filterLoaded && filterZone !== 'green'
-    const filterBadgeClass = filterZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+    // Backwash badge — only shown on the Maintenance card when zone is yellow/red
+    const backwashZone    = useBackwashStore((s) => s.zone)
+    const backwashLoaded  = useBackwashStore((s) => s.isLoaded)
+    const showBackwashBadge = section.id === 'maintenance' && !isLocked && backwashLoaded && backwashZone !== 'green'
+    const backwashBadgeClass = backwashZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
 
     return (
       <button
@@ -227,8 +227,8 @@ export default function SettingsPage() {
           <span className="flex items-center gap-0.5 text-[9px] font-bold rounded px-1.5 py-0.5 bg-amber-100 text-amber-700 shrink-0">
             PRO
           </span>
-        ) : showFilterBadge ? (
-          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', filterBadgeClass)} />
+        ) : showBackwashBadge ? (
+          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', backwashBadgeClass)} />
         ) : (
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         )}

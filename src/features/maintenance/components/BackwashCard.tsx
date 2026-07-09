@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Droplets, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
-import { useFilterTracker } from '../hooks/useFilterTracker'
+import { useBackwashTracker } from '../hooks/useBackwashTracker'
 import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
@@ -10,17 +10,17 @@ const REFERENCE_COUNT = 300
 // Tick labels at even 50-unit intervals across the bar
 const BAR_TICKS = [0, 50, 100, 150, 200, 250, 300]
 
-export function FilterTrackerCard() {
+export function BackwashCard() {
   const { toast } = useToast()
   const {
     combinedCount, slimCount, roundCount,
     slimYtd, roundYtd,
-    lastReplacedAt,
+    lastBackwashedAt,
     zone,
     isLoading,
     error,
-    markAsReplaced,
-  } = useFilterTracker()
+    markAsBackwashed,
+  } = useBackwashTracker()
 
   const [isMarking, setIsMarking] = useState(false)
 
@@ -51,20 +51,20 @@ export function FilterTrackerCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  const sinceLabel = lastReplacedAt
-    ? `Since ${formatDate(lastReplacedAt)}`
+  const sinceLabel = lastBackwashedAt
+    ? `Since ${formatDate(lastBackwashedAt)}`
     : 'Since installation'
 
   const ytdTotal = slimYtd + roundYtd
 
-  const handleReplace = async () => {
+  const handleBackwash = async () => {
     setIsMarking(true)
     try {
-      await markAsReplaced()
-      toast({ title: 'Filter replacement logged', description: 'Counter reset to 0.' })
+      await markAsBackwashed()
+      toast({ title: 'Backwash logged', description: 'Counter reset to 0.' })
     } catch (e) {
       toast({
-        title: 'Failed to log replacement',
+        title: 'Failed to log backwash',
         description: e instanceof Error ? e.message : 'Something went wrong',
         variant: 'destructive',
       })
@@ -92,7 +92,7 @@ export function FilterTrackerCard() {
             : <AlertTriangle className={cn('h-3.5 w-3.5', iconColorClass)} />
           }
         </div>
-        <p className="text-sm font-semibold text-foreground">Filter Replacement Tracker</p>
+        <p className="text-sm font-semibold text-foreground">Backwash Tracker</p>
       </div>
 
       {/* Progress bar — SVG avoids inline style={{}} */}
@@ -121,7 +121,7 @@ export function FilterTrackerCard() {
           <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
             {combinedCount.toLocaleString()}
             <span className="text-sm font-normal text-muted-foreground">
-              {' '}/ {REFERENCE_COUNT} refills since last replacement
+              {' '}/ {REFERENCE_COUNT} refills since last backwash
             </span>
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -137,10 +137,10 @@ export function FilterTrackerCard() {
           size="sm"
           className="shrink-0 w-full md:w-auto"
           disabled={isMarking}
-          onClick={() => void handleReplace()}
+          onClick={() => void handleBackwash()}
         >
           <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-          {isMarking ? 'Logging…' : 'Mark as Replaced'}
+          {isMarking ? 'Logging…' : 'Mark as Backwashed'}
         </Button>
       </div>
 

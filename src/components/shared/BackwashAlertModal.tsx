@@ -2,19 +2,19 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-interface FilterAlertModalProps {
+interface BackwashAlertModalProps {
   combinedCount: number
   slimCount: number
   roundCount: number
   onDismiss: () => void
 }
 
-export function FilterAlertModal({
+export function BackwashAlertModal({
   combinedCount,
   slimCount,
   roundCount,
   onDismiss,
-}: FilterAlertModalProps) {
+}: BackwashAlertModalProps) {
   const navigate = useNavigate()
 
   const handleGoToMaintenance = () => {
@@ -36,7 +36,7 @@ export function FilterAlertModal({
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
               <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
-            <span className="text-sm font-semibold text-foreground">Filter Replacement Overdue</span>
+            <span className="text-sm font-semibold text-foreground">Backwash Overdue</span>
           </div>
           <button
             type="button"
@@ -55,7 +55,7 @@ export function FilterAlertModal({
             <span className="font-bold text-red-600 dark:text-red-400">
               {combinedCount.toLocaleString()} refills
             </span>{' '}
-            since the last replacement. Replace the filter soon to maintain water quality.
+            since the last backwash. Backwash the filter soon to maintain water quality.
           </p>
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
             {slimCount.toLocaleString()} Slim · {roundCount.toLocaleString()} Round

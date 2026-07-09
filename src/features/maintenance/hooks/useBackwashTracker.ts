@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { useFilterStore } from '@/stores/filterStore'
+import { useBackwashStore } from '@/stores/backwashStore'
 import { PH_TZ } from '@/lib/utils'
-import type { FilterZone } from '@/stores/filterStore'
+import type { BackwashZone } from '@/stores/backwashStore'
 
-export type { FilterZone }
+export type { BackwashZone }
 
 // ── Refill detection ─────────────────────────────────────────────────────────
 
@@ -42,29 +42,29 @@ function countRefillsFromSale(sale: SaleRow): { slim: number; round: number } {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
-export interface UseFilterTrackerReturn {
+export interface UseBackwashTrackerReturn {
   combinedCount: number
   slimCount: number
   roundCount: number
   slimYtd: number
   roundYtd: number
-  lastReplacedAt: string | null
-  zone: FilterZone
+  lastBackwashedAt: string | null
+  zone: BackwashZone
   isLoading: boolean
   error: string | null
-  markAsReplaced: () => Promise<void>
+  markAsBackwashed: () => Promise<void>
 }
 
-export function useFilterTracker(): UseFilterTrackerReturn {
-  const stationId = useAuthStore((s) => s.stationId)
-  const setCounts     = useFilterStore((s) => s.setCounts)
-  const combinedCount = useFilterStore((s) => s.combinedCount)
-  const slimCount     = useFilterStore((s) => s.slimCount)
-  const roundCount    = useFilterStore((s) => s.roundCount)
-  const slimYtd       = useFilterStore((s) => s.slimYtd)
-  const roundYtd      = useFilterStore((s) => s.roundYtd)
-  const lastReplacedAt = useFilterStore((s) => s.lastReplacedAt)
-  const zone          = useFilterStore((s) => s.zone)
+export function useBackwashTracker(): UseBackwashTrackerReturn {
+  const stationId       = useAuthStore((s) => s.stationId)
+  const setCounts       = useBackwashStore((s) => s.setCounts)
+  const combinedCount   = useBackwashStore((s) => s.combinedCount)
+  const slimCount       = useBackwashStore((s) => s.slimCount)
+  const roundCount      = useBackwashStore((s) => s.roundCount)
+  const slimYtd         = useBackwashStore((s) => s.slimYtd)
+  const roundYtd        = useBackwashStore((s) => s.roundYtd)
+  const lastBackwashedAt = useBackwashStore((s) => s.lastBackwashedAt)
+  const zone            = useBackwashStore((s) => s.zone)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error,     setError]     = useState<string | null>(null)
@@ -73,23 +73,23 @@ export function useFilterTracker(): UseFilterTrackerReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      // 1. Get the last replacement timestamp
-      const { data: replacements, error: rErr } = await supabase
-        .from('filter_replacements')
-        .select('replaced_at')
+      // 1. Get the last backwash timestamp
+      const { data: logs, error: rErr } = await supabase
+        .from('backwash_logs')
+        .select('backwashed_at')
         .eq('station_id', stationId)
-        .order('replaced_at', { ascending: false })
+        .order('backwashed_at', { ascending: false })
         .limit(1)
 
       if (rErr) throw new Error(rErr.message)
 
-      const lastReplacedAt =
-        (replacements?.[0]?.replaced_at as string | undefined) ?? null
+      const lastBackwashedAt =
+        (logs?.[0]?.backwashed_at as string | undefined) ?? null
 
       // Convert to PH date for comparison with sale_date (YYYY-MM-DD)
-      // spec: "sale_date > MAX(replaced_at)" → sales ON the replacement day don't count
-      const lastReplacedDate = lastReplacedAt
-        ? formatInTimeZone(new Date(lastReplacedAt), PH_TZ, 'yyyy-MM-dd')
+      // spec: "sale_date > MAX(backwashed_at)" → sales ON the backwash day don't count
+      const lastBackwashedDate = lastBackwashedAt
+        ? formatInTimeZone(new Date(lastBackwashedAt), PH_TZ, 'yyyy-MM-dd')
         : null
 
       // 2. Fetch all sales for this station (lean select)
@@ -112,13 +112,13 @@ export function useFilterTracker(): UseFilterTrackerReturn {
         const { slim: s, round: r } = countRefillsFromSale(sale)
         const saleDate = sale.sale_date
 
-        // Since last replacement (all-time if never replaced)
-        if (!lastReplacedDate || saleDate > lastReplacedDate) {
+        // Since last backwash (all-time if never backwashed)
+        if (!lastBackwashedDate || saleDate > lastBackwashedDate) {
           slim  += s
           round += r
         }
 
-        // YTD — independent of replacement resets
+        // YTD — independent of backwash resets
         if (saleDate >= ytdStart) {
           sYtd += s
           rYtd += r
@@ -126,15 +126,15 @@ export function useFilterTracker(): UseFilterTrackerReturn {
       }
 
       setCounts({
-        combinedCount:  slim + round,
-        slimCount:      slim,
-        roundCount:     round,
-        slimYtd:        sYtd,
-        roundYtd:       rYtd,
-        lastReplacedAt,
+        combinedCount:   slim + round,
+        slimCount:       slim,
+        roundCount:      round,
+        slimYtd:         sYtd,
+        roundYtd:        rYtd,
+        lastBackwashedAt,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load filter data')
+      setError(err instanceof Error ? err.message : 'Failed to load backwash data')
     } finally {
       setIsLoading(false)
     }
@@ -142,18 +142,18 @@ export function useFilterTracker(): UseFilterTrackerReturn {
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  const markAsReplaced = useCallback(async () => {
+  const markAsBackwashed = useCallback(async () => {
     if (!stationId) return
     // Use getState() to always capture the latest counts at call time
-    const { slimCount, roundCount } = useFilterStore.getState()
+    const { slimCount, roundCount } = useBackwashStore.getState()
 
     const { error: e } = await supabase
-      .from('filter_replacements')
+      .from('backwash_logs')
       .insert({
-        station_id:                  stationId,
-        replaced_at:                 new Date().toISOString(),
-        slim_count_at_replacement:   slimCount,
-        round_count_at_replacement:  roundCount,
+        station_id:              stationId,
+        backwashed_at:           new Date().toISOString(),
+        slim_count_at_backwash:  slimCount,
+        round_count_at_backwash: roundCount,
       })
 
     if (e) throw new Error(e.message)
@@ -166,10 +166,10 @@ export function useFilterTracker(): UseFilterTrackerReturn {
     roundCount,
     slimYtd,
     roundYtd,
-    lastReplacedAt,
+    lastBackwashedAt,
     zone,
     isLoading,
     error,
-    markAsReplaced,
+    markAsBackwashed,
   }
 }

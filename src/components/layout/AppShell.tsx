@@ -4,10 +4,10 @@ import { AlertTriangle } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
-import { FilterAlertModal } from '@/components/shared/FilterAlertModal'
+import { BackwashAlertModal } from '@/components/shared/BackwashAlertModal'
 import { startReminderPolling, stopReminderPolling } from '@/lib/reminders'
-import { useFilterTracker } from '@/features/maintenance/hooks/useFilterTracker'
-import { useFilterStore } from '@/stores/filterStore'
+import { useBackwashTracker } from '@/features/maintenance/hooks/useBackwashTracker'
+import { useBackwashStore } from '@/stores/backwashStore'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { cn } from '@/lib/utils'
@@ -15,9 +15,9 @@ import type { Reminder } from '@/lib/reminders'
 
 const SUPER_ADMIN_EMAIL = 'hello@beanstack.studio'
 
-// ── FilterDataLoader — calls the hook for its side effect (populates filterStore) ──
-function FilterDataLoader() {
-  useFilterTracker()
+// ── BackwashDataLoader — calls the hook for its side effect (populates backwashStore) ──
+function BackwashDataLoader() {
+  useBackwashTracker()
   return null
 }
 
@@ -77,7 +77,7 @@ function RoleViewToggle() {
 export function AppShell() {
   const [pendingReminders,     setPendingReminders]     = useState<Reminder[]>([])
   const [hasUpdate,            setHasUpdate]            = useState(false)
-  const [filterAlertDismissed, setFilterAlertDismissed] = useState(false)
+  const [backwashAlertDismissed, setBackwashAlertDismissed] = useState(false)
   const [sidebarCollapsed,     setSidebarCollapsed]     = useState<boolean>(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
@@ -85,12 +85,12 @@ export function AppShell() {
   const plan   = usePlan()
   const isFree = plan === 'free'
 
-  // Filter alert state — read from store (populated by FilterDataLoader)
-  const filterLoaded    = useFilterStore((s) => s.isLoaded)
-  const filterCombined  = useFilterStore((s) => s.combinedCount)
-  const filterSlim      = useFilterStore((s) => s.slimCount)
-  const filterRound     = useFilterStore((s) => s.roundCount)
-  const showFilterAlert = filterLoaded && filterCombined >= 300 && !filterAlertDismissed
+  // Backwash alert state — read from store (populated by BackwashDataLoader)
+  const backwashLoaded    = useBackwashStore((s) => s.isLoaded)
+  const backwashCombined  = useBackwashStore((s) => s.combinedCount)
+  const backwashSlim      = useBackwashStore((s) => s.slimCount)
+  const backwashRound     = useBackwashStore((s) => s.roundCount)
+  const showBackwashAlert = backwashLoaded && backwashCombined >= 300 && !backwashAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -135,8 +135,8 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Loads filter counts into filterStore on app mount */}
-      <FilterDataLoader />
+      {/* Loads backwash counts into backwashStore on app mount */}
+      <BackwashDataLoader />
 
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <div className={contentClass}>
@@ -162,12 +162,12 @@ export function AppShell() {
 
       <BottomNav />
       <ReminderModal reminders={pendingReminders} onDismiss={handleDismissReminder} />
-      {showFilterAlert && (
-        <FilterAlertModal
-          combinedCount={filterCombined}
-          slimCount={filterSlim}
-          roundCount={filterRound}
-          onDismiss={() => setFilterAlertDismissed(true)}
+      {showBackwashAlert && (
+        <BackwashAlertModal
+          combinedCount={backwashCombined}
+          slimCount={backwashSlim}
+          roundCount={backwashRound}
+          onDismiss={() => setBackwashAlertDismissed(true)}
         />
       )}
     </div>

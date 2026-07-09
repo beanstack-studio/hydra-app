@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuthStore } from '@/stores/authStore'
-import { useFilterStore } from '@/stores/filterStore'
+import { useBackwashStore } from '@/stores/backwashStore'
 import { cn } from '@/lib/utils'
 
 interface PageHeaderProps {
@@ -17,10 +17,10 @@ export function PageHeader({ title, children }: PageHeaderProps) {
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
   const stationName     = station?.name ?? ''
 
-  const filterZone   = useFilterStore((s) => s.zone)
-  const filterLoaded = useFilterStore((s) => s.isLoaded)
-  const showBadge    = filterLoaded && filterZone !== 'green'
-  const badgeClass   = filterZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+  const backwashZone   = useBackwashStore((s) => s.zone)
+  const backwashLoaded = useBackwashStore((s) => s.isLoaded)
+  const showBadge      = backwashLoaded && backwashZone !== 'green'
+  const badgeClass     = backwashZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
 
   return (
     <div className="flex items-center justify-between mb-6">

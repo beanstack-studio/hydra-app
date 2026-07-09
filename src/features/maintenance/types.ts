@@ -26,12 +26,12 @@ export type MaintenanceLogInput = {
   photos_urls: string | null
 }
 
-// Filter Replacement Tracker — one row per replacement event
-export interface FilterReplacement {
+// Backwash Tracker — one row per backwash event
+export interface BackwashLog {
   id: string
   station_id: string
-  replaced_at: string
-  slim_count_at_replacement: number
-  round_count_at_replacement: number
+  backwashed_at: string
+  slim_count_at_backwash: number
+  round_count_at_backwash: number
   created_at: string
 }
