@@ -69,6 +69,11 @@ export function computeFilterReplacementZone(daysRemaining: number): FilterRepla
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+export interface SupplyOption {
+  id: string
+  name: string
+}
+
 export interface UseFilterReplacementReturn {
   lastReplacedAt: string | null
   nextDueDate: Date | null
@@ -78,6 +83,7 @@ export interface UseFilterReplacementReturn {
   replacementsYtd: number
   linkedSupplyId: string | null
   linkedSupplyQty: number
+  supplies: SupplyOption[]
   zone: FilterReplacementZone
   isLoading: boolean
   error: string | null
@@ -94,6 +100,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [cycleDays,      setCycleDays]      = useState(30)
   const [replacementDay, setReplacementDay] = useState(DEFAULT_REPLACEMENT_DAY)
   const [replacementsYtd, setReplacementsYtd] = useState(0)
+  const [supplies,        setSupplies]        = useState<SupplyOption[]>([])
   const [linkedSupplyId,  setLinkedSupplyId]  = useState<string | null>(null)
   const [linkedSupplyQty, setLinkedSupplyQty] = useState(1)
   const [zone,           setZone]           = useState<FilterReplacementZone>('red')
@@ -109,7 +116,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       const ytdStartTz   = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
       const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
 
-      const [logsRes, ytdRes, settingsRes] = await Promise.all([
+      const [logsRes, ytdRes, settingsRes, suppliesRes] = await Promise.all([
         supabase
           .from('filter_replacement_logs')
           .select('replaced_at')
@@ -126,6 +133,12 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
           .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty')
           .eq('station_id', stationId)
           .maybeSingle(),
+        // Fetch supply names for the settings modal dropdown — plain read, no realtime needed
+        supabase
+          .from('supplies')
+          .select('id, name')
+          .eq('station_id', stationId)
+          .order('name'),
       ])
 
       if (logsRes.error) throw new Error(logsRes.error.message)
@@ -170,6 +183,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setCycleDays(cycle)
       setReplacementDay(fetchedDay)
       setReplacementsYtd(ytdRes.count ?? 0)
+      setSupplies((suppliesRes.data ?? []) as SupplyOption[])
       setLinkedSupplyId(fetchedSupplyId)
       setLinkedSupplyQty(fetchedSupplyQty ?? 1)
       setZone(computedZone)
@@ -248,6 +262,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     cycleDays,
     replacementDay,
     replacementsYtd,
+    supplies,
     linkedSupplyId,
     linkedSupplyQty,
     zone,

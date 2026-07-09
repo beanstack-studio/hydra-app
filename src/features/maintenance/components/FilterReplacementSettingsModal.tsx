@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import type { Supply } from '@/features/supplies/types'
+import type { SupplyOption } from '../hooks/useFilterReplacement'
 
 const schema = z.object({
   day: z.coerce
@@ -28,7 +28,7 @@ interface FilterReplacementSettingsModalProps {
   replacementDay: number
   linkedSupplyId: string | null
   linkedSupplyQty: number
-  supplies: Supply[]
+  supplies: SupplyOption[]
   onSave: (day: number, supplyId: string | null, supplyQty: number) => Promise<void>
 }
 

@@ -3,7 +3,6 @@ import { Calendar, CheckCircle2, AlertTriangle, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { useFilterReplacement } from '../hooks/useFilterReplacement'
-import { useSupplies } from '@/features/supplies/hooks/useSupplies'
 import { FilterReplacementSettingsModal } from './FilterReplacementSettingsModal'
 import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -24,6 +23,7 @@ export function FilterReplacementCard() {
     cycleDays,
     replacementDay,
     replacementsYtd,
+    supplies,
     linkedSupplyId,
     linkedSupplyQty,
     zone,
@@ -32,8 +32,6 @@ export function FilterReplacementCard() {
     markAsReplaced,
     updateSettings,
   } = useFilterReplacement()
-
-  const { data: supplies } = useSupplies()
 
   const [isMarking,    setIsMarking]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
