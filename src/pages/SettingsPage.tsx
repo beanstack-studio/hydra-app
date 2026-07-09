@@ -14,6 +14,7 @@ import { ProductsTab } from '@/features/settings/components/ProductsTab'
 import { TeamSettings } from '@/features/settings/components/TeamSettings'
 import { MaintenanceTable } from '@/features/maintenance/components/MaintenanceTable'
 import { BackwashCard } from '@/features/maintenance/components/BackwashCard'
+import { FilterReplacementCard } from '@/features/maintenance/components/FilterReplacementCard'
 import { PlanSettings } from '@/features/settings/components/PlanSettings'
 import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
@@ -159,6 +160,7 @@ export default function SettingsPage() {
             {/* Grid: single column on mobile, 2-column on lg+ (ready for a second card) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <BackwashCard />
+              <FilterReplacementCard />
             </div>
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
