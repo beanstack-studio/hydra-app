@@ -29,15 +29,68 @@ export function BackwashCard() {
     alertEnabled,
     zone,
     isLoading,
+    isConfigured,
     error,
     markAsBackwashed,
     updateThreshold,
   } = useBackwashTracker()
 
-  const [isMarking,     setIsMarking]     = useState(false)
-  const [settingsOpen,  setSettingsOpen]  = useState(false)
+  const [isMarking,    setIsMarking]    = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Progress bar: 0–100 within the SVG viewBox
+  if (isLoading) return <LoadingSkeleton rows={3} />
+
+  if (error) return (
+    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      {error}
+    </div>
+  )
+
+  // ── Not configured ─────────────────────────────────────────────────────────
+  // backwash_threshold is NULL — show a neutral placeholder with no bar or badge.
+  if (!isConfigured) {
+    return (
+      <>
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted">
+                <Droplets className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Backwash Tracker</p>
+            </div>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-all duration-150"
+                aria-label="Set up backwash tracking"
+              >
+                <Settings className="h-3 w-3" />
+                Set up
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground py-1">
+            Not set up yet — configure in settings to start tracking.
+          </p>
+        </div>
+
+        {isOwner && (
+          <BackwashSettingsModal
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            threshold={threshold}
+            alertEnabled={alertEnabled}
+            onSave={updateThreshold}
+          />
+        )}
+      </>
+    )
+  }
+
+  // ── Configured — normal tracking state ────────────────────────────────────
+
   const barPercent = Math.min(100, (combinedCount / threshold) * 100)
   const barTicks   = computeBarTicks(threshold)
 
@@ -84,14 +137,6 @@ export function BackwashCard() {
       setIsMarking(false)
     }
   }
-
-  if (isLoading) return <LoadingSkeleton rows={3} />
-
-  if (error) return (
-    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-      {error}
-    </div>
-  )
 
   return (
     <>
@@ -144,7 +189,6 @@ export function BackwashCard() {
               )}
             </svg>
           </div>
-          {/* 4 tick labels: 0 / ⅓ / ⅔ / max */}
           <div className="flex justify-between text-[9px] text-muted-foreground px-0.5">
             {barTicks.map((t) => (
               <span key={t}>{t}</span>
@@ -152,7 +196,7 @@ export function BackwashCard() {
           </div>
         </div>
 
-        {/* Count row + button (side-by-side on md+, stacked on mobile) */}
+        {/* Count row + button */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>

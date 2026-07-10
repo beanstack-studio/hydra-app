@@ -29,6 +29,7 @@ export function FilterReplacementCard() {
     cycleDays,
     intervalDays,
     alertEnabled,
+    isConfigured,
     replacementsYtd,
     supplies,
     linkedSupplies,
@@ -42,7 +43,61 @@ export function FilterReplacementCard() {
   const [isMarking,    setIsMarking]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Countdown bar: full (100%) right after replacement, drains to 0% at due date.
+  if (isLoading) return <LoadingSkeleton rows={3} />
+
+  if (error) return (
+    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      {error}
+    </div>
+  )
+
+  // ── Not configured ─────────────────────────────────────────────────────────
+  // filter_replacement_interval_days is NULL — show neutral placeholder with no bar or badge.
+  if (!isConfigured) {
+    return (
+      <>
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Filter Replacement</p>
+            </div>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-all duration-150"
+                aria-label="Set up filter replacement tracking"
+              >
+                <Settings className="h-3 w-3" />
+                Set up
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground py-1">
+            Not set up yet — configure in settings to start tracking.
+          </p>
+        </div>
+
+        {isOwner && (
+          <FilterReplacementSettingsModal
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            intervalDays={intervalDays}
+            alertEnabled={alertEnabled}
+            linkedSupplies={linkedSupplies}
+            supplies={supplies}
+            onSave={updateSettings}
+          />
+        )}
+      </>
+    )
+  }
+
+  // ── Configured — normal tracking state ────────────────────────────────────
+
   const barPercent = lastReplacedAt === null
     ? 0
     : Math.max(0, Math.min(100, (daysRemaining / cycleDays) * 100))
@@ -73,8 +128,6 @@ export function FilterReplacementCard() {
     red:    'text-red-600 dark:text-red-400',
   }[zone]
 
-  // Split main display line: number (bold/large) + descriptor (small/regular)
-  // mainNumber is null when there is no leading numeric value ("Due today", "No replacement recorded")
   const mainNumber: number | null =
     lastReplacedAt !== null && daysRemaining !== 0
       ? daysRemaining > 0 ? daysRemaining : Math.abs(daysRemaining)
@@ -105,14 +158,6 @@ export function FilterReplacementCard() {
       setIsMarking(false)
     }
   }
-
-  if (isLoading) return <LoadingSkeleton rows={3} />
-
-  if (error) return (
-    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-      {error}
-    </div>
-  )
 
   return (
     <>
@@ -165,7 +210,6 @@ export function FilterReplacementCard() {
               )}
             </svg>
           </div>
-          {/* Tick labels: days remaining (0 = empty/overdue, cycleDays = full/just replaced) */}
           <div className="flex justify-between text-[9px] text-muted-foreground px-0.5">
             {barTicks.map((t) => (
               <span key={t}>{t}</span>
@@ -173,7 +217,7 @@ export function FilterReplacementCard() {
           </div>
         </div>
 
-        {/* Count row + button (side-by-side on md+, stacked on mobile) */}
+        {/* Count row + button */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>

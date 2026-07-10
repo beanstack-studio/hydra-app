@@ -78,19 +78,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const stationName     = station?.name ?? 'My Station'
   const planLabel       = station?.plan === 'free' ? 'Free' : 'Pro'
 
-  const backwashZone   = useBackwashStore((s) => s.zone)
-  const backwashLoaded = useBackwashStore((s) => s.isLoaded)
-  const filterZone     = useFilterReplacementStore((s) => s.zone)
+  const backwashZone        = useBackwashStore((s) => s.zone)
+  const backwashLoaded      = useBackwashStore((s) => s.isLoaded)
+  const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
+  const filterZone          = useFilterReplacementStore((s) => s.zone)
+  const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
 
-  // Show badge if either card is in a non-green zone.
-  // filterZone defaults to 'green' in the store, so no false positives before data loads.
-  // backwashLoaded guard kept for backwash (its store also defaults to 'green' but isLoaded
-  // is already the established pattern there — keeping it consistent).
-  // Red wins: if either card is red the badge is red; otherwise yellow.
-  const showMaintenanceBadge =
-    (backwashLoaded && backwashZone !== 'green') || filterZone !== 'green'
+  // Badge only shows when the card is both loaded AND configured AND in a non-green zone.
+  // Unconfigured cards contribute nothing to the badge — they have their own "Set up" CTA.
+  const showBackwashBadge = backwashLoaded && backwashConfigured && backwashZone !== 'green'
+  const showFilterBadge   = filterConfigured && filterZone !== 'green'
+  const showMaintenanceBadge = showBackwashBadge || showFilterBadge
   const maintenanceBadgeClass =
-    backwashZone === 'red' || filterZone === 'red' ? 'bg-red-500' : 'bg-yellow-400'
+    (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
+      ? 'bg-red-500'
+      : 'bg-yellow-400'
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage

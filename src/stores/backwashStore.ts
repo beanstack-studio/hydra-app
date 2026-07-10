@@ -26,6 +26,9 @@ interface BackwashStoreState {
   zone: BackwashZone
   /** True once the first successful fetch has completed. Used to gate the login alert. */
   isLoaded: boolean
+  /** True only when backwash_threshold is non-null on station_settings.
+   *  Suppresses badge, "!" indicator, and login alert when false. */
+  isConfigured: boolean
   /** When false, the login popup is suppressed even when zone is red. Badge still shows. */
   alertEnabled: boolean
   setCounts: (data: {
@@ -39,6 +42,8 @@ interface BackwashStoreState {
   }) => void
   setThreshold: (threshold: number) => void
   setAlertEnabled: (enabled: boolean) => void
+  /** Called when the station has no backwash threshold configured. Resets to neutral state. */
+  setUnconfigured: () => void
 }
 
 export const useBackwashStore = create<BackwashStoreState>()((set) => ({
@@ -52,12 +57,14 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
   threshold: DEFAULT_BACKWASH_THRESHOLD,
   zone: 'green',
   isLoaded: false,
-  alertEnabled: true,
+  isConfigured: false,
+  alertEnabled: false,
   setCounts: (data) =>
     set((state) => ({
       ...data,
       zone: computeBackwashZone(data.combinedCount, state.threshold),
       isLoaded: true,
+      isConfigured: true,
     })),
   setThreshold: (threshold) =>
     set((state) => ({
@@ -65,4 +72,10 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
       zone: computeBackwashZone(state.combinedCount, threshold),
     })),
   setAlertEnabled: (enabled) => set({ alertEnabled: enabled }),
+  setUnconfigured: () => set({
+    zone: 'green',
+    isLoaded: true,
+    isConfigured: false,
+    alertEnabled: false,
+  }),
 }))

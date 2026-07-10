@@ -3,12 +3,14 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useBackwashStore, DEFAULT_BACKWASH_THRESHOLD } from '@/stores/backwashStore'
-
-const DEFAULT_BACKWASH_ALERT_ENABLED = true
 import { PH_TZ } from '@/lib/utils'
 import type { BackwashZone } from '@/stores/backwashStore'
 
 export type { BackwashZone }
+
+// Fallback when DB row exists but backwash_alert_enabled is null (defensive).
+// Keeping true so the modal toggle defaults ON when first configured.
+const DEFAULT_BACKWASH_ALERT_ENABLED = true
 
 // ── Refill detection ─────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ export interface UseBackwashTrackerReturn {
   alertEnabled: boolean
   zone: BackwashZone
   isLoading: boolean
+  isConfigured: boolean
   error: string | null
   markAsBackwashed: () => Promise<void>
   updateThreshold: (threshold: number, alertEnabled: boolean) => Promise<void>
@@ -67,6 +70,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
   const setThreshold     = useBackwashStore((s) => s.setThreshold)
   const setAlertEnabled  = useBackwashStore((s) => s.setAlertEnabled)
   const alertEnabled     = useBackwashStore((s) => s.alertEnabled)
+  const isConfigured     = useBackwashStore((s) => s.isConfigured)
   const combinedCount    = useBackwashStore((s) => s.combinedCount)
   const slimCount        = useBackwashStore((s) => s.slimCount)
   const roundCount       = useBackwashStore((s) => s.roundCount)
@@ -84,11 +88,9 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      // Compute PHT year before queries (needed for YTD filter)
-      const phNow = toZonedTime(new Date(), PH_TZ)
+      const phNow      = toZonedTime(new Date(), PH_TZ)
       const ytdStartTz = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
 
-      // Fetch in parallel: last backwash log, YTD backwash count, all sales, and threshold
       const [logsRes, ytdCountRes, salesRes, settingsRes] = await Promise.all([
         supabase
           .from('backwash_logs')
@@ -114,31 +116,37 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
 
       if (logsRes.error) throw new Error(logsRes.error.message)
       if (salesRes.error) throw new Error(salesRes.error.message)
-      // settingsRes failure is non-fatal — fall back to default
+      // settingsRes failure is non-fatal — fall back to unconfigured
 
-      const fetchedThreshold =
-        settingsRes.data?.backwash_threshold ?? DEFAULT_BACKWASH_THRESHOLD
-      const fetchedAlertEnabled =
-        (settingsRes.data?.backwash_alert_enabled as boolean | null | undefined)
-          ?? DEFAULT_BACKWASH_ALERT_ENABLED
+      // ── Configured vs. not configured ────────────────────────────────────
+      // "Not configured" = backwash_threshold IS NULL on station_settings
+      // (or no row at all). The card renders a placeholder until the owner
+      // saves a real threshold via the settings modal.
+      const configured = settingsRes.data?.backwash_threshold != null
 
-      // Update threshold first so setCounts can use it for zone computation
+      if (!configured) {
+        useBackwashStore.getState().setUnconfigured()
+        return
+      }
+
+      const fetchedThreshold    = settingsRes.data!.backwash_threshold as number
+      const fetchedAlertEnabled = (settingsRes.data?.backwash_alert_enabled as boolean | null | undefined)
+        ?? DEFAULT_BACKWASH_ALERT_ENABLED
+
+      // Update threshold before setCounts so zone is computed with the correct max
       setThreshold(fetchedThreshold)
       setAlertEnabled(fetchedAlertEnabled)
 
-      const lastBackwashedAt =
-        (logsRes.data?.[0]?.backwashed_at as string | undefined) ?? null
+      const fetchedLastAt = (logsRes.data?.[0]?.backwashed_at as string | undefined) ?? null
 
       // Convert to PH date for comparison with sale_date (YYYY-MM-DD)
       // spec: "sale_date > MAX(backwashed_at)" → sales ON the backwash day don't count
-      const lastBackwashedDate = lastBackwashedAt
-        ? formatInTimeZone(new Date(lastBackwashedAt), PH_TZ, 'yyyy-MM-dd')
+      const lastBackwashedDate = fetchedLastAt
+        ? formatInTimeZone(new Date(fetchedLastAt), PH_TZ, 'yyyy-MM-dd')
         : null
 
-      // YTD start in PH timezone (date string for sale_date comparison)
       const ytdStart = `${phNow.getFullYear()}-01-01`
 
-      // Accumulate counts
       let slim = 0, round = 0
       let sYtd = 0, rYtd = 0
 
@@ -146,13 +154,10 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         const { slim: s, round: r } = countRefillsFromSale(sale)
         const saleDate = sale.sale_date
 
-        // Since last backwash (all-time if never backwashed)
         if (!lastBackwashedDate || saleDate > lastBackwashedDate) {
           slim  += s
           round += r
         }
-
-        // YTD — independent of backwash resets
         if (saleDate >= ytdStart) {
           sYtd += s
           rYtd += r
@@ -166,20 +171,19 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         slimYtd:         sYtd,
         roundYtd:        rYtd,
         backwashYtd:     ytdCountRes.count ?? 0,
-        lastBackwashedAt,
+        lastBackwashedAt: fetchedLastAt,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load backwash data')
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, setCounts, setThreshold])
+  }, [stationId, setCounts, setThreshold, setAlertEnabled])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
   const markAsBackwashed = useCallback(async () => {
     if (!stationId) return
-    // Use getState() to always capture the latest counts at call time
     const { slimCount, roundCount } = useBackwashStore.getState()
 
     const { error: e } = await supabase
@@ -201,18 +205,17 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
       .from('station_settings')
       .upsert(
         {
-          station_id:            stationId,
-          backwash_threshold:    newThreshold,
+          station_id:             stationId,
+          backwash_threshold:     newThreshold,
           backwash_alert_enabled: newAlertEnabled,
-          updated_at:            new Date().toISOString(),
+          updated_at:             new Date().toISOString(),
         },
         { onConflict: 'station_id' }
       )
     if (e) throw new Error(e.message)
-    // Update stores immediately so the card/AppShell reflect new values at once
-    setThreshold(newThreshold)
-    setAlertEnabled(newAlertEnabled)
-  }, [stationId, setThreshold, setAlertEnabled])
+    // fetchData re-reads the DB and sets isConfigured = true via setCounts
+    await fetchData()
+  }, [stationId, fetchData])
 
   return {
     combinedCount,
@@ -226,6 +229,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     alertEnabled,
     zone,
     isLoading,
+    isConfigured,
     error,
     markAsBackwashed,
     updateThreshold,

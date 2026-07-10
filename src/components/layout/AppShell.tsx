@@ -94,21 +94,22 @@ export function AppShell() {
   const plan   = usePlan()
   const isFree = plan === 'free'
 
-  // Backwash alert — fires when zone is red (≥ red threshold), not just at the hard limit
+  // Backwash alert — fires when configured, loaded, zone red, alert enabled, not dismissed
   const backwashLoaded        = useBackwashStore((s) => s.isLoaded)
+  const backwashConfigured    = useBackwashStore((s) => s.isConfigured)
   const backwashZone          = useBackwashStore((s) => s.zone)
   const backwashAlertEnabled  = useBackwashStore((s) => s.alertEnabled)
   const backwashCombined      = useBackwashStore((s) => s.combinedCount)
   const backwashSlim          = useBackwashStore((s) => s.slimCount)
   const backwashRound         = useBackwashStore((s) => s.roundCount)
-  const showBackwashAlert     = backwashLoaded && backwashZone === 'red' && backwashAlertEnabled && !backwashAlertDismissed
+  const showBackwashAlert     = backwashLoaded && backwashConfigured && backwashZone === 'red' && backwashAlertEnabled && !backwashAlertDismissed
 
-  // Filter replacement alert — fires when zone is red (due today or overdue)
-  // Shown sequentially after backwash alert is dismissed, so only one modal at a time
+  // Filter replacement alert — same gates; shown after backwash alert is dismissed
   const filterLoaded          = useFilterReplacementStore((s) => s.isLoaded)
+  const filterConfigured      = useFilterReplacementStore((s) => s.isConfigured)
   const filterZone            = useFilterReplacementStore((s) => s.zone)
   const filterAlertEnabled    = useFilterReplacementStore((s) => s.alertEnabled)
-  const showFilterAlert       = !showBackwashAlert && filterLoaded && filterZone === 'red' && filterAlertEnabled && !filterAlertDismissed
+  const showFilterAlert       = !showBackwashAlert && filterLoaded && filterConfigured && filterZone === 'red' && filterAlertEnabled && !filterAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {

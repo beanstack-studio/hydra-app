@@ -44,6 +44,7 @@ export interface UseFilterReplacementReturn {
   cycleDays: number
   intervalDays: number
   alertEnabled: boolean
+  isConfigured: boolean
   replacementsYtd: number
   linkedSupplies: FilterReplacementSupplyLink[]
   supplies: SupplyOption[]
@@ -64,6 +65,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [cycleDays,       setCycleDays]       = useState(DEFAULT_INTERVAL_DAYS)
   const [intervalDays,    setIntervalDays]    = useState(DEFAULT_INTERVAL_DAYS)
   const [alertEnabled,    setAlertEnabledState] = useState(DEFAULT_FILTER_ALERT_ENABLED)
+  const [isConfigured,    setIsConfiguredState] = useState(false)
   const [replacementsYtd, setReplacementsYtd] = useState(0)
   const [supplies,        setSupplies]        = useState<SupplyOption[]>([])
   const [linkedSupplies,  setLinkedSupplies]  = useState<FilterReplacementSupplyLink[]>([])
@@ -104,23 +106,36 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       ])
 
       if (logsRes.error) throw new Error(logsRes.error.message)
-      // settingsRes failure is non-fatal — fall back to defaults
+      // settingsRes failure is non-fatal — treat as unconfigured
 
-      const fetchedInterval = (settingsRes.data?.filter_replacement_interval_days as number | null | undefined)
-        ?? DEFAULT_INTERVAL_DAYS
-      const fetchedAlertEnabled = (settingsRes.data?.filter_replacement_alert_enabled as boolean | null | undefined)
-        ?? DEFAULT_FILTER_ALERT_ENABLED
-      const fetchedLastAt   = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
-
-      // Read linked supply from legacy single columns.
+      // Read supply options regardless of configuration (needed for the modal)
       const legacyId  = (settingsRes.data?.filter_replacement_supply_id as string | null | undefined) ?? null
       const legacyQty = (settingsRes.data?.filter_replacement_supply_qty as number | null | undefined) ?? 1
       const fetchedSupplies: FilterReplacementSupplyLink[] = legacyId
         ? [{ supply_id: legacyId, qty: legacyQty }]
         : []
+      setSupplies((suppliesRes.data ?? []) as SupplyOption[])
+      setLinkedSupplies(fetchedSupplies)
+
+      // ── Configured vs. not configured ────────────────────────────────────
+      // "Not configured" = filter_replacement_interval_days IS NULL on station_settings
+      // (or no row at all). Card renders a placeholder until owner saves a real interval.
+      const configured = settingsRes.data?.filter_replacement_interval_days != null
+
+      if (!configured) {
+        setIsConfiguredState(false)
+        setIntervalDays(DEFAULT_INTERVAL_DAYS)     // modal default when first opened
+        setAlertEnabledState(DEFAULT_FILTER_ALERT_ENABLED)
+        useFilterReplacementStore.getState().setUnconfigured()
+        return
+      }
+
+      const fetchedInterval     = settingsRes.data!.filter_replacement_interval_days as number
+      const fetchedAlertEnabled = (settingsRes.data?.filter_replacement_alert_enabled as boolean | null | undefined)
+        ?? DEFAULT_FILTER_ALERT_ENABLED
+      const fetchedLastAt       = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
       // ── Interval-based day arithmetic in PHT ─────────────────────────────
-      // nextDue = lastReplaced + intervalDays (simple date addition, no month clamping needed)
       const MS_PER_DAY = 86_400_000
 
       let nextDue: Date
@@ -129,7 +144,6 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       let computedZone: FilterReplacementZone
 
       if (fetchedLastAt === null) {
-        // No replacement recorded yet — show as overdue/due today
         nextDue      = todayMidnight
         elapsed      = 0
         daysRem      = 0
@@ -151,14 +165,13 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setCycleDays(fetchedInterval)
       setIntervalDays(fetchedInterval)
       setAlertEnabledState(fetchedAlertEnabled)
+      setIsConfiguredState(true)
       setReplacementsYtd(ytdRes.count ?? 0)
-      setSupplies((suppliesRes.data ?? []) as SupplyOption[])
-      setLinkedSupplies(fetchedSupplies)
       setZone(computedZone)
-      // Push to global store so Sidebar badge and login alert can read zone/alertEnabled
+      // Push to global store so Sidebar badge and login alert can read zone/alertEnabled/isConfigured
       // regardless of whether FilterReplacementCard is mounted.
       const store = useFilterReplacementStore.getState()
-      store.setZone(computedZone)
+      store.setZone(computedZone)        // also sets store.isConfigured = true
       store.setAlertEnabled(fetchedAlertEnabled)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
@@ -238,6 +251,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     cycleDays,
     intervalDays,
     alertEnabled,
+    isConfigured,
     replacementsYtd,
     linkedSupplies,
     supplies,
