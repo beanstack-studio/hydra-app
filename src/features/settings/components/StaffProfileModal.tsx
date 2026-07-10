@@ -34,6 +34,7 @@ interface StaffProfileModalProps {
   onSendInvite: (email: string, fullName: string) => Promise<void>
   onRevokeAccess: (staffId: string) => Promise<void>
   activeEmails: Set<string>
+  pendingInviteEmails: Set<string>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ export function StaffProfileModal({
   onSendInvite,
   onRevokeAccess,
   activeEmails,
+  pendingInviteEmails,
 }: StaffProfileModalProps) {
   const { toast } = useToast()
   const plan = usePlan()
@@ -67,18 +69,19 @@ export function StaffProfileModal({
   const watchedPayRate = watch('pay_rate')
   const watchedName    = watch('full_name')
 
-  // hasAccess is derived from the SAVED staff.email — not the live form value.
-  // This prevents the UI from flickering if the admin types a new email.
-  const hasAccess = !!staff?.email && activeEmails.has(staff.email.toLowerCase())
+  // hasAccess: staff has accepted the invite and has an active login.
+  // hasPendingInvite: invite was sent but not yet accepted — derived from real
+  //   server data (pendingInviteEmails from useTeamSettings), so it's consistent
+  //   across any device/session, not just the one that triggered the send.
+  const hasAccess        = !!staff?.email && activeEmails.has(staff.email.toLowerCase())
+  const hasPendingInvite = !hasAccess && !!staff?.email && pendingInviteEmails.has(staff.email.toLowerCase())
 
-  const [inviteSent,        setInviteSent]        = useState(false)
   const [isSendingInvite,   setIsSendingInvite]   = useState(false)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   const [isRevoking,        setIsRevoking]        = useState(false)
 
   useEffect(() => {
     if (isOpen) {
-      setInviteSent(false)
       setShowRevokeConfirm(false)
       reset({
         full_name: staff?.full_name ?? '',
@@ -120,7 +123,8 @@ export function StaffProfileModal({
     setIsSendingInvite(true)
     try {
       await onSendInvite(email, watchedName)
-      setInviteSent(true)
+      // No local inviteSent flag needed — onSendInvite calls fetchAll() which
+      // updates pendingInviteEmails in the hook, driving hasPendingInvite here.
       toast({ title: 'Invite sent', description: `Invitation link sent to ${email}` })
     } catch (e) {
       toast({
@@ -139,7 +143,6 @@ export function StaffProfileModal({
     try {
       await onRevokeAccess(staff.id)
       setShowRevokeConfirm(false)
-      setInviteSent(false)
       toast({ title: 'Access revoked', description: `${staff.full_name} can no longer sign in.` })
       // Modal stays open — UI transitions to State A so owner can re-invite if needed
     } catch (e) {
@@ -294,10 +297,10 @@ export function StaffProfileModal({
                 type="email"
                 placeholder="staff@example.com"
                 className="flex-1 min-w-0"
-                disabled={inviteSent}
+                disabled={hasPendingInvite}
                 {...register('email')}
               />
-              {inviteSent ? (
+              {hasPendingInvite ? (
                 <Button
                   type="button"
                   size="sm"
@@ -332,7 +335,7 @@ export function StaffProfileModal({
             {errors.email && (
               <p className="text-xs text-destructive">{errors.email.message}</p>
             )}
-            {inviteSent ? (
+            {hasPendingInvite ? (
               <p className="text-xs font-medium text-primary">
                 Invite sent — link emailed to {watchedEmail ?? staff?.email}
               </p>

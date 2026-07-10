@@ -5,6 +5,8 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { cn, downloadCSV, PH_TZ } from '@/lib/utils'
 import { formatInTimeZone } from 'date-fns-tz'
+import { usePlan } from '@/hooks/usePlan'
+import { useAuthStore } from '@/stores/authStore'
 import type { FilterGroup } from './FilterButton'
 import type { ExportColumnDef } from './ExportModal'
 import {
@@ -56,6 +58,10 @@ export function TableOptionsButton({
   exportFilename = 'hydra-export',
   exportTitle = 'Export',
 }: TableOptionsButtonProps) {
+  const plan = usePlan()
+  const role = useAuthStore((s) => s.role)
+  const canExport = plan !== 'free' && (role === 'owner' || role === 'super_admin')
+
   const [isOpen,        setIsOpen]        = useState(false)
   const [exportChecked, setExportChecked] = useState<Record<string, boolean>>({})
   const [format,        setFormat]        = useState<FileFormat>('csv')
@@ -64,7 +70,7 @@ export function TableOptionsButton({
     .filter(([k, v]) => v && !uncountedFilterKeys?.includes(k))
     .length
   const hasFilters        = filterGroups  && filterGroups.length  > 0
-  const hasExport         = exportColumns && exportColumns.length > 0 && exportRows
+  const hasExport         = canExport && exportColumns && exportColumns.length > 0 && exportRows
 
   // Initialise column checked state when dialog opens.
   // When hiddenKeys is provided, it is the source of truth:

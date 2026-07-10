@@ -43,6 +43,7 @@ export interface MemberInput {
 interface UseTeamSettingsReturn {
   staff: StaffMember[]
   activeEmails: Set<string>
+  pendingInviteEmails: Set<string>
   isLoading: boolean
   addMember: (input: MemberInput) => Promise<void>
   editMember: (id: string, input: MemberInput) => Promise<void>
@@ -55,12 +56,13 @@ export function useTeamSettings(): UseTeamSettingsReturn {
   const stationId = useAuthStore((s) => s.stationId)
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [activeEmails, setActiveEmails] = useState<Set<string>>(new Set())
+  const [pendingInviteEmails, setPendingInviteEmails] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     if (!stationId) { setIsLoading(false); return }
 
-    const [staffResult, emailsResult] = await Promise.all([
+    const [staffResult, emailsResult, pendingResult] = await Promise.all([
       supabase
         .from('staff')
         .select('id, full_name, phone, email, pay_type, pay_rate, created_at')
@@ -70,6 +72,10 @@ export function useTeamSettings(): UseTeamSettingsReturn {
       // would return nothing for staff in the owner's station. Use the
       // SECURITY DEFINER RPC which bypasses RLS and returns staff emails only.
       supabase.rpc('get_station_staff_emails'),
+      // invitations table RLS only allows reading your own row, so a direct
+      // SELECT returns nothing for the owner. SECURITY DEFINER RPC returns
+      // all pending invitations for the caller's station.
+      supabase.rpc('get_station_pending_invites'),
     ])
 
     setStaff((staffResult.data ?? []) as StaffMember[])
@@ -79,6 +85,13 @@ export function useTeamSettings(): UseTeamSettingsReturn {
         .map((u) => u.email.toLowerCase()),
     )
     setActiveEmails(emailSet)
+
+    const pendingSet = new Set(
+      ((pendingResult.data ?? []) as Array<{ email: string }>)
+        .map((i) => i.email.toLowerCase()),
+    )
+    setPendingInviteEmails(pendingSet)
+
     setIsLoading(false)
   }, [stationId])
 
@@ -181,5 +194,5 @@ export function useTeamSettings(): UseTeamSettingsReturn {
     await fetchAll()
   }, [fetchAll])
 
-  return { staff, activeEmails, isLoading, addMember, editMember, removeMember, sendInvite, revokeAccess }
+  return { staff, activeEmails, pendingInviteEmails, isLoading, addMember, editMember, removeMember, sendInvite, revokeAccess }
 }

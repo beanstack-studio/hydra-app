@@ -6,7 +6,8 @@ import { Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
-import { generateTimeSlots } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+import { cn, generateTimeSlots } from '@/lib/utils'
 import { DEFAULT_OPEN_HOURS as DEFAULTS } from '../types'
 import type { StationSettings, StationSettingsInput, DayKey, OpenHours } from '../types'
 
@@ -70,6 +71,7 @@ interface OpenHoursSettingsProps {
 
 export function OpenHoursSettings({ stationSettings, onUpdateSettings }: OpenHoursSettingsProps) {
   const { toast } = useToast()
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
   const [isEditing, setIsEditing] = useState(false)
 
   const currentHours: OpenHours = stationSettings?.open_hours ?? DEFAULTS
@@ -93,6 +95,7 @@ export function OpenHoursSettings({ stationSettings, onUpdateSettings }: OpenHou
   const watchedDays = watch()
 
   const onSave = handleSubmit(async (values) => {
+    if (!isOwner) return
     try {
       await onUpdateSettings({ open_hours: values as OpenHours })
       toast({ title: 'Open hours saved' })
@@ -120,8 +123,11 @@ export function OpenHoursSettings({ stationSettings, onUpdateSettings }: OpenHou
 
         <button
           type="button"
-          className="w-full text-left rounded-lg border border-border bg-card divide-y divide-border cursor-pointer hover:border-primary/50 transition-colors duration-150"
-          onClick={() => setIsEditing(true)}
+          className={cn(
+            'w-full text-left rounded-lg border border-border bg-card divide-y divide-border transition-colors duration-150',
+            isOwner ? 'cursor-pointer hover:border-primary/50' : 'cursor-default',
+          )}
+          onClick={isOwner ? () => setIsEditing(true) : undefined}
         >
           {DAY_ORDER.map((day) => {
             const d = currentHours[day]

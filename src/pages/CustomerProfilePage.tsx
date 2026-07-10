@@ -16,6 +16,8 @@ import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
 import { useAuthStore } from '@/stores/authStore'
+import { usePlan } from '@/hooks/usePlan'
+import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
@@ -71,6 +73,8 @@ export default function CustomerProfilePage() {
 
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
+  const plan    = usePlan()
+  const isPro   = plan !== 'free'
   const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer } = useCustomerProfile(id)
 
   // ── Sort state ────────────────────────────────────────────────────────────
@@ -226,6 +230,9 @@ export default function CustomerProfilePage() {
   // ── End debug ──────────────────────────────────────────────────────────────
 
   const { hiddenKeys, toggleColumn } = useTablePrefs('customer-order-history', [])
+
+  // Free-plan gate — covers direct-URL access bypassing CustomersPage's UpgradeWall
+  if (!isPro) return <UpgradeWall title="Customer Profile" feature="Customers" />
 
   // ── Export rows ───────────────────────────────────────────────────────────
   const orderHistoryExportRows = sortedSales.map((s) => ({
@@ -453,8 +460,8 @@ export default function CustomerProfilePage() {
                 Order History
               </h2>
               <div className="flex items-center gap-2">
-                {/* Bulk payment button — only when there are unpaid/partial sales */}
-                {hasBulkable && !selectionMode && (
+                {/* Bulk payment button — Pro plan only, only when there are unpaid/partial sales */}
+                {isPro && hasBulkable && !selectionMode && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -506,7 +513,7 @@ export default function CustomerProfilePage() {
             />
 
             {/* ── Bulk payment action bar — inline below table ── */}
-            {selectionMode && (
+            {isPro && selectionMode && (
               <div className="mt-4 rounded-xl border border-border bg-card shadow-sm p-4 space-y-3">
 
                 {/* Header label */}
