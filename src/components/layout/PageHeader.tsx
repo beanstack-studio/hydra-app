@@ -3,6 +3,7 @@ import { Building2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useBackwashStore } from '@/stores/backwashStore'
+import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 import { cn } from '@/lib/utils'
 
 interface PageHeaderProps {
@@ -17,10 +18,18 @@ export function PageHeader({ title, children }: PageHeaderProps) {
   const stationPhotoUrl = (station as { photo_url?: string | null } | null)?.photo_url ?? null
   const stationName     = station?.name ?? ''
 
-  const backwashZone   = useBackwashStore((s) => s.zone)
-  const backwashLoaded = useBackwashStore((s) => s.isLoaded)
-  const showBadge      = backwashLoaded && backwashZone !== 'green'
-  const badgeClass     = backwashZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+  const backwashZone        = useBackwashStore((s) => s.zone)
+  const backwashLoaded      = useBackwashStore((s) => s.isLoaded)
+  const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
+  const filterZone          = useFilterReplacementStore((s) => s.zone)
+  const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
+  const showBackwashBadge   = backwashLoaded && backwashConfigured && backwashZone !== 'green'
+  const showFilterBadge     = filterConfigured && filterZone !== 'green'
+  const showBadge           = showBackwashBadge || showFilterBadge
+  const badgeClass          =
+    (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
+      ? 'bg-red-500'
+      : 'bg-yellow-400'
 
   return (
     <div className="flex items-center justify-between mb-6">

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { useBackwashStore } from '@/stores/backwashStore'
+import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 
 type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
@@ -209,11 +210,20 @@ export default function SettingsPage() {
     const SECTION_FREE_LOCKED = new Set(['maintenance', 'team'])
     const isLocked = isFree && SECTION_FREE_LOCKED.has(section.id)
 
-    // Backwash badge — only shown on the Maintenance card when zone is yellow/red
-    const backwashZone    = useBackwashStore((s) => s.zone)
-    const backwashLoaded  = useBackwashStore((s) => s.isLoaded)
-    const showBackwashBadge = section.id === 'maintenance' && !isLocked && backwashLoaded && backwashZone !== 'green'
-    const backwashBadgeClass = backwashZone === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+    // Maintenance badge — shown when backwash or filter replacement needs attention
+    const backwashZone        = useBackwashStore((s) => s.zone)
+    const backwashLoaded      = useBackwashStore((s) => s.isLoaded)
+    const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
+    const filterZone          = useFilterReplacementStore((s) => s.zone)
+    const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
+    const showMaintenanceBadge = section.id === 'maintenance' && !isLocked && (
+      (backwashLoaded && backwashConfigured && backwashZone !== 'green') ||
+      (filterConfigured && filterZone !== 'green')
+    )
+    const maintenanceBadgeClass =
+      (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
+        ? 'bg-red-500'
+        : 'bg-yellow-400'
 
     return (
       <button
@@ -232,8 +242,8 @@ export default function SettingsPage() {
           <span className="flex items-center gap-0.5 text-[9px] font-bold rounded px-1.5 py-0.5 bg-amber-100 text-amber-700 shrink-0">
             PRO
           </span>
-        ) : showBackwashBadge ? (
-          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', backwashBadgeClass)} />
+        ) : showMaintenanceBadge ? (
+          <span className={cn('h-2.5 w-2.5 rounded-full shrink-0', maintenanceBadgeClass)} />
         ) : (
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
         )}

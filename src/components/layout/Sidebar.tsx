@@ -214,7 +214,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {/* Wrap icon in relative container so we can place the collapsed badge */}
           <div className="relative shrink-0">
             <Settings className="h-[18px] w-[18px]" />
-            {collapsed && showMaintenanceBadge && (
+            {(!settingsOpen || collapsed) && showMaintenanceBadge && (
               <span className={cn(
                 'absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-[hsl(191,72%,14%)]',
                 maintenanceBadgeClass,
