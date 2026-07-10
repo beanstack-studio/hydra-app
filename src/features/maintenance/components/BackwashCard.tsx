@@ -26,6 +26,7 @@ export function BackwashCard() {
     lastBackwashedAt,
     backwashYtd,
     threshold,
+    alertEnabled,
     zone,
     isLoading,
     error,
@@ -188,6 +189,7 @@ export function BackwashCard() {
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           threshold={threshold}
+          alertEnabled={alertEnabled}
           onSave={updateThreshold}
         />
       )}

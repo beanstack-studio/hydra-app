@@ -3,6 +3,8 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useBackwashStore, DEFAULT_BACKWASH_THRESHOLD } from '@/stores/backwashStore'
+
+const DEFAULT_BACKWASH_ALERT_ENABLED = true
 import { PH_TZ } from '@/lib/utils'
 import type { BackwashZone } from '@/stores/backwashStore'
 
@@ -51,17 +53,20 @@ export interface UseBackwashTrackerReturn {
   backwashYtd: number
   lastBackwashedAt: string | null
   threshold: number
+  alertEnabled: boolean
   zone: BackwashZone
   isLoading: boolean
   error: string | null
   markAsBackwashed: () => Promise<void>
-  updateThreshold: (threshold: number) => Promise<void>
+  updateThreshold: (threshold: number, alertEnabled: boolean) => Promise<void>
 }
 
 export function useBackwashTracker(): UseBackwashTrackerReturn {
   const stationId        = useAuthStore((s) => s.stationId)
   const setCounts        = useBackwashStore((s) => s.setCounts)
   const setThreshold     = useBackwashStore((s) => s.setThreshold)
+  const setAlertEnabled  = useBackwashStore((s) => s.setAlertEnabled)
+  const alertEnabled     = useBackwashStore((s) => s.alertEnabled)
   const combinedCount    = useBackwashStore((s) => s.combinedCount)
   const slimCount        = useBackwashStore((s) => s.slimCount)
   const roundCount       = useBackwashStore((s) => s.roundCount)
@@ -102,7 +107,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
           .eq('station_id', stationId),
         supabase
           .from('station_settings')
-          .select('backwash_threshold')
+          .select('backwash_threshold, backwash_alert_enabled')
           .eq('station_id', stationId)
           .maybeSingle(),
       ])
@@ -113,9 +118,13 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
 
       const fetchedThreshold =
         settingsRes.data?.backwash_threshold ?? DEFAULT_BACKWASH_THRESHOLD
+      const fetchedAlertEnabled =
+        (settingsRes.data?.backwash_alert_enabled as boolean | null | undefined)
+          ?? DEFAULT_BACKWASH_ALERT_ENABLED
 
       // Update threshold first so setCounts can use it for zone computation
       setThreshold(fetchedThreshold)
+      setAlertEnabled(fetchedAlertEnabled)
 
       const lastBackwashedAt =
         (logsRes.data?.[0]?.backwashed_at as string | undefined) ?? null
@@ -186,18 +195,24 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     await fetchData()
   }, [stationId, fetchData])
 
-  const updateThreshold = useCallback(async (newThreshold: number) => {
+  const updateThreshold = useCallback(async (newThreshold: number, newAlertEnabled: boolean) => {
     if (!stationId) return
     const { error: e } = await supabase
       .from('station_settings')
       .upsert(
-        { station_id: stationId, backwash_threshold: newThreshold, updated_at: new Date().toISOString() },
+        {
+          station_id:            stationId,
+          backwash_threshold:    newThreshold,
+          backwash_alert_enabled: newAlertEnabled,
+          updated_at:            new Date().toISOString(),
+        },
         { onConflict: 'station_id' }
       )
     if (e) throw new Error(e.message)
-    // Update the store immediately so the card reflects the new threshold at once
+    // Update stores immediately so the card/AppShell reflect new values at once
     setThreshold(newThreshold)
-  }, [stationId, setThreshold])
+    setAlertEnabled(newAlertEnabled)
+  }, [stationId, setThreshold, setAlertEnabled])
 
   return {
     combinedCount,
@@ -208,6 +223,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     backwashYtd,
     lastBackwashedAt,
     threshold,
+    alertEnabled,
     zone,
     isLoading,
     error,

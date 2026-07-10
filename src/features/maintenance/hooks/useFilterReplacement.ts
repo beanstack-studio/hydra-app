@@ -10,6 +10,7 @@ export type { FilterReplacementZone } from '@/stores/filterReplacementStore'
 import type { FilterReplacementZone } from '@/stores/filterReplacementStore'
 
 export const DEFAULT_INTERVAL_DAYS = 30
+const DEFAULT_FILTER_ALERT_ENABLED = true
 
 // ── Zone thresholds ───────────────────────────────────────────────────────────
 // daysRemaining > 5  → green
@@ -42,6 +43,7 @@ export interface UseFilterReplacementReturn {
   daysRemaining: number
   cycleDays: number
   intervalDays: number
+  alertEnabled: boolean
   replacementsYtd: number
   linkedSupplies: FilterReplacementSupplyLink[]
   supplies: SupplyOption[]
@@ -49,7 +51,7 @@ export interface UseFilterReplacementReturn {
   isLoading: boolean
   error: string | null
   markAsReplaced: () => Promise<void>
-  updateSettings: (intervalDays: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
+  updateSettings: (intervalDays: number, supplies: FilterReplacementSupplyLink[], alertEnabled: boolean) => Promise<void>
 }
 
 export function useFilterReplacement(): UseFilterReplacementReturn {
@@ -61,6 +63,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [daysRemaining,   setDaysRemaining]   = useState(0)
   const [cycleDays,       setCycleDays]       = useState(DEFAULT_INTERVAL_DAYS)
   const [intervalDays,    setIntervalDays]    = useState(DEFAULT_INTERVAL_DAYS)
+  const [alertEnabled,    setAlertEnabledState] = useState(DEFAULT_FILTER_ALERT_ENABLED)
   const [replacementsYtd, setReplacementsYtd] = useState(0)
   const [supplies,        setSupplies]        = useState<SupplyOption[]>([])
   const [linkedSupplies,  setLinkedSupplies]  = useState<FilterReplacementSupplyLink[]>([])
@@ -90,7 +93,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
           .gte('replaced_at', ytdStartTz),
         supabase
           .from('station_settings')
-          .select('filter_replacement_interval_days, filter_replacement_supply_id, filter_replacement_supply_qty')
+          .select('filter_replacement_interval_days, filter_replacement_alert_enabled, filter_replacement_supply_id, filter_replacement_supply_qty')
           .eq('station_id', stationId)
           .maybeSingle(),
         supabase
@@ -105,6 +108,8 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
 
       const fetchedInterval = (settingsRes.data?.filter_replacement_interval_days as number | null | undefined)
         ?? DEFAULT_INTERVAL_DAYS
+      const fetchedAlertEnabled = (settingsRes.data?.filter_replacement_alert_enabled as boolean | null | undefined)
+        ?? DEFAULT_FILTER_ALERT_ENABLED
       const fetchedLastAt   = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
       // Read linked supply from legacy single columns.
@@ -145,13 +150,16 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setDaysRemaining(daysRem)
       setCycleDays(fetchedInterval)
       setIntervalDays(fetchedInterval)
+      setAlertEnabledState(fetchedAlertEnabled)
       setReplacementsYtd(ytdRes.count ?? 0)
       setSupplies((suppliesRes.data ?? []) as SupplyOption[])
       setLinkedSupplies(fetchedSupplies)
       setZone(computedZone)
-      // Push to global store so Sidebar badge and login alert can read zone
+      // Push to global store so Sidebar badge and login alert can read zone/alertEnabled
       // regardless of whether FilterReplacementCard is mounted.
-      useFilterReplacementStore.getState().setZone(computedZone)
+      const store = useFilterReplacementStore.getState()
+      store.setZone(computedZone)
+      store.setAlertEnabled(fetchedAlertEnabled)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
     } finally {
@@ -198,18 +206,23 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     await fetchData()
   }, [stationId, fetchData, linkedSupplies])
 
-  const updateSettings = useCallback(async (newIntervalDays: number, newSupplies: FilterReplacementSupplyLink[]) => {
+  const updateSettings = useCallback(async (
+    newIntervalDays: number,
+    newSupplies: FilterReplacementSupplyLink[],
+    newAlertEnabled: boolean,
+  ) => {
     if (!stationId) return
     const firstLink = newSupplies[0] ?? null
     const { error: e } = await supabase
       .from('station_settings')
       .upsert(
         {
-          station_id:                       stationId,
-          filter_replacement_interval_days: newIntervalDays,
-          filter_replacement_supply_id:     firstLink?.supply_id ?? null,
-          filter_replacement_supply_qty:    firstLink?.qty       ?? null,
-          updated_at:                       new Date().toISOString(),
+          station_id:                           stationId,
+          filter_replacement_interval_days:     newIntervalDays,
+          filter_replacement_alert_enabled:     newAlertEnabled,
+          filter_replacement_supply_id:         firstLink?.supply_id ?? null,
+          filter_replacement_supply_qty:        firstLink?.qty       ?? null,
+          updated_at:                           new Date().toISOString(),
         },
         { onConflict: 'station_id' }
       )
@@ -224,6 +237,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     daysRemaining,
     cycleDays,
     intervalDays,
+    alertEnabled,
     replacementsYtd,
     linkedSupplies,
     supplies,

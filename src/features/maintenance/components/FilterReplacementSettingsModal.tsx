@@ -4,6 +4,7 @@ import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 import type { SupplyOption, FilterReplacementSupplyLink } from '../hooks/useFilterReplacement'
 
@@ -19,22 +20,25 @@ interface FilterReplacementSettingsModalProps {
   isOpen: boolean
   onClose: () => void
   intervalDays: number
+  alertEnabled: boolean
   linkedSupplies: FilterReplacementSupplyLink[]
   supplies: SupplyOption[]
-  onSave: (intervalDays: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
+  onSave: (intervalDays: number, supplies: FilterReplacementSupplyLink[], alertEnabled: boolean) => Promise<void>
 }
 
 export function FilterReplacementSettingsModal({
   isOpen,
   onClose,
   intervalDays,
+  alertEnabled,
   linkedSupplies,
   supplies,
   onSave,
 }: FilterReplacementSettingsModalProps) {
   const { toast } = useToast()
 
-  const [selectedInterval, setSelectedInterval] = useState(intervalDays)
+  const [selectedInterval,    setSelectedInterval]    = useState(intervalDays)
+  const [localAlertEnabled,   setLocalAlertEnabled]   = useState(alertEnabled)
   const [supplyRows,       setSupplyRows]       = useState<SupplyRow[]>([{ ...EMPTY_ROW }])
   const [openDropdownIdx,  setOpenDropdownIdx]  = useState<number | null>(null)
   const [isSaving,         setIsSaving]         = useState(false)
@@ -46,6 +50,7 @@ export function FilterReplacementSettingsModal({
   useEffect(() => {
     if (!isOpen) return
     setSelectedInterval(intervalDays)
+    setLocalAlertEnabled(alertEnabled)
     setSupplyRows(linkedSupplies.length > 0
       ? linkedSupplies.map((l) => ({
           supply_id:  l.supply_id,
@@ -55,7 +60,7 @@ export function FilterReplacementSettingsModal({
       : [{ ...EMPTY_ROW }]
     )
     setOpenDropdownIdx(null)
-  }, [isOpen, intervalDays, linkedSupplies, supplies])
+  }, [isOpen, intervalDays, alertEnabled, linkedSupplies, supplies])
 
   // ── Row helpers ──────────────────────────────────────────────────────────────
 
@@ -115,7 +120,7 @@ export function FilterReplacementSettingsModal({
       const validLinks: FilterReplacementSupplyLink[] = supplyRows
         .filter((r) => r.supply_id !== '')
         .map((r) => ({ supply_id: r.supply_id, qty: r.qty }))
-      await onSave(selectedInterval, validLinks)
+      await onSave(selectedInterval, validLinks, localAlertEnabled)
       toast({ title: 'Filter replacement settings saved' })
       onClose()
     } catch (e) {
@@ -229,6 +234,21 @@ export function FilterReplacementSettingsModal({
             <Plus className="h-3 w-3" />
             Add another product
           </Button>
+        </div>
+
+        {/* Login alert toggle */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="fr-alert-enabled">Show login reminder when overdue</Label>
+            <Switch
+              id="fr-alert-enabled"
+              checked={localAlertEnabled}
+              onCheckedChange={setLocalAlertEnabled}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Badge will still show even if reminders are muted.
+          </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-1">

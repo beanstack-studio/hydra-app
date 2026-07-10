@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,6 +6,7 @@ import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
 
 const schema = z.object({
@@ -22,16 +23,20 @@ interface BackwashSettingsModalProps {
   isOpen: boolean
   onClose: () => void
   threshold: number
-  onSave: (threshold: number) => Promise<void>
+  alertEnabled: boolean
+  onSave: (threshold: number, alertEnabled: boolean) => Promise<void>
 }
 
 export function BackwashSettingsModal({
   isOpen,
   onClose,
   threshold,
+  alertEnabled,
   onSave,
 }: BackwashSettingsModalProps) {
   const { toast } = useToast()
+
+  const [localAlertEnabled, setLocalAlertEnabled] = useState(alertEnabled)
 
   const {
     register,
@@ -43,14 +48,16 @@ export function BackwashSettingsModal({
     defaultValues: { threshold },
   })
 
-  // Sync form value whenever the modal reopens or threshold changes externally
+  // Sync form + toggle whenever the modal reopens or values change externally
   useEffect(() => {
-    if (isOpen) reset({ threshold })
-  }, [isOpen, threshold, reset])
+    if (!isOpen) return
+    reset({ threshold })
+    setLocalAlertEnabled(alertEnabled)
+  }, [isOpen, threshold, alertEnabled, reset])
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await onSave(values.threshold)
+      await onSave(values.threshold, localAlertEnabled)
       toast({ title: 'Backwash settings saved' })
       onClose()
     } catch (e) {
@@ -81,6 +88,21 @@ export function BackwashSettingsModal({
           {errors.threshold && (
             <p className="text-xs text-destructive">{errors.threshold.message}</p>
           )}
+        </div>
+
+        {/* Login alert toggle */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="bw-alert-enabled">Show login reminder when overdue</Label>
+            <Switch
+              id="bw-alert-enabled"
+              checked={localAlertEnabled}
+              onCheckedChange={setLocalAlertEnabled}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Badge will still show even if reminders are muted.
+          </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-1">

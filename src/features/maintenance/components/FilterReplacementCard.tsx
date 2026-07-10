@@ -28,6 +28,7 @@ export function FilterReplacementCard() {
     daysRemaining,
     cycleDays,
     intervalDays,
+    alertEnabled,
     replacementsYtd,
     supplies,
     linkedSupplies,
@@ -210,6 +211,7 @@ export function FilterReplacementCard() {
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           intervalDays={intervalDays}
+          alertEnabled={alertEnabled}
           linkedSupplies={linkedSupplies}
           supplies={supplies}
           onSave={updateSettings}

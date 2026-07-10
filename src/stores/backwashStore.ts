@@ -26,6 +26,8 @@ interface BackwashStoreState {
   zone: BackwashZone
   /** True once the first successful fetch has completed. Used to gate the login alert. */
   isLoaded: boolean
+  /** When false, the login popup is suppressed even when zone is red. Badge still shows. */
+  alertEnabled: boolean
   setCounts: (data: {
     combinedCount: number
     slimCount: number
@@ -36,6 +38,7 @@ interface BackwashStoreState {
     lastBackwashedAt: string | null
   }) => void
   setThreshold: (threshold: number) => void
+  setAlertEnabled: (enabled: boolean) => void
 }
 
 export const useBackwashStore = create<BackwashStoreState>()((set) => ({
@@ -49,6 +52,7 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
   threshold: DEFAULT_BACKWASH_THRESHOLD,
   zone: 'green',
   isLoaded: false,
+  alertEnabled: true,
   setCounts: (data) =>
     set((state) => ({
       ...data,
@@ -60,4 +64,5 @@ export const useBackwashStore = create<BackwashStoreState>()((set) => ({
       threshold,
       zone: computeBackwashZone(state.combinedCount, threshold),
     })),
+  setAlertEnabled: (enabled) => set({ alertEnabled: enabled }),
 }))

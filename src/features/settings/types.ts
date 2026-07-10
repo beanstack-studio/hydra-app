@@ -47,8 +47,10 @@ export interface StationSettings {
   business_address: string | null
   open_hours: OpenHours | null
   backwash_threshold: number | null
+  backwash_alert_enabled: boolean
   filter_replacement_day: number | null
   filter_replacement_interval_days: number | null
+  filter_replacement_alert_enabled: boolean
   filter_replacement_supply_id: string | null
   filter_replacement_supply_qty: number | null
   updated_at: string
