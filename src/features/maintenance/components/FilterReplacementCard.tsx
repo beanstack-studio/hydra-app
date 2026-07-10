@@ -27,7 +27,7 @@ export function FilterReplacementCard() {
     lastReplacedAt,
     daysRemaining,
     cycleDays,
-    replacementDay,
+    intervalDays,
     replacementsYtd,
     supplies,
     linkedSupplies,
@@ -209,7 +209,7 @@ export function FilterReplacementCard() {
         <FilterReplacementSettingsModal
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          replacementDay={replacementDay}
+          intervalDays={intervalDays}
           linkedSupplies={linkedSupplies}
           supplies={supplies}
           onSave={updateSettings}

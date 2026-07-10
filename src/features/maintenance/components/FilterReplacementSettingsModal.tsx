@@ -7,12 +7,6 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import type { SupplyOption, FilterReplacementSupplyLink } from '../hooks/useFilterReplacement'
 
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
-
-// Consistent select styling used across the app
-const selectClass =
-  'rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-
 interface SupplyRow {
   supply_id: string
   qty: number
@@ -24,23 +18,23 @@ const EMPTY_ROW: SupplyRow = { supply_id: '', qty: 1, inputValue: '' }
 interface FilterReplacementSettingsModalProps {
   isOpen: boolean
   onClose: () => void
-  replacementDay: number
+  intervalDays: number
   linkedSupplies: FilterReplacementSupplyLink[]
   supplies: SupplyOption[]
-  onSave: (day: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
+  onSave: (intervalDays: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
 }
 
 export function FilterReplacementSettingsModal({
   isOpen,
   onClose,
-  replacementDay,
+  intervalDays,
   linkedSupplies,
   supplies,
   onSave,
 }: FilterReplacementSettingsModalProps) {
   const { toast } = useToast()
 
-  const [selectedDay,      setSelectedDay]      = useState(replacementDay)
+  const [selectedInterval, setSelectedInterval] = useState(intervalDays)
   const [supplyRows,       setSupplyRows]       = useState<SupplyRow[]>([{ ...EMPTY_ROW }])
   const [openDropdownIdx,  setOpenDropdownIdx]  = useState<number | null>(null)
   const [isSaving,         setIsSaving]         = useState(false)
@@ -51,7 +45,7 @@ export function FilterReplacementSettingsModal({
   // Sync state whenever the modal reopens or values change externally
   useEffect(() => {
     if (!isOpen) return
-    setSelectedDay(replacementDay)
+    setSelectedInterval(intervalDays)
     setSupplyRows(linkedSupplies.length > 0
       ? linkedSupplies.map((l) => ({
           supply_id:  l.supply_id,
@@ -61,7 +55,7 @@ export function FilterReplacementSettingsModal({
       : [{ ...EMPTY_ROW }]
     )
     setOpenDropdownIdx(null)
-  }, [isOpen, replacementDay, linkedSupplies, supplies])
+  }, [isOpen, intervalDays, linkedSupplies, supplies])
 
   // ── Row helpers ──────────────────────────────────────────────────────────────
 
@@ -86,7 +80,6 @@ export function FilterReplacementSettingsModal({
     const available = supplies.filter((s) => !taken.has(s.id))
 
     if (term.length === 0) {
-      // Show top-5 alphabetically when field is focused but empty
       return available.slice(0, 5)
     }
 
@@ -122,7 +115,7 @@ export function FilterReplacementSettingsModal({
       const validLinks: FilterReplacementSupplyLink[] = supplyRows
         .filter((r) => r.supply_id !== '')
         .map((r) => ({ supply_id: r.supply_id, qty: r.qty }))
-      await onSave(selectedDay, validLinks)
+      await onSave(selectedInterval, validLinks)
       toast({ title: 'Filter replacement settings saved' })
       onClose()
     } catch (e) {
@@ -140,27 +133,22 @@ export function FilterReplacementSettingsModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Filter Replacement Settings" size="sm">
       <div className="space-y-5">
 
-        {/* Replacement schedule — dropdown for day 1–31 */}
+        {/* Replacement interval — typed number input */}
         <div className="space-y-1.5">
-          <Label htmlFor="fr-day">Replacement schedule</Label>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">Replace filters on day</span>
-            <select
-              id="fr-day"
-              value={selectedDay}
-              onChange={(e) => setSelectedDay(Number(e.target.value))}
-              className={selectClass}
-            >
-              {DAY_OPTIONS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <span className="text-sm text-muted-foreground">of each month</span>
+          <Label htmlFor="fr-interval">Replacement schedule</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Replace filters every</span>
+            <Input
+              id="fr-interval"
+              type="number"
+              min={1}
+              step={1}
+              value={selectedInterval}
+              onChange={(e) => setSelectedInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="w-20"
+            />
+            <span className="text-sm text-muted-foreground">days</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            If the chosen day doesn&apos;t exist in a given month (e.g. day 31 in
-            February), the last valid day of that month is used automatically.
-          </p>
         </div>
 
         {/* Supply deduction — type-ahead search, multiple rows */}
@@ -241,11 +229,6 @@ export function FilterReplacementSettingsModal({
             <Plus className="h-3 w-3" />
             Add another product
           </Button>
-
-          <p className="text-xs text-muted-foreground">
-            Optional. When set, clicking &ldquo;Mark as Replaced&rdquo; deducts each
-            linked supply&rsquo;s qty from stock automatically.
-          </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-1">

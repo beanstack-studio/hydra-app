@@ -81,10 +81,6 @@ export function BackwashSettingsModal({
           {errors.threshold && (
             <p className="text-xs text-destructive">{errors.threshold.message}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1">
-            Counts Slim and Round refills since the last backwash. Warning zones
-            scale proportionally with this value.
-          </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-1">

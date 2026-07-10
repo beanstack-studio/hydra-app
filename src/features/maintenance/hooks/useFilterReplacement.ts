@@ -9,39 +9,7 @@ import { PH_TZ } from '@/lib/utils'
 export type { FilterReplacementZone } from '@/stores/filterReplacementStore'
 import type { FilterReplacementZone } from '@/stores/filterReplacementStore'
 
-export const DEFAULT_REPLACEMENT_DAY = 1
-
-// ── Day-of-month clamping ─────────────────────────────────────────────────────
-//
-// Uses the JS idiom `new Date(year, month + 1, 0).getDate()`:
-//   "day 0 of the next month" = last day of the current month.
-//
-// Clamping is recalculated fresh each month — storing day 31 always keeps the
-// intent; Feb reverts to 28/29, then March correctly returns to 31.
-
-export function lastDayOfMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate()
-}
-
-export function clampReplacementDay(desiredDay: number, year: number, month: number): number {
-  return Math.min(desiredDay, lastDayOfMonth(year, month))
-}
-
-// Returns the first scheduled replacement Date (local midnight) STRICTLY AFTER
-// afterDate. Checks this month first, falls back to next month.
-export function getNextDueAfter(replacementDay: number, afterDate: Date): Date {
-  const year  = afterDate.getFullYear()
-  const month = afterDate.getMonth()
-
-  const thisMonthClamped = clampReplacementDay(replacementDay, year, month)
-  const thisMonthDue     = new Date(year, month, thisMonthClamped)
-
-  if (thisMonthDue > afterDate) return thisMonthDue
-
-  const nextMonth = (month + 1) % 12
-  const nextYear  = month === 11 ? year + 1 : year
-  return new Date(nextYear, nextMonth, clampReplacementDay(replacementDay, nextYear, nextMonth))
-}
+export const DEFAULT_INTERVAL_DAYS = 30
 
 // ── Zone thresholds ───────────────────────────────────────────────────────────
 // daysRemaining > 5  → green
@@ -62,9 +30,6 @@ export interface SupplyOption {
 }
 
 // One supply→qty pair for the replacement cycle setting.
-// NOTE: multi-supply JSONB persistence (migration 20260708000005) is pending
-// a `supabase db push`. Until applied, only the first entry is stored in the
-// legacy single-column pair (filter_replacement_supply_id / _qty).
 export interface FilterReplacementSupplyLink {
   supply_id: string
   qty: number
@@ -76,7 +41,7 @@ export interface UseFilterReplacementReturn {
   daysElapsed: number
   daysRemaining: number
   cycleDays: number
-  replacementDay: number
+  intervalDays: number
   replacementsYtd: number
   linkedSupplies: FilterReplacementSupplyLink[]
   supplies: SupplyOption[]
@@ -84,7 +49,7 @@ export interface UseFilterReplacementReturn {
   isLoading: boolean
   error: string | null
   markAsReplaced: () => Promise<void>
-  updateSettings: (day: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
+  updateSettings: (intervalDays: number, supplies: FilterReplacementSupplyLink[]) => Promise<void>
 }
 
 export function useFilterReplacement(): UseFilterReplacementReturn {
@@ -94,8 +59,8 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
   const [nextDueDate,     setNextDueDate]     = useState<Date | null>(null)
   const [daysElapsed,     setDaysElapsed]     = useState(0)
   const [daysRemaining,   setDaysRemaining]   = useState(0)
-  const [cycleDays,       setCycleDays]       = useState(30)
-  const [replacementDay,  setReplacementDay]  = useState(DEFAULT_REPLACEMENT_DAY)
+  const [cycleDays,       setCycleDays]       = useState(DEFAULT_INTERVAL_DAYS)
+  const [intervalDays,    setIntervalDays]    = useState(DEFAULT_INTERVAL_DAYS)
   const [replacementsYtd, setReplacementsYtd] = useState(0)
   const [supplies,        setSupplies]        = useState<SupplyOption[]>([])
   const [linkedSupplies,  setLinkedSupplies]  = useState<FilterReplacementSupplyLink[]>([])
@@ -123,11 +88,9 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
           .select('*', { count: 'exact', head: true })
           .eq('station_id', stationId)
           .gte('replaced_at', ytdStartTz),
-        // Only select columns that exist in the current schema.
-        // filter_replacement_supplies (JSONB) requires migration 20260708000005.
         supabase
           .from('station_settings')
-          .select('filter_replacement_day, filter_replacement_supply_id, filter_replacement_supply_qty')
+          .select('filter_replacement_interval_days, filter_replacement_supply_id, filter_replacement_supply_qty')
           .eq('station_id', stationId)
           .maybeSingle(),
         supabase
@@ -140,41 +103,39 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       if (logsRes.error) throw new Error(logsRes.error.message)
       // settingsRes failure is non-fatal — fall back to defaults
 
-      const fetchedDay    = settingsRes.data?.filter_replacement_day ?? DEFAULT_REPLACEMENT_DAY
-      const fetchedLastAt = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
+      const fetchedInterval = (settingsRes.data?.filter_replacement_interval_days as number | null | undefined)
+        ?? DEFAULT_INTERVAL_DAYS
+      const fetchedLastAt   = (logsRes.data?.[0]?.replaced_at as string | undefined) ?? null
 
       // Read linked supply from legacy single columns.
-      // Once migration 20260708000005 is applied, switch to reading filter_replacement_supplies JSONB.
       const legacyId  = (settingsRes.data?.filter_replacement_supply_id as string | null | undefined) ?? null
       const legacyQty = (settingsRes.data?.filter_replacement_supply_qty as number | null | undefined) ?? 1
       const fetchedSupplies: FilterReplacementSupplyLink[] = legacyId
         ? [{ supply_id: legacyId, qty: legacyQty }]
         : []
 
-      // ── Day arithmetic in PHT ─────────────────────────────────────────────
+      // ── Interval-based day arithmetic in PHT ─────────────────────────────
+      // nextDue = lastReplaced + intervalDays (simple date addition, no month clamping needed)
       const MS_PER_DAY = 86_400_000
 
       let nextDue: Date
       let elapsed: number
       let daysRem: number
-      let cycle: number
       let computedZone: FilterReplacementZone
 
       if (fetchedLastAt === null) {
-        const justBeforeToday = new Date(todayMidnight.getTime() - 1)
-        nextDue      = getNextDueAfter(fetchedDay, justBeforeToday)
+        // No replacement recorded yet — show as overdue/due today
+        nextDue      = todayMidnight
         elapsed      = 0
         daysRem      = 0
-        cycle        = 30
         computedZone = 'red'
       } else {
         const lastPH       = toZonedTime(new Date(fetchedLastAt), PH_TZ)
         const lastMidnight = new Date(lastPH.getFullYear(), lastPH.getMonth(), lastPH.getDate())
 
-        nextDue  = getNextDueAfter(fetchedDay, lastMidnight)
-        elapsed  = Math.max(0, Math.round((todayMidnight.getTime() - lastMidnight.getTime()) / MS_PER_DAY))
-        cycle    = Math.max(1, Math.round((nextDue.getTime()       - lastMidnight.getTime()) / MS_PER_DAY))
-        daysRem  = Math.round((nextDue.getTime() - todayMidnight.getTime()) / MS_PER_DAY)
+        nextDue      = new Date(lastMidnight.getTime() + fetchedInterval * MS_PER_DAY)
+        elapsed      = Math.max(0, Math.round((todayMidnight.getTime() - lastMidnight.getTime()) / MS_PER_DAY))
+        daysRem      = Math.round((nextDue.getTime() - todayMidnight.getTime()) / MS_PER_DAY)
         computedZone = computeFilterReplacementZone(daysRem)
       }
 
@@ -182,15 +143,14 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       setNextDueDate(nextDue)
       setDaysElapsed(elapsed)
       setDaysRemaining(daysRem)
-      setCycleDays(cycle)
-      setReplacementDay(fetchedDay)
+      setCycleDays(fetchedInterval)
+      setIntervalDays(fetchedInterval)
       setReplacementsYtd(ytdRes.count ?? 0)
       setSupplies((suppliesRes.data ?? []) as SupplyOption[])
       setLinkedSupplies(fetchedSupplies)
       setZone(computedZone)
       // Push to global store so Sidebar badge and login alert can read zone
       // regardless of whether FilterReplacementCard is mounted.
-      // Use .getState() — the imperative Zustand API is safer in async callbacks.
       useFilterReplacementStore.getState().setZone(computedZone)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filter replacement data')
@@ -225,8 +185,6 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     }
 
     const firstDeduction = deductions[0] ?? null
-    // supply_deductions JSONB column requires migration 20260708000005.
-    // Writing to legacy single columns until that migration is applied.
     const { error: e } = await supabase
       .from('filter_replacement_logs')
       .insert({
@@ -240,20 +198,18 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     await fetchData()
   }, [stationId, fetchData, linkedSupplies])
 
-  const updateSettings = useCallback(async (day: number, newSupplies: FilterReplacementSupplyLink[]) => {
+  const updateSettings = useCallback(async (newIntervalDays: number, newSupplies: FilterReplacementSupplyLink[]) => {
     if (!stationId) return
     const firstLink = newSupplies[0] ?? null
-    // filter_replacement_supplies JSONB column requires migration 20260708000005.
-    // Writing to legacy single columns until that migration is applied.
     const { error: e } = await supabase
       .from('station_settings')
       .upsert(
         {
-          station_id:                    stationId,
-          filter_replacement_day:        day,
-          filter_replacement_supply_id:  firstLink?.supply_id ?? null,
-          filter_replacement_supply_qty: firstLink?.qty       ?? null,
-          updated_at:                    new Date().toISOString(),
+          station_id:                       stationId,
+          filter_replacement_interval_days: newIntervalDays,
+          filter_replacement_supply_id:     firstLink?.supply_id ?? null,
+          filter_replacement_supply_qty:    firstLink?.qty       ?? null,
+          updated_at:                       new Date().toISOString(),
         },
         { onConflict: 'station_id' }
       )
@@ -267,7 +223,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     daysElapsed,
     daysRemaining,
     cycleDays,
-    replacementDay,
+    intervalDays,
     replacementsYtd,
     linkedSupplies,
     supplies,
