@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
@@ -77,6 +77,45 @@ function RoleViewToggle() {
       </div>
       <span className="text-amber-600 italic">testing only — resets on refresh</span>
     </div>
+  )
+}
+
+// ── FreePlanPreviewToggle ─────────────────────────────────────────────────────
+// Floating pill visible only to the Test Station owner. Lets the owner flip
+// viewPlan between null (real Pro) and 'free' (free-plan preview) without
+// touching the database. Invisible to every other station.
+
+const TEST_STATION_ID = 'd32dce16-e4aa-4893-a9c5-4a35042b8bbc'
+
+function FreePlanPreviewToggle() {
+  const stationId   = useAuthStore((s) => s.stationId)
+  const role        = useAuthStore((s) => s.role)
+  const viewPlan    = useAuthStore((s) => s.viewPlan)
+  const setViewPlan = useAuthStore((s) => s.setViewPlan)
+
+  if (stationId !== TEST_STATION_ID || role !== 'owner') return null
+
+  const isActive = viewPlan === 'free'
+
+  return (
+    <button
+      type="button"
+      onClick={() => setViewPlan(isActive ? null : 'free')}
+      className={cn(
+        'fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50',
+        'flex items-center gap-1.5 rounded-full px-3 py-1.5',
+        'text-xs font-semibold shadow-lg border transition-all duration-150',
+        isActive
+          ? 'bg-amber-500 text-white border-amber-600 shadow-amber-200'
+          : 'bg-background text-muted-foreground border-border hover:border-primary hover:text-primary',
+      )}
+      title={isActive ? 'Exit Free Plan preview' : 'Preview app as Free Plan user'}
+    >
+      {isActive
+        ? <><EyeOff className="h-3 w-3 shrink-0" /> Previewing Free</>
+        : <><Eye    className="h-3 w-3 shrink-0" /> Preview: Free Plan</>
+      }
+    </button>
   )
 }
 
@@ -181,6 +220,7 @@ export function AppShell() {
       </div>
 
       <BottomNav />
+      <FreePlanPreviewToggle />
       <ReminderModal reminders={pendingReminders} onDismiss={handleDismissReminder} />
       {showBackwashAlert && (
         <BackwashAlertModal
