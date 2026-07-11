@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
+import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
@@ -77,7 +78,8 @@ export default function CustomerProfilePage() {
   const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer } = useCustomerProfile(id)
 
   // ── Sort state ────────────────────────────────────────────────────────────
-  const [payingSale,  setPayingSale]  = useState<SaleWithPayments | null>(null)
+  const [payingSale,   setPayingSale]   = useState<SaleWithPayments | null>(null)
+  const [viewingSale,  setViewingSale]  = useState<SaleWithPayments | null>(null)
   const [isEditOpen,  setIsEditOpen]  = useState(false)
   const [sortKey,     setSortKey]     = useState<OrderSortKey>('date')
   const [sortDir,     setSortDir]     = useState<SortDir>('desc')
@@ -495,6 +497,7 @@ export default function CustomerProfilePage() {
               columns={activeColumns}
               data={sortedSales}
               rowKey={(sale) => sale.id}
+              onRowClick={selectionMode ? undefined : (sale) => setViewingSale(sale)}
               hiddenKeys={hiddenKeys}
               sortKey={sortKey}
               sortDir={sortDir}
@@ -605,6 +608,15 @@ export default function CustomerProfilePage() {
         isOpen={!!payingSale}
         onClose={() => setPayingSale(null)}
         onRecord={handlePayment}
+      />
+
+      {/* ── Sale detail modal (row click) ── */}
+      <SaleDetailModal
+        sale={viewingSale}
+        isOpen={!!viewingSale}
+        onClose={() => setViewingSale(null)}
+        customerPhone={customer?.phone ?? null}
+        customerAddress={customer?.address ?? null}
       />
 
       {customer && (
