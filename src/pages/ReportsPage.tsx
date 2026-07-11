@@ -160,15 +160,15 @@ export default function ReportsPage() {
             />
           </div>
 
-          {/* Per-product unit + revenue tally */}
-          <ProductTallySection groups={data?.productTally ?? []} />
-
           {/* Rankings / Insights */}
           <InsightsSection
             topProducts={data?.topProducts ?? []}
             topCustomers={data?.topCustomers ?? []}
             topSupplies={data?.topSupplies ?? []}
           />
+
+          {/* Per-product unit + revenue tally */}
+          <ProductTallySection groups={data?.productTally ?? []} />
         </div>
       )}
     </div>
