@@ -6,6 +6,7 @@ import { SalesChart } from '@/features/reports/components/SalesChart'
 import { ExpenseSummary } from '@/features/reports/components/ExpenseSummary'
 import { SalesByProductChart } from '@/features/reports/components/SalesByProductChart'
 import { InsightsSection } from '@/features/reports/components/InsightsSection'
+import { ProductTallySection } from '@/features/reports/components/ProductTallySection'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { useReports } from '@/features/reports/hooks/useReports'
 import { usePlan } from '@/hooks/usePlan'
@@ -158,6 +159,9 @@ export default function ReportsPage() {
               total={(data?.productSales ?? []).reduce((s, p) => s + p.total_amount, 0)}
             />
           </div>
+
+          {/* Per-product unit + revenue tally */}
+          <ProductTallySection groups={data?.productTally ?? []} />
 
           {/* Rankings / Insights */}
           <InsightsSection

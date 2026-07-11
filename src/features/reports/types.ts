@@ -39,6 +39,22 @@ export interface DailyPoint {
   expenses: number
 }
 
+export interface ProductTallyRow {
+  product_id: string
+  product_name: string
+  type: 'water' | 'ice' | 'addon'
+  units: number
+  revenue: number
+}
+
+export interface ProductTallyGroup {
+  type: 'water' | 'ice' | 'addon'
+  label: string
+  products: ProductTallyRow[]
+  totalUnits: number
+  totalRevenue: number
+}
+
 export interface ReportsData {
   dailyPoints: DailyPoint[]
   expenseSummary: ExpenseSummaryItem[]
@@ -50,4 +66,5 @@ export interface ReportsData {
   topProducts: ProductRanking[]
   topCustomers: CustomerRanking[]
   topSupplies: SupplyRanking[]
+  productTally: ProductTallyGroup[]
 }

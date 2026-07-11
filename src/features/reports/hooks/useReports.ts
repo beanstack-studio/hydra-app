@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatInTimeZone } from 'date-fns-tz'
 import { nowPH, PH_TZ } from '@/lib/utils'
-import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking } from '../types'
+import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking, ProductTallyRow, ProductTallyGroup } from '../types'
 
 export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
 
@@ -105,7 +105,7 @@ export function useReports(): UseReportsReturn {
         billsQuery = billsQuery.lte('month', billsMaxMonth)
       }
 
-      const [salesRes, expensesRes, billsRes] = await Promise.all([
+      const [salesRes, expensesRes, billsRes, productsRes] = await Promise.all([
         supabase
           .from('sales')
           .select('id, sale_date, total_amount, status, balance_due, product_name, qty, customer_name, items, amount_received, payment_mode')
@@ -119,6 +119,13 @@ export function useReports(): UseReportsReturn {
           .gte('expense_date', startDate)
           .lte('expense_date', endDate),
         includeBills ? billsQuery : Promise.resolve({ data: [], error: null }),
+        supabase
+          .from('products')
+          .select('id, name, type')
+          .eq('station_id', stationId)
+          .eq('is_active', true)
+          .order('type')
+          .order('name'),
       ])
 
       const sales    = salesRes.data    ?? []
@@ -255,6 +262,64 @@ export function useReports(): UseReportsReturn {
         .sort((a, b) => b.purchase_count - a.purchase_count || b.total_amount - a.total_amount)
         .slice(0, 5)
 
+      // ── Product tally (grouped by type, promo variants merged) ──────────
+      type ProductType = 'water' | 'ice' | 'addon'
+      const PROMO_RE = /^\*PROMO\s+/i
+      const TYPE_LABELS: Record<ProductType, string> = { water: 'Water', ice: 'Ice', addon: 'Add-ons' }
+      const TYPE_ORDER: ProductType[] = ['water', 'ice', 'addon']
+
+      const activeProducts = (productsRes.data ?? []) as Array<{ id: string; name: string; type: ProductType }>
+
+      // Base-name → product lookup (sale items are matched after stripping promo prefix)
+      const productByName = new Map<string, { id: string; type: ProductType }>()
+      for (const p of activeProducts) productByName.set(p.name, { id: p.id, type: p.type })
+
+      // Init all active products at zero units/revenue
+      const tallyById = new Map<string, { units: number; revenue: number }>()
+      for (const p of activeProducts) tallyById.set(p.id, { units: 0, revenue: 0 })
+
+      for (const s of sales) {
+        const items = s.items as Array<{ product_name: string; qty: number; price: number }> | null
+        if (items && items.length > 0) {
+          for (const item of items) {
+            const baseName = item.product_name.replace(PROMO_RE, '')
+            const meta = productByName.get(baseName)
+            if (!meta) continue
+            const cur = tallyById.get(meta.id) ?? { units: 0, revenue: 0 }
+            tallyById.set(meta.id, { units: cur.units + item.qty, revenue: cur.revenue + item.qty * item.price })
+          }
+        } else {
+          const baseName = ((s.product_name as string) || '').replace(PROMO_RE, '')
+          const meta = productByName.get(baseName)
+          if (!meta) continue
+          const cur = tallyById.get(meta.id) ?? { units: 0, revenue: 0 }
+          tallyById.set(meta.id, {
+            units:   cur.units   + ((s.qty as number) ?? 0),
+            revenue: cur.revenue + (s.total_amount as number),
+          })
+        }
+      }
+
+      // Group by type (activeProducts already ordered type → name by DB query)
+      const groupRows = new Map<ProductType, ProductTallyRow[]>()
+      for (const t of TYPE_ORDER) groupRows.set(t, [])
+      for (const p of activeProducts) {
+        const tally = tallyById.get(p.id) ?? { units: 0, revenue: 0 }
+        groupRows.get(p.type)!.push({ product_id: p.id, product_name: p.name, type: p.type, ...tally })
+      }
+      const productTally: ProductTallyGroup[] = TYPE_ORDER
+        .map((type) => {
+          const products = groupRows.get(type) ?? []
+          return {
+            type,
+            label:        TYPE_LABELS[type],
+            products,
+            totalUnits:   products.reduce((sum, r) => sum + r.units,   0),
+            totalRevenue: products.reduce((sum, r) => sum + r.revenue, 0),
+          }
+        })
+        .filter((g) => g.products.length > 0)
+
       // ── Totals ───────────────────────────────────────────────────────────
       const totalSalesAmount = sales.reduce((sum, s) => sum + (s.total_amount as number), 0)
       const totalExpensesAmount =
@@ -277,6 +342,7 @@ export function useReports(): UseReportsReturn {
         topProducts,
         topCustomers,
         topSupplies,
+        productTally,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load reports')
