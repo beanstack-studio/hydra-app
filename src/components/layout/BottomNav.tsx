@@ -20,7 +20,7 @@ const STAFF_NAV = [
   { to: '/settings',  label: 'Settings',  icon: Settings },
 ]
 
-const FREE_LOCKED = new Set(['/customers', '/inventory', '/reports'])
+const FREE_LOCKED = new Set(['/inventory', '/reports'])
 
 export function BottomNav() {
   const role     = useAuthStore((s) => s.role)

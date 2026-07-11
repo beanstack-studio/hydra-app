@@ -53,7 +53,7 @@ const ACCOUNT_MENU = [
   { id: 'plan', label: 'Plan & Billing', icon: CreditCard,  freeLocked: false },
 ]
 
-const FREE_LOCKED_ROUTES = new Set(['/customers', '/inventory', '/reports'])
+const FREE_LOCKED_ROUTES = new Set(['/inventory', '/reports'])
 
 const SIDEBAR_BG = 'bg-[hsl(191,72%,14%)]'
 const BORDER     = 'border-white/10'

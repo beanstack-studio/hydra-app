@@ -17,7 +17,6 @@ import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
-import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
@@ -231,9 +230,6 @@ export default function CustomerProfilePage() {
 
   const { hiddenKeys, toggleColumn } = useTablePrefs('customer-order-history', [])
 
-  // Free-plan gate — covers direct-URL access bypassing CustomersPage's UpgradeWall
-  if (!isPro) return <UpgradeWall title="Customer Profile" feature="Customers" />
-
   // ── Export rows ───────────────────────────────────────────────────────────
   const orderHistoryExportRows = sortedSales.map((s) => ({
     date:        formatDate(s.sale_date),
@@ -438,7 +434,7 @@ export default function CustomerProfilePage() {
               </div>
             </div>
 
-            {printStatementUrl && (
+            {isPro && printStatementUrl && (
               <Button
                 size="sm"
                 variant="outline"
