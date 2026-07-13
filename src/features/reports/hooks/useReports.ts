@@ -268,12 +268,25 @@ export function useReports(): UseReportsReturn {
         .slice(0, 5)
 
       // ── Top expenses ranking (by total amount, grouped by item label) ────
+      // Unions general expenses + bills (bills only available for monthly/ytd)
+      const BILL_LABEL: Record<string, string> = {
+        electricity: 'Electricity', water: 'Water', internet: 'Internet',
+        rent: 'Rent', maintenance: 'Maintenance', other: 'Other',
+      }
       const expenseRankMap = new Map<string, { total_amount: number; category: string }>()
       for (const e of expenses) {
         const item = (e.item as string) || 'Unknown'
         const cat  = (e.category as string) || 'other'
         const prev = expenseRankMap.get(item) ?? { total_amount: 0, category: cat }
         expenseRankMap.set(item, { total_amount: prev.total_amount + (e.amount as number), category: prev.category })
+      }
+      for (const b of bills) {
+        const typeLabel = BILL_LABEL[b.bill_type as string] ?? (b.bill_type as string)
+        const desc = (b.description as string | null)?.trim() ?? null
+        // Use description when it meaningfully differs from the type label
+        const item = desc && desc.toLowerCase() !== typeLabel.toLowerCase() ? desc : typeLabel
+        const prev = expenseRankMap.get(item) ?? { total_amount: 0, category: `bill_${b.bill_type as string}` }
+        expenseRankMap.set(item, { total_amount: prev.total_amount + (b.amount as number), category: prev.category })
       }
       const topExpenses: ExpenseRanking[] = Array.from(expenseRankMap.entries())
         .map(([item, v]) => ({ item, ...v }))

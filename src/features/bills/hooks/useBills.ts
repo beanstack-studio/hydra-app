@@ -1,17 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { nowPH } from '@/lib/utils'
 import type { Bill, BillInput } from '../types'
 
 interface UseBillsReturn {
   data: Bill[]
   isLoading: boolean
   error: string | null
-  month: number
-  year: number
-  setMonth: (m: number) => void
-  setYear: (y: number) => void
   addBill: (input: BillInput, billFile?: File, paymentFile?: File) => Promise<void>
   updateBill: (id: string, input: Partial<BillInput>, billFile?: File, paymentFile?: File) => Promise<void>
   deleteBill: (id: string) => Promise<void>
@@ -22,9 +17,6 @@ interface UseBillsReturn {
 
 export function useBills(): UseBillsReturn {
   const stationId = useAuthStore((s) => s.stationId)
-  const now = nowPH()
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [year, setYear] = useState(now.getFullYear())
   const [data, setData] = useState<Bill[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,9 +29,9 @@ export function useBills(): UseBillsReturn {
         .from('monthly_bills')
         .select('*')
         .eq('station_id', stationId)
-        .eq('month', month)
-        .eq('year', year)
-        .order('created_at')
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .order('created_at', { ascending: true })
       if (e) throw new Error(e.message)
       setData((rows ?? []) as Bill[])
     } catch (err) {
@@ -47,7 +39,7 @@ export function useBills(): UseBillsReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId, month, year])
+  }, [stationId])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
@@ -194,5 +186,5 @@ export function useBills(): UseBillsReturn {
     return signed.signedUrl
   }, [])
 
-  return { data, isLoading, error, month, year, setMonth, setYear, addBill, updateBill, deleteBill, markPaid, payBill, getFileUrl }
+  return { data, isLoading, error, addBill, updateBill, deleteBill, markPaid, payBill, getFileUrl }
 }
