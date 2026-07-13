@@ -1,11 +1,32 @@
-import { TrendingUp, Users, Package } from 'lucide-react'
+import { Users, Receipt, AlertCircle } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
-import type { ProductRanking, CustomerRanking, SupplyRanking } from '../types'
+import type { CustomerRanking, ExpenseRanking, OutstandingCustomer } from '../types'
 
 interface InsightsSectionProps {
-  topProducts: ProductRanking[]
   topCustomers: CustomerRanking[]
-  topSupplies: SupplyRanking[]
+  topExpenses: ExpenseRanking[]
+  topOutstanding: OutstandingCustomer[]
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  labor:       'Labor',
+  gasoline:    'Gasoline',
+  supplies:    'Supplies',
+  maintenance: 'Maintenance',
+  other:       'Other',
+}
+
+/**
+ * Returns the display label for an expense row.
+ * Shows just the item name. If item text and category label are the same
+ * (case-insensitive substring match), item is returned as-is to avoid
+ * duplication like "Gasoline (Gasoline)".
+ */
+function expenseLabel(item: string, category: string): string {
+  const catLabel = (CATEGORY_LABELS[category] ?? category).toLowerCase()
+  const desc = item.toLowerCase()
+  if (desc.includes(catLabel) || catLabel.includes(desc)) return item
+  return item
 }
 
 function RankBadge({ rank }: { rank: number }) {
@@ -44,34 +65,9 @@ function InsightCard({ icon, title, subtitle, children }: {
   )
 }
 
-export function InsightsSection({ topProducts, topCustomers, topSupplies }: InsightsSectionProps) {
+export function InsightsSection({ topCustomers, topExpenses, topOutstanding }: InsightsSectionProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-      {/* Best selling products */}
-      <InsightCard
-        icon={<TrendingUp className="h-4 w-4" />}
-        title="Best Selling Products"
-        subtitle="By units sold this period"
-      >
-        {topProducts.length === 0 ? (
-          <EmptyRow label="No sales this period" />
-        ) : (
-          topProducts.map((p, i) => (
-            <div key={p.product_name} className="flex items-center gap-2">
-              <RankBadge rank={i + 1} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{p.product_name}</p>
-                <p className="text-[10px] text-muted-foreground">{p.order_count} order{p.order_count !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs font-semibold text-foreground">{p.qty} units</p>
-                <p className="text-[10px] text-muted-foreground">{formatCurrency(p.total_amount)}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </InsightCard>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
       {/* Top customers */}
       <InsightCard
@@ -95,23 +91,43 @@ export function InsightsSection({ topProducts, topCustomers, topSupplies }: Insi
         )}
       </InsightCard>
 
-      {/* Most replenished supplies */}
+      {/* Top expenses */}
       <InsightCard
-        icon={<Package className="h-4 w-4" />}
-        title="Most Replenished"
-        subtitle="Supplies bought most — depletes fastest"
+        icon={<Receipt className="h-4 w-4" />}
+        title="Top Expenses"
+        subtitle="By total amount this period"
       >
-        {topSupplies.length === 0 ? (
-          <EmptyRow label="No supply purchases this period" />
+        {topExpenses.length === 0 ? (
+          <EmptyRow label="No expenses this period" />
         ) : (
-          topSupplies.map((s, i) => (
-            <div key={s.item} className="flex items-center gap-2">
+          topExpenses.map((e, i) => (
+            <div key={e.item} className="flex items-center gap-2">
               <RankBadge rank={i + 1} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{s.item}</p>
-                <p className="text-[10px] text-muted-foreground">{s.purchase_count} purchase{s.purchase_count !== 1 ? 's' : ''}</p>
-              </div>
-              <p className="text-xs font-semibold text-foreground shrink-0">{formatCurrency(s.total_amount)}</p>
+              <p className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">
+                {expenseLabel(e.item, e.category)}
+              </p>
+              <p className="text-xs font-semibold text-foreground shrink-0">{formatCurrency(e.total_amount)}</p>
+            </div>
+          ))
+        )}
+      </InsightCard>
+
+      {/* Top outstanding balances */}
+      <InsightCard
+        icon={<AlertCircle className="h-4 w-4" />}
+        title="Top Outstanding Balances"
+        subtitle="Current unpaid balances — as of today"
+      >
+        {topOutstanding.length === 0 ? (
+          <EmptyRow label="No outstanding balances" />
+        ) : (
+          topOutstanding.map((o, i) => (
+            <div key={o.customer_name} className="flex items-center gap-2">
+              <RankBadge rank={i + 1} />
+              <p className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">
+                {o.customer_name}
+              </p>
+              <p className="text-xs font-semibold text-destructive shrink-0">{formatCurrency(o.balance_due)}</p>
             </div>
           ))
         )}

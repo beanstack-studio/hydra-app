@@ -55,6 +55,17 @@ export interface ProductTallyGroup {
   totalRevenue: number
 }
 
+export interface ExpenseRanking {
+  item: string
+  category: string
+  total_amount: number
+}
+
+export interface OutstandingCustomer {
+  customer_name: string
+  balance_due: number
+}
+
 export interface ReportsData {
   dailyPoints: DailyPoint[]
   expenseSummary: ExpenseSummaryItem[]
@@ -66,5 +77,7 @@ export interface ReportsData {
   topProducts: ProductRanking[]
   topCustomers: CustomerRanking[]
   topSupplies: SupplyRanking[]
+  topExpenses: ExpenseRanking[]
+  topOutstanding: OutstandingCustomer[]
   productTally: ProductTallyGroup[]
 }

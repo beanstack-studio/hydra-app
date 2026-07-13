@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatInTimeZone } from 'date-fns-tz'
 import { nowPH, PH_TZ } from '@/lib/utils'
-import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking, ProductTallyRow, ProductTallyGroup } from '../types'
+import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking, ExpenseRanking, OutstandingCustomer, ProductTallyRow, ProductTallyGroup } from '../types'
 
 export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
 
@@ -105,7 +105,7 @@ export function useReports(): UseReportsReturn {
         billsQuery = billsQuery.lte('month', billsMaxMonth)
       }
 
-      const [salesRes, expensesRes, billsRes, productsRes] = await Promise.all([
+      const [salesRes, expensesRes, billsRes, productsRes, outstandingRes] = await Promise.all([
         supabase
           .from('sales')
           .select('id, sale_date, total_amount, status, balance_due, product_name, qty, customer_name, items, amount_received, payment_mode')
@@ -126,6 +126,11 @@ export function useReports(): UseReportsReturn {
           .eq('is_active', true)
           .order('type')
           .order('name'),
+        supabase
+          .from('sales')
+          .select('customer_name, balance_due')
+          .eq('station_id', stationId)
+          .gt('balance_due', 0),
       ])
 
       const sales    = salesRes.data    ?? []
@@ -262,6 +267,30 @@ export function useReports(): UseReportsReturn {
         .sort((a, b) => b.purchase_count - a.purchase_count || b.total_amount - a.total_amount)
         .slice(0, 5)
 
+      // ── Top expenses ranking (by total amount, grouped by item label) ────
+      const expenseRankMap = new Map<string, { total_amount: number; category: string }>()
+      for (const e of expenses) {
+        const item = (e.item as string) || 'Unknown'
+        const cat  = (e.category as string) || 'other'
+        const prev = expenseRankMap.get(item) ?? { total_amount: 0, category: cat }
+        expenseRankMap.set(item, { total_amount: prev.total_amount + (e.amount as number), category: prev.category })
+      }
+      const topExpenses: ExpenseRanking[] = Array.from(expenseRankMap.entries())
+        .map(([item, v]) => ({ item, ...v }))
+        .sort((a, b) => b.total_amount - a.total_amount)
+        .slice(0, 5)
+
+      // ── Top outstanding balances (all-time, not date-scoped) ─────────────
+      const outstandingMap = new Map<string, number>()
+      for (const s of (outstandingRes.data ?? [])) {
+        const name = (s.customer_name as string) || 'Walk-in'
+        outstandingMap.set(name, (outstandingMap.get(name) ?? 0) + ((s.balance_due as number) ?? 0))
+      }
+      const topOutstanding: OutstandingCustomer[] = Array.from(outstandingMap.entries())
+        .map(([customer_name, balance_due]) => ({ customer_name, balance_due }))
+        .sort((a, b) => b.balance_due - a.balance_due)
+        .slice(0, 5)
+
       // ── Product tally (grouped by type, promo variants merged) ──────────
       type ProductType = 'water' | 'ice' | 'addon'
       const PROMO_RE = /^\*PROMO\s+/i
@@ -342,6 +371,8 @@ export function useReports(): UseReportsReturn {
         topProducts,
         topCustomers,
         topSupplies,
+        topExpenses,
+        topOutstanding,
         productTally,
       })
     } catch (err) {

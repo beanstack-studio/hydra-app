@@ -162,9 +162,9 @@ export default function ReportsPage() {
 
           {/* Rankings / Insights */}
           <InsightsSection
-            topProducts={data?.topProducts ?? []}
             topCustomers={data?.topCustomers ?? []}
-            topSupplies={data?.topSupplies ?? []}
+            topExpenses={data?.topExpenses ?? []}
+            topOutstanding={data?.topOutstanding ?? []}
           />
 
           {/* Per-product unit + revenue tally */}
