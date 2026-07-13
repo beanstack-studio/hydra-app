@@ -69,6 +69,27 @@ export function InsightsSection({ topCustomers, topExpenses, topOutstanding }: I
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
+      {/* Top expenses */}
+      <InsightCard
+        icon={<Receipt className="h-4 w-4" />}
+        title="Top Expenses"
+        subtitle="By total amount this period"
+      >
+        {topExpenses.length === 0 ? (
+          <EmptyRow label="No expenses this period" />
+        ) : (
+          topExpenses.map((e, i) => (
+            <div key={e.item} className="flex items-center gap-2">
+              <RankBadge rank={i + 1} />
+              <p className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">
+                {expenseLabel(e.item, e.category)}
+              </p>
+              <p className="text-xs font-semibold text-foreground shrink-0">{formatCurrency(e.total_amount)}</p>
+            </div>
+          ))
+        )}
+      </InsightCard>
+
       {/* Top customers */}
       <InsightCard
         icon={<Users className="h-4 w-4" />}
@@ -86,27 +107,6 @@ export function InsightsSection({ topCustomers, topExpenses, topOutstanding }: I
                 <p className="text-[10px] text-muted-foreground">{c.order_count} order{c.order_count !== 1 ? 's' : ''}</p>
               </div>
               <p className="text-xs font-semibold text-foreground shrink-0">{formatCurrency(c.total_amount)}</p>
-            </div>
-          ))
-        )}
-      </InsightCard>
-
-      {/* Top expenses */}
-      <InsightCard
-        icon={<Receipt className="h-4 w-4" />}
-        title="Top Expenses"
-        subtitle="By total amount this period"
-      >
-        {topExpenses.length === 0 ? (
-          <EmptyRow label="No expenses this period" />
-        ) : (
-          topExpenses.map((e, i) => (
-            <div key={e.item} className="flex items-center gap-2">
-              <RankBadge rank={i + 1} />
-              <p className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">
-                {expenseLabel(e.item, e.category)}
-              </p>
-              <p className="text-xs font-semibold text-foreground shrink-0">{formatCurrency(e.total_amount)}</p>
             </div>
           ))
         )}
