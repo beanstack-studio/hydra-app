@@ -217,8 +217,7 @@ export function BackwashCard() {
             variant="outline"
             size="sm"
             className="shrink-0 w-full md:w-auto"
-            disabled={isMarking || zone === 'green'}
-            title={zone === 'green' ? 'Not due yet' : undefined}
+            disabled={isMarking}
             onClick={() => void handleBackwash()}
           >
             <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
