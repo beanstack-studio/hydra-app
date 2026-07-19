@@ -73,9 +73,19 @@ export default function SalesPage() {
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
   const [deletingSale,      setDeletingSale]      = useState<Sale | null>(null)
   const [isDeleting,        setIsDeleting]        = useState(false)
-  const [search,            setSearch]            = useState('')
+  // Raw input value — debounced 300 ms before passing to the hook so we
+  // don't fire a Supabase request on every keystroke.
+  const [searchInput, setSearchInput] = useState('')
+  const [search,      setSearch]      = useState('')
 
-  const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales()
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  // Search and filters are applied server-side so they work across ALL sales,
+  // not just the ~1000 rows Supabase returns without an explicit limit.
+  const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales({ search, filterValues })
   const { data: customers } = useCustomers()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
@@ -90,25 +100,8 @@ export default function SalesPage() {
 
   const isLoading = salesLoading || settingsLoading
 
-  const filteredSales = sales
-    .filter((s) => {
-      if (filterValues.status     && filterValues.status     !== s.status)     return false
-      if (filterValues.order_type && filterValues.order_type !== s.order_type) return false
-      return true
-    })
-    .filter((s) => {
-      if (search.length < 3) return true
-      const q = search.toLowerCase()
-      const orderNo = s.id.slice(-6).toUpperCase()
-      return (
-        s.customer_name.toLowerCase().includes(q) ||
-        s.product_name.toLowerCase().includes(q) ||
-        s.order_type.toLowerCase().includes(q) ||
-        orderNo.includes(search.replace(/^#/, '').toUpperCase())
-      )
-    })
-
-  const exportRows = filteredSales.map((s) => ({
+  // No client-side filtering — useSales applies search + filters server-side.
+  const exportRows = sales.map((s) => ({
     order_no:    `#${s.id.slice(-6).toUpperCase()}`,
     date:        formatDate(s.sale_date),
     customer:    s.customer_name,
@@ -178,7 +171,7 @@ export default function SalesPage() {
 
       <div className="flex items-center gap-3 mb-4">
         <SearchInput
-          onSearch={setSearch}
+          onSearch={setSearchInput}
           placeholder="Search customer, product, order #…"
           className="flex-1"
         />
@@ -205,7 +198,7 @@ export default function SalesPage() {
         <LoadingSkeleton rows={5} />
       ) : (
         <SaleTable
-          sales={filteredSales}
+          sales={sales}
           onSelect={setSelectedSale}
           onPay={(sale) => {
             setSelectedSale(null)

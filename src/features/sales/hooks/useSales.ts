@@ -87,6 +87,11 @@ async function deductLinkedSupplies(stationId: string, productId: string, qtySol
   )
 }
 
+interface UseSalesOptions {
+  search?: string
+  filterValues?: Record<string, string>
+}
+
 interface UseSalesReturn {
   data: Sale[]
   isLoading: boolean
@@ -99,21 +104,41 @@ interface UseSalesReturn {
   refetch: () => Promise<void>
 }
 
-export function useSales(): UseSalesReturn {
+export function useSales(options?: UseSalesOptions): UseSalesReturn {
   const stationId = useAuthStore((s) => s.stationId)
   const [data, setData] = useState<Sale[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Extract primitives so useCallback deps are stable across re-renders
+  const search = options?.search ?? ''
+  const filterStatus = options?.filterValues?.status ?? ''
+  const filterOrderType = options?.filterValues?.order_type ?? ''
+
   const fetchData = useCallback(async () => {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      const { data: rows, error: e } = await supabase
+      let query = supabase
         .from('sales')
         .select('*')
         .eq('station_id', stationId)
         .order('created_at', { ascending: false })
+
+      // Server-side status and order_type filters
+      if (filterStatus)    query = query.eq('status', filterStatus)
+      if (filterOrderType) query = query.eq('order_type', filterOrderType)
+
+      // Server-side search: queries ALL sales, not just the first 1000 loaded.
+      // Strips leading # so "#ABC123" correctly matches UUID suffix "abc123".
+      if (search.length >= 3) {
+        const q = search.replace(/^#/, '').replace(/%/g, '')
+        query = query.or(
+          `customer_name.ilike.%${q}%,product_name.ilike.%${q}%,id.ilike.%${q}%`
+        )
+      }
+
+      const { data: rows, error: e } = await query
       if (e) throw new Error(e.message)
       setData((rows ?? []) as Sale[])
     } catch (err) {
@@ -121,7 +146,7 @@ export function useSales(): UseSalesReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [stationId])
+  }, [stationId, search, filterStatus, filterOrderType])
 
   useEffect(() => {
     void fetchData()

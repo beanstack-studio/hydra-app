@@ -38,7 +38,9 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
     if (!customerId || !stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      const [custRes, salesRes] = await Promise.all([
+      // Phase 1 — customer info + total sales count in parallel.
+      // We need the count before we can issue the right number of range queries.
+      const [custRes, countRes] = await Promise.all([
         supabase
           .from('customers')
           .select('*')
@@ -47,15 +49,40 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
           .single(),
         supabase
           .from('sales')
-          .select('*, sale_payments(*)')
+          .select('*', { count: 'exact', head: true })
           .eq('customer_id', customerId)
-          .eq('station_id', stationId)
-          .order('created_at', { ascending: false }),
+          .eq('station_id', stationId),
       ])
       if (custRes.error) throw new Error(custRes.error.message)
-      if (salesRes.error) throw new Error(salesRes.error.message)
+      if (countRes.error) throw new Error(countRes.error.message)
+
+      const total = countRes.count ?? 0
+      let allSales: SaleWithPayments[] = []
+
+      if (total > 0) {
+        // Phase 2 — fetch all pages in parallel (1 000 rows/batch).
+        // Supabase silently caps un-limited queries at 1 000 rows; customers
+        // with many orders would lose older history without this two-phase approach.
+        const batchCount = Math.ceil(total / 1000)
+        const batchResults = await Promise.all(
+          Array.from({ length: batchCount }, (_, i) =>
+            supabase
+              .from('sales')
+              .select('*, sale_payments(*)')
+              .eq('customer_id', customerId)
+              .eq('station_id', stationId)
+              .order('created_at', { ascending: false })
+              .range(i * 1000, i * 1000 + 999)
+          )
+        )
+        for (const res of batchResults) {
+          if (res.error) throw new Error(res.error.message)
+        }
+        allSales = batchResults.flatMap((r) => (r.data ?? []) as SaleWithPayments[])
+      }
+
       setCustomer(custRes.data as Customer)
-      setSales((salesRes.data ?? []) as SaleWithPayments[])
+      setSales(allSales)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load customer')
     } finally {
