@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Filter, CheckCircle2, AlertTriangle, Settings } from 'lucide-react'
+import { Filter, CheckCircle2, AlertTriangle, Settings, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { useFilterReplacement } from '../hooks/useFilterReplacement'
 import { FilterReplacementSettingsModal } from './FilterReplacementSettingsModal'
+import { FilterReplacementHistoryModal } from './FilterReplacementHistoryModal'
 import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -42,6 +44,9 @@ export function FilterReplacementCard() {
 
   const [isMarking,    setIsMarking]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [historyOpen,  setHistoryOpen]  = useState(false)
+  const [noteExpanded, setNoteExpanded] = useState(false)
+  const [noteText,     setNoteText]     = useState('')
 
   if (isLoading) return <LoadingSkeleton rows={3} />
 
@@ -52,7 +57,6 @@ export function FilterReplacementCard() {
   )
 
   // ── Not configured ─────────────────────────────────────────────────────────
-  // filter_replacement_interval_days is NULL — show neutral placeholder with no bar or badge.
   if (!isConfigured) {
     return (
       <>
@@ -143,11 +147,18 @@ export function FilterReplacementCard() {
     ? `Last replaced: ${formatDate(lastReplacedAt)}`
     : 'Not yet replaced'
 
+  const handleCancelNote = () => {
+    setNoteExpanded(false)
+    setNoteText('')
+  }
+
   const handleReplace = async () => {
     setIsMarking(true)
     try {
-      await markAsReplaced()
+      await markAsReplaced(noteText.trim() || undefined)
       toast({ title: 'Filter replacement logged', description: 'Counter reset.' })
+      setNoteExpanded(false)
+      setNoteText('')
     } catch (e) {
       toast({
         title: 'Failed to log replacement',
@@ -217,8 +228,10 @@ export function FilterReplacementCard() {
           </div>
         </div>
 
-        {/* Count row + button */}
+        {/* Count row + action area */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
+
+          {/* Left: stats + history link */}
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
               {mainNumber !== null
@@ -233,18 +246,60 @@ export function FilterReplacementCard() {
             <p className="text-xs text-muted-foreground mt-0.5">
               {replacementsYtd} replacement{replacementsYtd !== 1 ? 's' : ''} all time
             </p>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors duration-150 mt-1.5"
+            >
+              <History className="h-3 w-3" />
+              View History
+            </button>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 w-full md:w-auto"
-            disabled={isMarking}
-            onClick={() => void handleReplace()}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-            {isMarking ? 'Logging…' : 'Mark as Replaced'}
-          </Button>
+          {/* Right: inline note expand OR mark button */}
+          {noteExpanded ? (
+            <div className="flex flex-col gap-2 md:min-w-[200px]">
+              <Input
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Add a note (optional)"
+                className="text-sm"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isMarking}
+                  onClick={handleCancelNote}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isMarking}
+                  onClick={() => void handleReplace()}
+                >
+                  {isMarking ? 'Logging…' : 'Log it'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 w-full md:w-auto"
+              disabled={isMarking}
+              onClick={() => setNoteExpanded(true)}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+              Mark as Replaced
+            </Button>
+          )}
         </div>
 
       </div>
@@ -260,6 +315,11 @@ export function FilterReplacementCard() {
           onSave={updateSettings}
         />
       )}
+
+      <FilterReplacementHistoryModal
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      />
     </>
   )
 }

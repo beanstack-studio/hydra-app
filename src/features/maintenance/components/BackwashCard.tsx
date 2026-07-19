@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Droplets, CheckCircle2, AlertTriangle, Settings } from 'lucide-react'
+import { Droplets, CheckCircle2, AlertTriangle, Settings, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { useBackwashTracker } from '../hooks/useBackwashTracker'
 import { BackwashSettingsModal } from './BackwashSettingsModal'
+import { BackwashHistoryModal } from './BackwashHistoryModal'
 import { formatDate, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
@@ -37,6 +39,9 @@ export function BackwashCard() {
 
   const [isMarking,    setIsMarking]    = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [historyOpen,  setHistoryOpen]  = useState(false)
+  const [noteExpanded, setNoteExpanded] = useState(false)
+  const [noteText,     setNoteText]     = useState('')
 
   if (isLoading) return <LoadingSkeleton rows={3} />
 
@@ -47,7 +52,6 @@ export function BackwashCard() {
   )
 
   // ── Not configured ─────────────────────────────────────────────────────────
-  // backwash_threshold is NULL — show a neutral placeholder with no bar or badge.
   if (!isConfigured) {
     return (
       <>
@@ -122,11 +126,18 @@ export function BackwashCard() {
     ? `Last backwash: ${formatDate(lastBackwashedAt)}`
     : 'Not yet backwashed'
 
+  const handleCancelNote = () => {
+    setNoteExpanded(false)
+    setNoteText('')
+  }
+
   const handleBackwash = async () => {
     setIsMarking(true)
     try {
-      await markAsBackwashed()
+      await markAsBackwashed(noteText.trim() || undefined)
       toast({ title: 'Backwash logged', description: 'Counter reset to 0.' })
+      setNoteExpanded(false)
+      setNoteText('')
     } catch (e) {
       toast({
         title: 'Failed to log backwash',
@@ -196,8 +207,10 @@ export function BackwashCard() {
           </div>
         </div>
 
-        {/* Count row + button */}
+        {/* Count row + action area */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
+
+          {/* Left: stats + history link */}
           <div className="min-w-0">
             <p className={cn('text-xl font-bold leading-tight', countColorClass)}>
               {combinedCount.toLocaleString()}
@@ -211,18 +224,60 @@ export function BackwashCard() {
             <p className="text-xs text-muted-foreground mt-0.5">
               {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} all time
             </p>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors duration-150 mt-1.5"
+            >
+              <History className="h-3 w-3" />
+              View History
+            </button>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 w-full md:w-auto"
-            disabled={isMarking}
-            onClick={() => void handleBackwash()}
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-            {isMarking ? 'Logging…' : 'Mark as Backwashed'}
-          </Button>
+          {/* Right: inline note expand OR mark button */}
+          {noteExpanded ? (
+            <div className="flex flex-col gap-2 md:min-w-[200px]">
+              <Input
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Add a note (optional)"
+                className="text-sm"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isMarking}
+                  onClick={handleCancelNote}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isMarking}
+                  onClick={() => void handleBackwash()}
+                >
+                  {isMarking ? 'Logging…' : 'Log it'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 w-full md:w-auto"
+              disabled={isMarking}
+              onClick={() => setNoteExpanded(true)}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+              Mark as Backwashed
+            </Button>
+          )}
         </div>
 
       </div>
@@ -236,6 +291,11 @@ export function BackwashCard() {
           onSave={updateThreshold}
         />
       )}
+
+      <BackwashHistoryModal
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      />
     </>
   )
 }

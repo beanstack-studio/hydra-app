@@ -51,7 +51,7 @@ export interface UseFilterReplacementReturn {
   zone: FilterReplacementZone
   isLoading: boolean
   error: string | null
-  markAsReplaced: () => Promise<void>
+  markAsReplaced: (notes?: string) => Promise<void>
   updateSettings: (intervalDays: number, supplies: FilterReplacementSupplyLink[], alertEnabled: boolean) => Promise<void>
 }
 
@@ -180,7 +180,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  const markAsReplaced = useCallback(async () => {
+  const markAsReplaced = useCallback(async (notes?: string) => {
     if (!stationId) return
 
     // Deduct all linked supplies sequentially
@@ -209,6 +209,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
       .insert({
         station_id:  stationId,
         replaced_at: new Date().toISOString(),
+        ...(notes ? { notes } : {}),
         ...(firstDeduction
           ? { linked_supply_id: firstDeduction.supply_id, qty_deducted: firstDeduction.qty_deducted }
           : {}),

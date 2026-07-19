@@ -60,7 +60,7 @@ export interface UseBackwashTrackerReturn {
   isLoading: boolean
   isConfigured: boolean
   error: string | null
-  markAsBackwashed: () => Promise<void>
+  markAsBackwashed: (notes?: string) => Promise<void>
   updateThreshold: (threshold: number, alertEnabled: boolean) => Promise<void>
 }
 
@@ -180,7 +180,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
 
   useEffect(() => { void fetchData() }, [fetchData])
 
-  const markAsBackwashed = useCallback(async () => {
+  const markAsBackwashed = useCallback(async (notes?: string) => {
     if (!stationId) return
     const { slimCount, roundCount } = useBackwashStore.getState()
 
@@ -191,6 +191,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         backwashed_at:           new Date().toISOString(),
         slim_count_at_backwash:  slimCount,
         round_count_at_backwash: roundCount,
+        ...(notes ? { notes } : {}),
       })
 
     if (e) throw new Error(e.message)
