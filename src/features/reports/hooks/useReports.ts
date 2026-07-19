@@ -105,16 +105,21 @@ export function useReports(): UseReportsReturn {
         billsQuery = billsQuery.lte('month', billsMaxMonth)
       }
 
-      const [salesRes, expensesRes, billsRes, productsRes, outstandingRes] = await Promise.all([
+      // ── Phase 1: row counts + small tables + outstanding RPC (all parallel) ──
+      // Row counts are needed to plan how many 1 000-row batch queries to fire.
+      // Bills, products, and the outstanding RPC are small / aggregate so they
+      // don't need batching and can be fetched directly here.
+      const BATCH = 1000
+      const [salesCountRes, expCountRes, billsRes, productsRes, outstandingRpc] = await Promise.all([
         supabase
           .from('sales')
-          .select('id, sale_date, total_amount, status, balance_due, product_name, qty, customer_name, items, amount_received, payment_mode')
+          .select('*', { count: 'exact', head: true })
           .eq('station_id', stationId)
           .gte('sale_date', startDate)
           .lte('sale_date', endDate),
         supabase
           .from('expenses')
-          .select('*')
+          .select('*', { count: 'exact', head: true })
           .eq('station_id', stationId)
           .gte('expense_date', startDate)
           .lte('expense_date', endDate),
@@ -126,19 +131,60 @@ export function useReports(): UseReportsReturn {
           .eq('is_active', true)
           .order('type')
           .order('name'),
-        supabase
-          .from('sales')
-          .select('customer_name, balance_due')
-          .eq('station_id', stationId)
-          .gt('balance_due', 0),
+        // RPC: SUM(balance_due) + top-5 per customer across ALL time.
+        // Replaces the unbounded raw table scan that was silently capped at
+        // 1 000 rows by PostgREST (stations with >1 000 lifetime sales would
+        // understate their true outstanding balance with no visible error).
+        supabase.rpc('get_outstanding_summary', { p_station_id: stationId }),
       ])
 
-      const sales    = salesRes.data    ?? []
-      const expenses = expensesRes.data ?? []
-      const bills    = billsRes.data    ?? []
+      if (salesCountRes.error) throw new Error(salesCountRes.error.message)
+      if (expCountRes.error)   throw new Error(expCountRes.error.message)
+      if (outstandingRpc.error) throw new Error(outstandingRpc.error.message)
+      if (billsRes.error) setError(`Could not load bills: ${billsRes.error.message}`)
 
-      const queryError = salesRes.error?.message || expensesRes.error?.message
-      if (queryError) setError(`Could not load all data: ${queryError}`)
+      const salesTotal = salesCountRes.count ?? 0
+      const expTotal   = expCountRes.count   ?? 0
+
+      // ── Phase 2: fetch all sales + expenses rows in parallel 1 000-row batches ─
+      // A period with >1 000 rows (e.g. YTD for a busy station) would silently
+      // truncate with a plain .select() — same root cause as the Backwash Tracker
+      // bug. Two-phase count→batch guarantees we get every row.
+      const salesFetches = Array.from({ length: Math.ceil(salesTotal / BATCH) || 0 }, (_, i) =>
+        supabase
+          .from('sales')
+          .select('id, sale_date, total_amount, status, balance_due, product_name, qty, customer_name, items, amount_received, payment_mode')
+          .eq('station_id', stationId)
+          .gte('sale_date', startDate)
+          .lte('sale_date', endDate)
+          .range(i * BATCH, i * BATCH + BATCH - 1)
+      )
+      const expFetches = Array.from({ length: Math.ceil(expTotal / BATCH) || 0 }, (_, i) =>
+        supabase
+          .from('expenses')
+          .select('*')
+          .eq('station_id', stationId)
+          .gte('expense_date', startDate)
+          .lte('expense_date', endDate)
+          .range(i * BATCH, i * BATCH + BATCH - 1)
+      )
+
+      const [salesBatches, expBatches] = await Promise.all([
+        Promise.all(salesFetches),
+        Promise.all(expFetches),
+      ])
+
+      for (const res of [...salesBatches, ...expBatches]) {
+        if (res.error) throw new Error(res.error.message)
+      }
+
+      const sales    = salesBatches.flatMap((r) => r.data ?? [])
+      const expenses = expBatches.flatMap((r) => r.data ?? [])
+      const bills    = billsRes.data ?? []
+
+      // Parse outstanding RPC result
+      type OutstandingSummary = { total: number; top: Array<{ customer_name: string; balance_due: number }> }
+      const outstandingSummary = outstandingRpc.data as OutstandingSummary | null
 
       // ── Daily sales map: full order totals by sale/order date ─────────────
       const dailyOrderMap = new Map<string, number>()
@@ -293,16 +339,13 @@ export function useReports(): UseReportsReturn {
         .sort((a, b) => b.total_amount - a.total_amount)
         .slice(0, 5)
 
-      // ── Top outstanding balances (all-time, not date-scoped) ─────────────
-      const outstandingMap = new Map<string, number>()
-      for (const s of (outstandingRes.data ?? [])) {
-        const name = (s.customer_name as string) || 'Walk-in'
-        outstandingMap.set(name, (outstandingMap.get(name) ?? 0) + ((s.balance_due as number) ?? 0))
-      }
-      const topOutstanding: OutstandingCustomer[] = Array.from(outstandingMap.entries())
-        .map(([customer_name, balance_due]) => ({ customer_name, balance_due }))
-        .sort((a, b) => b.balance_due - a.balance_due)
-        .slice(0, 5)
+      // ── Top outstanding balances (all-time, from RPC) ────────────────────
+      // Computed server-side by get_outstanding_summary() — no JS aggregation
+      // of raw rows needed, and no 1 000-row truncation risk.
+      const topOutstanding: OutstandingCustomer[] = (outstandingSummary?.top ?? []).map((t) => ({
+        customer_name: t.customer_name,
+        balance_due:   Number(t.balance_due),
+      }))
 
       // ── Product tally (grouped by type, promo variants merged) ──────────
       type ProductType = 'water' | 'ice' | 'addon'
@@ -368,10 +411,11 @@ export function useReports(): UseReportsReturn {
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
 
-      // ── Outstanding: current balance_due for any sale with an open balance
-      const outstandingAmount = sales
-        .filter((s) => ((s.balance_due as number) ?? 0) > 0)
-        .reduce((sum, s) => sum + ((s.balance_due as number) ?? 0), 0)
+      // ── Outstanding: all-time total from RPC (NOT date-scoped) ─────────────
+      // get_outstanding_summary() sums balance_due across the station's entire
+      // history, so this reflects the real current unpaid balance regardless of
+      // which reporting period (daily / weekly / monthly / YTD) is selected.
+      const outstandingAmount = Number(outstandingSummary?.total ?? 0)
 
       setData({
         dailyPoints,
