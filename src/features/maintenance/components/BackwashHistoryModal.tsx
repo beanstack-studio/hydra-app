@@ -14,7 +14,7 @@ export function BackwashHistoryModal({ isOpen, onClose }: BackwashHistoryModalPr
   const { data, isLoading, error } = useBackwashHistory(isOpen)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Backwash History" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="Backwash History" size="md">
       {isLoading ? (
         <LoadingSkeleton rows={4} />
       ) : error ? (

@@ -14,7 +14,7 @@ export function FilterReplacementHistoryModal({ isOpen, onClose }: FilterReplace
   const { data, isLoading, error } = useFilterReplacementHistory(isOpen)
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Filter Replacement History" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title="Filter Replacement History" size="md">
       {isLoading ? (
         <LoadingSkeleton rows={4} />
       ) : error ? (
