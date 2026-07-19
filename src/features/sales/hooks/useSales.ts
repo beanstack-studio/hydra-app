@@ -119,30 +119,79 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      let query = supabase
+      // Cleaned search term — strip leading # so "#9C790D" → "9C790D"
+      const q = search.length >= 3
+        ? search.replace(/^#/, '').replace(/%/g, '').trim()
+        : ''
+
+      if (!q) {
+        // No active search — load all sales with only the dropdown filters applied
+        let baseQuery = supabase
+          .from('sales')
+          .select('*')
+          .eq('station_id', stationId)
+          .order('created_at', { ascending: false })
+        if (filterStatus)    baseQuery = baseQuery.eq('status', filterStatus)
+        if (filterOrderType) baseQuery = baseQuery.eq('order_type', filterOrderType)
+        const { data: rows, error: e } = await baseQuery
+        if (e) throw new Error(e.message)
+        setData((rows ?? []) as Sale[])
+        return
+      }
+
+      // ── Active search ────────────────────────────────────────────────────────
+
+      // 1. Server-side text search across customer_name and product_name.
+      //    These are TEXT columns so ILIKE works correctly.  Results come from
+      //    ALL sales — not just the most-recently-loaded 1 000 rows.
+      let textQuery = supabase
         .from('sales')
         .select('*')
         .eq('station_id', stationId)
+        .or(`customer_name.ilike.%${q}%,product_name.ilike.%${q}%`)
         .order('created_at', { ascending: false })
+      if (filterStatus)    textQuery = textQuery.eq('status', filterStatus)
+      if (filterOrderType) textQuery = textQuery.eq('order_type', filterOrderType)
+      const { data: textRows, error: textErr } = await textQuery
+      if (textErr) throw new Error(textErr.message)
 
-      // Server-side status and order_type filters
-      if (filterStatus)    query = query.eq('status', filterStatus)
-      if (filterOrderType) query = query.eq('order_type', filterOrderType)
+      const seen = new Set<string>((textRows ?? []).map((r) => r.id))
+      const merged: Sale[] = (textRows ?? []) as Sale[]
 
-      // Server-side search: queries ALL sales, not just the first 1000 loaded.
-      // Strips leading # so "#ABC123" correctly matches UUID suffix "abc123".
-      // id must be cast to text (id::text) — ILIKE on a uuid column is a
-      // Postgres type error ("operator does not exist: uuid ~~* unknown").
-      if (search.length >= 3) {
-        const q = search.replace(/^#/, '').replace(/%/g, '')
-        query = query.or(
-          `customer_name.ilike.%${q}%,product_name.ilike.%${q}%,id::text.ilike.%${q}%`
-        )
+      // 2. Order-number search — the displayed order # is id.slice(-6) (a UUID
+      //    suffix), so it cannot be matched with ILIKE through PostgREST: the
+      //    id column is typed uuid, and neither .or() inline casts (::text breaks
+      //    the PostgREST logic-tree parser) nor .filter() casts (URLSearchParams
+      //    percent-encodes :: so PostgREST never sees the cast) work via the JS
+      //    client without a server-side SQL function.
+      //
+      //    Workaround: if the search term looks like hex chars (the only
+      //    characters that appear in a UUID suffix), load the recent ~1 000 sales
+      //    and match the id suffix client-side.  For most stations this covers
+      //    their full history; a Postgres RPC (id::text ilike) can lift the cap
+      //    in a future migration.
+      if (/^[0-9a-f]+$/i.test(q) && q.length <= 8) {
+        let scanQuery = supabase
+          .from('sales')
+          .select('*')
+          .eq('station_id', stationId)
+          .order('created_at', { ascending: false })
+        if (filterStatus)    scanQuery = scanQuery.eq('status', filterStatus)
+        if (filterOrderType) scanQuery = scanQuery.eq('order_type', filterOrderType)
+        const { data: scanRows, error: scanErr } = await scanQuery
+        if (scanErr) throw new Error(scanErr.message)
+
+        const qUpper = q.toUpperCase()
+        for (const row of (scanRows ?? []) as Sale[]) {
+          if (!seen.has(row.id) && row.id.slice(-6).toUpperCase().includes(qUpper)) {
+            merged.push(row)
+          }
+        }
       }
 
-      const { data: rows, error: e } = await query
-      if (e) throw new Error(e.message)
-      setData((rows ?? []) as Sale[])
+      // Keep newest-first regardless of merge order
+      merged.sort((a, b) => b.created_at.localeCompare(a.created_at))
+      setData(merged)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sales')
     } finally {
