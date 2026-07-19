@@ -90,6 +90,9 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     try {
       const phNow      = toZonedTime(new Date(), PH_TZ)
       const ytdStartTz = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
+      // Plain date string used to filter the sales query (sale_date is a date column).
+      // Computing it here so it's available before the parallel fetch.
+      const ytdStart   = `${phNow.getFullYear()}-01-01`
 
       const [logsRes, ytdCountRes, salesRes, settingsRes] = await Promise.all([
         supabase
@@ -106,7 +109,11 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         supabase
           .from('sales')
           .select('product_name, qty, sale_date, items')
-          .eq('station_id', stationId),
+          .eq('station_id', stationId)
+          // Filter to current-year sales only — prevents Supabase's 1000-row default
+          // limit from silently truncating recent sales when the station has >1000 records.
+          // Safe because the last backwash is always within the current year.
+          .gte('sale_date', ytdStart),
         supabase
           .from('station_settings')
           .select('backwash_threshold, backwash_alert_enabled')
@@ -144,8 +151,6 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
       const lastBackwashedDate = fetchedLastAt
         ? formatInTimeZone(new Date(fetchedLastAt), PH_TZ, 'yyyy-MM-dd')
         : null
-
-      const ytdStart = `${phNow.getFullYear()}-01-01`
 
       let slim = 0, round = 0
       let sYtd = 0, rYtd = 0
