@@ -158,34 +158,29 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
       const seen = new Set<string>((textRows ?? []).map((r) => r.id))
       const merged: Sale[] = (textRows ?? []) as Sale[]
 
-      // 2. Order-number search — the displayed order # is id.slice(-6) (a UUID
-      //    suffix), so it cannot be matched with ILIKE through PostgREST: the
-      //    id column is typed uuid, and neither .or() inline casts (::text breaks
-      //    the PostgREST logic-tree parser) nor .filter() casts (URLSearchParams
-      //    percent-encodes :: so PostgREST never sees the cast) work via the JS
-      //    client without a server-side SQL function.
-      //
-      //    Workaround: if the search term looks like hex chars (the only
-      //    characters that appear in a UUID suffix), load the recent ~1 000 sales
-      //    and match the id suffix client-side.  For most stations this covers
-      //    their full history; a Postgres RPC (id::text ilike) can lift the cap
-      //    in a future migration.
+      // 2. Order-number search — the displayed order # is the last 6 chars of
+      //    the UUID (id.slice(-6) in the UI).  ILIKE on a uuid column cannot be
+      //    expressed through the PostgREST JS client (::text in .or() breaks the
+      //    logic-tree parser; ::text in .filter() gets URL-encoded by
+      //    URLSearchParams).  Instead we call a SECURITY INVOKER Postgres
+      //    function that does right(id::text, 6) ILIKE server-side, so the match
+      //    works across ALL sales with no row-count cap.
       if (/^[0-9a-f]+$/i.test(q) && q.length <= 8) {
-        let scanQuery = supabase
-          .from('sales')
-          .select('*')
-          .eq('station_id', stationId)
-          .order('created_at', { ascending: false })
-        if (filterStatus)    scanQuery = scanQuery.eq('status', filterStatus)
-        if (filterOrderType) scanQuery = scanQuery.eq('order_type', filterOrderType)
-        const { data: scanRows, error: scanErr } = await scanQuery
-        if (scanErr) throw new Error(scanErr.message)
+        const { data: rpcRows, error: rpcErr } = await supabase
+          .rpc('search_sales_by_order_suffix', {
+            p_station_id: stationId,
+            p_suffix:     q,
+          })
+        if (rpcErr) throw new Error(rpcErr.message)
 
-        const qUpper = q.toUpperCase()
-        for (const row of (scanRows ?? []) as Sale[]) {
-          if (!seen.has(row.id) && row.id.slice(-6).toUpperCase().includes(qUpper)) {
-            merged.push(row)
-          }
+        // Apply the active dropdown filters client-side on the (small) RPC
+        // result set so order-number search respects the same status / type
+        // filters as the name search above.
+        for (const row of (rpcRows ?? []) as Sale[]) {
+          if (seen.has(row.id)) continue
+          if (filterStatus    && row.status     !== filterStatus)    continue
+          if (filterOrderType && row.order_type !== filterOrderType) continue
+          merged.push(row)
         }
       }
 
