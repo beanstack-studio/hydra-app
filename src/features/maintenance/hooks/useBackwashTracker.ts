@@ -22,10 +22,10 @@ function isRoundRefill(name: string): boolean {
   return /refill.*round/i.test(name)
 }
 
+// sale_date is no longer needed client-side — server filters by it directly.
 interface SaleRow {
   product_name: string
   qty: number
-  sale_date: string
   items: unknown
 }
 
@@ -90,11 +90,10 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     try {
       const phNow      = toZonedTime(new Date(), PH_TZ)
       const ytdStartTz = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
-      // Plain date string used to filter the sales query (sale_date is a date column).
-      // Computing it here so it's available before the parallel fetch.
       const ytdStart   = `${phNow.getFullYear()}-01-01`
 
-      const [logsRes, ytdCountRes, salesRes, settingsRes] = await Promise.all([
+      // ── Phase 1: backwash log, YTD count, settings (parallel) ────────────
+      const [logsRes, ytdCountRes, settingsRes] = await Promise.all([
         supabase
           .from('backwash_logs')
           .select('backwashed_at')
@@ -107,14 +106,6 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
           .eq('station_id', stationId)
           .gte('backwashed_at', ytdStartTz),
         supabase
-          .from('sales')
-          .select('product_name, qty, sale_date, items')
-          .eq('station_id', stationId)
-          // Filter to current-year sales only — prevents Supabase's 1000-row default
-          // limit from silently truncating recent sales when the station has >1000 records.
-          // Safe because the last backwash is always within the current year.
-          .gte('sale_date', ytdStart),
-        supabase
           .from('station_settings')
           .select('backwash_threshold, backwash_alert_enabled')
           .eq('station_id', stationId)
@@ -122,7 +113,6 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
       ])
 
       if (logsRes.error) throw new Error(logsRes.error.message)
-      if (salesRes.error) throw new Error(salesRes.error.message)
       // settingsRes failure is non-fatal — fall back to unconfigured
 
       // ── Configured vs. not configured ────────────────────────────────────
@@ -146,36 +136,41 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
 
       const fetchedLastAt = (logsRes.data?.[0]?.backwashed_at as string | undefined) ?? null
 
-      // Convert to PH date for comparison with sale_date (YYYY-MM-DD)
-      // spec: "sale_date > MAX(backwashed_at)" → sales ON the backwash day don't count
+      // Convert backwash timestamp to PH date string for comparison with sale_date (YYYY-MM-DD).
+      // Spec: sales ON the backwash day don't count — only strictly-after dates.
       const lastBackwashedDate = fetchedLastAt
         ? formatInTimeZone(new Date(fetchedLastAt), PH_TZ, 'yyyy-MM-dd')
         : null
 
-      let slim = 0, round = 0
-      let sYtd = 0, rYtd = 0
+      // ── Phase 2: sales since last backwash ───────────────────────────────
+      // MUST be a separate sequential query — we need lastBackwashedDate from
+      // Phase 1 to filter server-side. This station has 1058+ sales (all 2026),
+      // so any unfiltered query silently truncates at Supabase's 1000-row cap.
+      // Filtering to sale_date > lastBackwashedDate returns ~48 rows — safe.
+      // Fall back to ytdStart if the station has never done a backwash.
+      const salesFloor = lastBackwashedDate ?? ytdStart
+      const salesRes = await supabase
+        .from('sales')
+        .select('product_name, qty, items')
+        .eq('station_id', stationId)
+        .gt('sale_date', salesFloor)
 
+      if (salesRes.error) throw new Error(salesRes.error.message)
+
+      let slim = 0, round = 0
       for (const sale of (salesRes.data ?? []) as SaleRow[]) {
         const { slim: s, round: r } = countRefillsFromSale(sale)
-        const saleDate = sale.sale_date
-
-        if (!lastBackwashedDate || saleDate > lastBackwashedDate) {
-          slim  += s
-          round += r
-        }
-        if (saleDate >= ytdStart) {
-          sYtd += s
-          rYtd += r
-        }
+        slim  += s
+        round += r
       }
 
       setCounts({
-        combinedCount:   slim + round,
-        slimCount:       slim,
-        roundCount:      round,
-        slimYtd:         sYtd,
-        roundYtd:        rYtd,
-        backwashYtd:     ytdCountRes.count ?? 0,
+        combinedCount:    slim + round,
+        slimCount:        slim,
+        roundCount:       round,
+        slimYtd:          0,   // not rendered in UI — excluded from query
+        roundYtd:         0,   // not rendered in UI — excluded from query
+        backwashYtd:      ytdCountRes.count ?? 0,
         lastBackwashedAt: fetchedLastAt,
       })
     } catch (err) {
