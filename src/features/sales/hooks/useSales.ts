@@ -131,10 +131,12 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
 
       // Server-side search: queries ALL sales, not just the first 1000 loaded.
       // Strips leading # so "#ABC123" correctly matches UUID suffix "abc123".
+      // id must be cast to text (id::text) — ILIKE on a uuid column is a
+      // Postgres type error ("operator does not exist: uuid ~~* unknown").
       if (search.length >= 3) {
         const q = search.replace(/^#/, '').replace(/%/g, '')
         query = query.or(
-          `customer_name.ilike.%${q}%,product_name.ilike.%${q}%,id.ilike.%${q}%`
+          `customer_name.ilike.%${q}%,product_name.ilike.%${q}%,id::text.ilike.%${q}%`
         )
       }
 
