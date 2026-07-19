@@ -231,7 +231,7 @@ export function FilterReplacementCard() {
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{lastLabel}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {replacementsYtd} replacement{replacementsYtd !== 1 ? 's' : ''} YTD
+              {replacementsYtd} replacement{replacementsYtd !== 1 ? 's' : ''} all time
             </p>
           </div>
 

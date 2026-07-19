@@ -78,7 +78,6 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
     setError(null)
     try {
       const phNow         = toZonedTime(new Date(), PH_TZ)
-      const ytdStartTz    = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
       const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
 
       const [logsRes, ytdRes, settingsRes, suppliesRes] = await Promise.all([
@@ -91,8 +90,7 @@ export function useFilterReplacement(): UseFilterReplacementReturn {
         supabase
           .from('filter_replacement_logs')
           .select('*', { count: 'exact', head: true })
-          .eq('station_id', stationId)
-          .gte('replaced_at', ytdStartTz),
+          .eq('station_id', stationId),
         supabase
           .from('station_settings')
           .select('filter_replacement_interval_days, filter_replacement_alert_enabled, filter_replacement_supply_id, filter_replacement_supply_qty')

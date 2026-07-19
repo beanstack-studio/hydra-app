@@ -209,7 +209,7 @@ export function BackwashCard() {
               {lastBackwashLabel}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} YTD
+              {backwashYtd} backwash{backwashYtd !== 1 ? 'es' : ''} all time
             </p>
           </div>
 

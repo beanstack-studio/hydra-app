@@ -88,11 +88,10 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      const phNow      = toZonedTime(new Date(), PH_TZ)
-      const ytdStartTz = `${phNow.getFullYear()}-01-01T00:00:00+08:00`
-      const ytdStart   = `${phNow.getFullYear()}-01-01`
+      const phNow    = toZonedTime(new Date(), PH_TZ)
+      const ytdStart = `${phNow.getFullYear()}-01-01`
 
-      // ── Phase 1: backwash log, YTD count, settings (parallel) ────────────
+      // ── Phase 1: backwash log, all-time count, settings (parallel) ─────────
       const [logsRes, ytdCountRes, settingsRes] = await Promise.all([
         supabase
           .from('backwash_logs')
@@ -103,8 +102,7 @@ export function useBackwashTracker(): UseBackwashTrackerReturn {
         supabase
           .from('backwash_logs')
           .select('*', { count: 'exact', head: true })
-          .eq('station_id', stationId)
-          .gte('backwashed_at', ytdStartTz),
+          .eq('station_id', stationId),
         supabase
           .from('station_settings')
           .select('backwash_threshold, backwash_alert_enabled')

@@ -20,7 +20,7 @@ const MONTHS = [
 ]
 
 const MODE_LABELS: Record<string, string> = {
-  daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', ytd: 'YTD',
+  daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', ytd: 'YTD', alltime: 'All-time',
 }
 
 export default function ReportsPage() {
@@ -50,7 +50,7 @@ export default function ReportsPage() {
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         {/* Daily / Weekly / Monthly / YTD pill toggle */}
         <div className="flex rounded-md border border-input overflow-hidden text-sm">
-          {(['daily', 'weekly', 'monthly', 'ytd'] as const).map((m) => (
+          {(['daily', 'weekly', 'monthly', 'ytd', 'alltime'] as const).map((m) => (
             <button
               key={m}
               type="button"

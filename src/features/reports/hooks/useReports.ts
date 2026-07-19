@@ -5,7 +5,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import { nowPH, PH_TZ } from '@/lib/utils'
 import type { ReportsData, ExpenseSummaryItem, ProductSalesSummary, DailyPoint, ProductRanking, CustomerRanking, SupplyRanking, ExpenseRanking, OutstandingCustomer, ProductTallyRow, ProductTallyGroup } from '../types'
 
-export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd'
+export type ReportMode = 'daily' | 'weekly' | 'monthly' | 'ytd' | 'alltime'
 
 // ── Week helpers ──────────────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ export function useReports(): UseReportsReturn {
       let startDate: string
       let endDate: string
       let billsMaxMonth: number | null = null
-      const includeBills = mode === 'monthly' || mode === 'ytd'
+      const includeBills = mode === 'monthly' || mode === 'ytd' || mode === 'alltime'
 
       if (mode === 'daily') {
         startDate = selectedDate
@@ -87,6 +87,11 @@ export function useReports(): UseReportsReturn {
           ? formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
           : `${year}-12-31`
         billsMaxMonth = year === currentYear ? todayPH.getMonth() + 1 : 12
+      } else if (mode === 'alltime') {
+        // '2000-01-01' is an effective lower-bound sentinel — no station data
+        // predates this, so the query returns every row in the station's history.
+        startDate = '2000-01-01'
+        endDate   = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
       } else {
         startDate = `${year}-${String(month).padStart(2, '0')}-01`
         const endMonth = month === 12 ? 1 : month + 1
@@ -94,11 +99,14 @@ export function useReports(): UseReportsReturn {
         endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`
       }
 
+      // Bills query: alltime omits the year filter so every bill row is included.
       let billsQuery = supabase
         .from('monthly_bills')
         .select('*')
         .eq('station_id', stationId)
-        .eq('year', year)
+      if (mode !== 'alltime') {
+        billsQuery = billsQuery.eq('year', year)
+      }
       if (mode === 'monthly') {
         billsQuery = billsQuery.eq('month', month)
       } else if (billsMaxMonth !== null) {
