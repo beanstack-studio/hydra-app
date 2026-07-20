@@ -419,11 +419,14 @@ export function useReports(): UseReportsReturn {
         expenses.reduce((s, r) => s + (r.amount as number), 0) +
         bills.reduce((s, r) => s + (r.amount as number), 0)
 
-      // ── Outstanding: all-time total from RPC (NOT date-scoped) ─────────────
-      // get_outstanding_summary() sums balance_due across the station's entire
-      // history, so this reflects the real current unpaid balance regardless of
-      // which reporting period (daily / weekly / monthly / YTD) is selected.
-      const outstandingAmount = Number(outstandingSummary?.total ?? 0)
+      // ── Outstanding: period-scoped, from already-fetched sales rows ────────
+      // sales[] is already filtered to startDate..endDate, so summing balance_due
+      // here gives the outstanding balance for the selected period only.
+      // topOutstanding (below) remains all-time via the RPC — intentionally.
+      const outstandingAmount = sales.reduce(
+        (sum, s) => sum + Math.max(0, Number(s.balance_due ?? 0)),
+        0,
+      )
 
       setData({
         dailyPoints,
