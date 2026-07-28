@@ -23,28 +23,13 @@ export function useCustomers(): UseCustomersReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
+      // RPC computes last_ordered_at and total_balance server-side via a single
+      // LEFT JOIN + GROUP BY, avoiding both the nested-subquery row-cap risk and
+      // the N-row JS aggregation the old .select('*, sales(...)') approach required.
       const { data: rows, error: e } = await supabase
-        .from('customers')
-        .select('*, sales(sale_date, balance_due, status)')
-        .eq('station_id', stationId)
-        .order('name')
+        .rpc('get_customers_with_stats', { p_station_id: stationId })
       if (e) throw new Error(e.message)
-
-      type SaleRow = { sale_date: string; balance_due: number | null; status: string }
-      type RawRow = Omit<Customer, 'last_ordered_at' | 'total_balance'> & { sales: SaleRow[] | null }
-
-      const customers = ((rows ?? []) as RawRow[]).map((row) => {
-        const salesArr = row.sales ?? []
-        const sorted = [...salesArr].sort((a, b) => b.sale_date.localeCompare(a.sale_date))
-        const last_ordered_at = sorted[0]?.sale_date ?? null
-        const total_balance = salesArr.reduce((sum, s) => {
-          if (s.status === 'unpaid' || s.status === 'partial') return sum + (s.balance_due ?? 0)
-          return sum
-        }, 0)
-        const { sales: _s, ...customer } = row
-        return { ...customer, last_ordered_at, total_balance } as Customer
-      })
-      setData(customers)
+      setData((rows ?? []) as Customer[])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load customers')
     } finally {

@@ -28,14 +28,36 @@ export function useUnpaidSales(): UseUnpaidSalesReturn {
     if (!stationId) { setIsLoading(false); return }
     setError(null)
     try {
-      const { data: rows, error: e } = await supabase
+      // Phase 1 — count total unpaid/partial rows.
+      // Supabase silently caps unfiltered queries at 1 000 rows; a busy
+      // utang ledger can exceed that over time, so we batch-fetch all pages.
+      const { count, error: countErr } = await supabase
         .from('sales')
-        .select('*')
+        .select('*', { count: 'exact', head: true })
         .eq('station_id', stationId)
         .in('status', ['unpaid', 'partial'])
-        .order('created_at', { ascending: false })
-      if (e) throw new Error(e.message)
-      setData((rows ?? []) as Sale[])
+      if (countErr) throw new Error(countErr.message)
+
+      const total = count ?? 0
+      if (total === 0) { setData([]); return }
+
+      // Phase 2 — fetch all pages in parallel (1 000 rows/batch).
+      const batchCount = Math.ceil(total / 1000)
+      const batchResults = await Promise.all(
+        Array.from({ length: batchCount }, (_, i) =>
+          supabase
+            .from('sales')
+            .select('*')
+            .eq('station_id', stationId)
+            .in('status', ['unpaid', 'partial'])
+            .order('created_at', { ascending: false })
+            .range(i * 1000, i * 1000 + 999)
+        )
+      )
+      for (const res of batchResults) {
+        if (res.error) throw new Error(res.error.message)
+      }
+      setData(batchResults.flatMap((r) => (r.data ?? []) as Sale[]))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load unpaid sales')
     } finally {
