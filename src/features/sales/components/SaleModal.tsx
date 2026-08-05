@@ -153,6 +153,8 @@ interface SaleModalProps {
 export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit }: SaleModalProps) {
   const { toast } = useToast()
   const stationId = useAuthStore((s) => s.stationId)
+  const role      = useAuthStore((s) => s.role)
+  const isOwner   = role === 'owner' || role === 'super_admin'
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
   const hasAddonProducts = activeProducts.some((p) => p.type === 'addon')
@@ -649,21 +651,23 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
             {step === 1 && (
               <div className="flex-1 overflow-y-auto divide-y divide-border">
 
-                {/* Sale Date */}
-                <div className="px-4 py-3 space-y-1.5">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</Label>
-                  <Controller
-                    name="sale_date"
-                    control={control}
-                    render={({ field }) => (
-                      <DatePickerInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        max={todayPH}
-                      />
-                    )}
-                  />
-                </div>
+                {/* Sale Date — owner only */}
+                {isOwner && (
+                  <div className="px-4 py-3 space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</Label>
+                    <Controller
+                      name="sale_date"
+                      control={control}
+                      render={({ field }) => (
+                        <DatePickerInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          max={todayPH}
+                        />
+                      )}
+                    />
+                  </div>
+                )}
 
                 {/* Customer */}
                 <div className="px-4 py-3 space-y-2">
