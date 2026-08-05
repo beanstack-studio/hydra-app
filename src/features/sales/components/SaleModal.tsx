@@ -865,6 +865,21 @@ export function SaleModal({ isOpen, onClose, products, stationSettings, onSubmit
                   )}
                 </div>
 
+                {/* Sale Date */}
+                <div className="px-4 py-3 space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</Label>
+                  <Controller
+                    name="sale_date"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePickerInput
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+
               </div>
             )}
 
