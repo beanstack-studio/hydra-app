@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { formatInTimeZone } from 'date-fns-tz'
-import { Minus, Plus, Search, X } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Clock, MapPin, Minus, Plus, Printer, Search, X } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
 import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatCurrency, formatDate, PH_TZ, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, formatTime, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import type { Sale, CartItem, PaymentMode, EditSaleUpdate } from '../types'
@@ -37,9 +37,10 @@ interface EditSaleModalProps {
   onClose: () => void
   products: Product[]
   onSave: (saleId: string, update: EditSaleUpdate) => Promise<void>
+  onReschedule?: () => void
 }
 
-export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditSaleModalProps) {
+export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onReschedule }: EditSaleModalProps) {
   const { toast } = useToast()
   const role    = useAuthStore((s) => s.role)
   const isOwner = role === 'owner' || role === 'super_admin'
@@ -135,9 +136,11 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   const hasNoResults   = searchQuery.trim().length > 0 && searchResults.length === 0
   const customerLabel  = sale?.customer_name || 'Unknown'
   const orderTypeLabel = sale ? (ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type) : '—'
-  const modalTitle     = readOnly
+  const modalTitle       = readOnly
     ? `Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
     : `Edit Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
+  const isScheduledOrder = sale ? (sale.order_type === 'delivery' || sale.order_type === 'pickup') : false
+  const orderLabel       = sale?.order_type === 'delivery' ? 'Delivery' : 'Pickup'
 
   const pillBase     = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
   const pillActive   = 'bg-primary text-primary-foreground border-primary'
@@ -445,27 +448,96 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-1">
-          {readOnly ? (
-            <Button type="button" className="flex-1" onClick={onClose}>
-              Close
+        {/* Delivery / Pickup details — shown for scheduled order types in both modes */}
+        {isScheduledOrder && (
+          <div className="border-t border-border pt-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {orderLabel} Details
+            </p>
+
+            {sale.delivery_address && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{sale.delivery_address}</span>
+              </div>
+            )}
+
+            {sale.scheduled_at && !isFulfilled && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>Scheduled for {formatDate(sale.scheduled_at)} {formatTime(sale.scheduled_at)}</span>
+              </div>
+            )}
+
+            {isFulfilled && sale.fulfilled_at && (
+              <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {orderLabel === 'Delivery' ? 'Delivered' : 'Picked up'} on{' '}
+                  {formatDate(sale.fulfilled_at)} at {formatTime(sale.fulfilled_at)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer: Print Receipt + optional Reschedule + main action buttons */}
+        <div className="border-t border-border pt-3 space-y-2">
+          {/* Print Receipt — both modes, both order types */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => {
+              const isAndroid = /Android/i.test(navigator.userAgent)
+              const scheme = isAndroid ? 'my.bluetoothprint.scheme://' : 'bprint://'
+              const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+              const platformParam = isAndroid ? '&platform=android' : ''
+              const url = `${scheme}${supabaseUrl}/functions/v1/receipt-print?txn_id=${sale.id}${platformParam}`
+              const a = document.createElement('a')
+              a.setAttribute('href', url)
+              a.click()
+            }}
+          >
+            <Printer className="h-4 w-4" />
+            Print Receipt
+          </Button>
+
+          {/* Reschedule — editable mode + delivery/pickup + onReschedule wired by parent */}
+          {!readOnly && isScheduledOrder && onReschedule && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              onClick={onReschedule}
+            >
+              <CalendarClock className="h-4 w-4" />
+              Reschedule
             </Button>
-          ) : (
-            <>
-              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                disabled={isSaving || cartItems.length === 0}
-                onClick={() => { void handleSave() }}
-              >
-                {isSaving ? 'Saving…' : 'Save Changes'}
-              </Button>
-            </>
           )}
+
+          {/* Cancel / Save  —or—  Close */}
+          <div className="flex gap-2">
+            {readOnly ? (
+              <Button type="button" className="flex-1" onClick={onClose}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  disabled={isSaving || cartItems.length === 0}
+                  onClick={() => { void handleSave() }}
+                >
+                  {isSaving ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
       </div>

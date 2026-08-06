@@ -229,6 +229,7 @@ export default function SalesPage() {
         onClose={() => setSelectedSale(null)}
         products={settings?.products ?? []}
         onSave={updateSaleItems}
+        onReschedule={handleRescheduleClick}
       />
 
       {/* Delete confirm modal */}
