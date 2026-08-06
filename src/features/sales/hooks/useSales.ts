@@ -92,7 +92,7 @@ interface UseSalesOptions {
   filterValues?: Record<string, string>
 }
 
-import type { CartItem } from '../types'
+import type { CartItem, EditSaleUpdate } from '../types'
 
 interface UseSalesReturn {
   data: Sale[]
@@ -103,7 +103,7 @@ interface UseSalesReturn {
   recordPayment: (saleId: string, amount: number, paymentMode: PaymentMode, paidAt: string, remarks: string) => Promise<void>
   rescheduleOrder: (saleId: string, scheduledAt: string) => Promise<void>
   confirmFulfillment: (saleId: string) => Promise<void>
-  updateSaleItems: (saleId: string, items: CartItem[], discount: number) => Promise<void>
+  updateSaleItems: (saleId: string, update: EditSaleUpdate) => Promise<void>
   refetch: () => Promise<void>
 }
 
@@ -325,10 +325,11 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
   }, [fetchData])
 
   const updateSaleItems = useCallback(async (
-    saleId: string, items: CartItem[], discount: number
+    saleId: string, update: EditSaleUpdate
   ) => {
     const sale = data.find((s) => s.id === saleId)
     if (!sale) throw new Error('Sale not found')
+    const { items, discount, saleDate, paymentMode, amountReceived, paidAt } = update
     const firstItem = items[0]
     if (!firstItem) throw new Error('At least one item is required')
     const containerTotal = sale.container_enabled ? sale.container_qty * sale.container_price : 0
@@ -345,6 +346,10 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
         product_total: firstItem.qty * firstItem.price,
         discount_amount: discount,
         total_amount: newTotal,
+        sale_date: saleDate,
+        payment_mode: paymentMode,
+        amount_received: amountReceived,
+        ...(paidAt !== null ? { paid_at: paidAt } : {}),
       })
       .eq('id', saleId)
       .eq('station_id', stationId)

@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
+import { formatInTimeZone } from 'date-fns-tz'
 import { Minus, Plus, Search, X } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
+import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import type { Sale, CartItem } from '../types'
+import type { Sale, CartItem, PaymentMode, EditSaleUpdate } from '../types'
 import type { Product } from '@/features/settings/types'
 
 const ORDER_TYPE_LABEL: Record<string, string> = {
@@ -15,34 +17,66 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   pickup:    'Pickup',
 }
 
+const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+  { value: 'cash',  label: 'Cash'  },
+  { value: 'gcash', label: 'GCash' },
+  { value: 'maya',  label: 'Maya'  },
+]
+
 interface EditSaleModalProps {
   sale: Sale | null
   isOpen: boolean
   onClose: () => void
   products: Product[]
-  onSave: (saleId: string, items: CartItem[], discount: number) => Promise<void>
+  onSave: (saleId: string, update: EditSaleUpdate) => Promise<void>
 }
 
 export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditSaleModalProps) {
   const { toast } = useToast()
 
-  const [cartItems,    setCartItems]    = useState<CartItem[]>([])
-  const [discount,     setDiscount]     = useState(0)
-  const [showDiscount, setShowDiscount] = useState(false)
-  const [searchQuery,  setSearchQuery]  = useState('')
-  const [isSaving,     setIsSaving]     = useState(false)
+  const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
+
+  const [cartItems,       setCartItems]       = useState<CartItem[]>([])
+  const [discount,        setDiscount]        = useState(0)
+  const [showDiscount,    setShowDiscount]    = useState(false)
+  const [searchQuery,     setSearchQuery]     = useState('')
+  const [saleDate,        setSaleDate]        = useState(todayPH)
+  const [paymentMode,     setPaymentMode]     = useState<PaymentMode>('cash')
+  const [amountReceived,  setAmountReceived]  = useState(0)
+  const [paidAt,          setPaidAt]          = useState(todayPH)
+  const [showPaymentDate, setShowPaymentDate] = useState(false)
+  const [isSaving,        setIsSaving]        = useState(false)
 
   // Populate from sale whenever modal opens
   useEffect(() => {
     if (!isOpen || !sale) return
+
     const initial: CartItem[] = sale.items && sale.items.length > 0
       ? sale.items.map((i) => ({ product_id: i.product_id, product_name: i.product_name, qty: i.qty, price: i.price }))
       : [{ product_id: sale.product_id, product_name: sale.product_name, qty: sale.qty, price: sale.price_per_piece }]
     setCartItems(initial)
+
     const d = sale.discount_amount ?? 0
     setDiscount(d)
     setShowDiscount(d > 0)
     setSearchQuery('')
+
+    setSaleDate(sale.sale_date ?? todayPH)
+
+    const knownModes: PaymentMode[] = ['cash', 'gcash', 'maya']
+    setPaymentMode(knownModes.includes(sale.payment_mode) ? sale.payment_mode : 'cash')
+
+    const received = sale.amount_received ?? 0
+    setAmountReceived(received)
+    setShowPaymentDate(received > 0)
+
+    setPaidAt(
+      sale.paid_at
+        ? formatInTimeZone(new Date(sale.paid_at), PH_TZ, 'yyyy-MM-dd')
+        : todayPH
+    )
+  // todayPH intentionally omitted — it's stable for the session
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, sale])
 
   // Full reset on close so stale state doesn't flash on next open
@@ -52,7 +86,13 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
       setDiscount(0)
       setShowDiscount(false)
       setSearchQuery('')
+      setSaleDate(todayPH)
+      setPaymentMode('cash')
+      setAmountReceived(0)
+      setPaidAt(todayPH)
+      setShowPaymentDate(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
@@ -74,6 +114,10 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   const hasNoResults   = searchQuery.trim().length > 0 && searchResults.length === 0
   const customerLabel  = sale?.customer_name || 'Unknown'
   const orderTypeLabel = sale ? (ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type) : '—'
+
+  const pillBase     = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
+  const pillActive   = 'bg-primary text-primary-foreground border-primary'
+  const pillInactive = 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-foreground'
 
   const setQty = (productId: string, qty: number) => {
     if (qty <= 0) {
@@ -99,7 +143,14 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
     }
     setIsSaving(true)
     try {
-      await onSave(sale.id, cartItems, discount)
+      await onSave(sale.id, {
+        items: cartItems,
+        discount,
+        saleDate,
+        paymentMode,
+        amountReceived,
+        paidAt: showPaymentDate ? paidAt : null,
+      })
       toast({ title: 'Sale updated' })
       onClose()
     } catch (e) {
@@ -136,8 +187,14 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
           </div>
         </div>
 
+        {/* Sale Date */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
+          <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+        </div>
+
         {/* Items */}
-        <div className="space-y-2">
+        <div className="border-t border-border pt-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
 
           {cartItems.map((item) => (
@@ -182,7 +239,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
             </div>
           ))}
 
-          {/* Container fee — read-only if present */}
+          {/* Container fee — read-only */}
           {sale.container_enabled && sale.container_qty > 0 && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="flex-1 min-w-0">
@@ -192,7 +249,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
               <span className="text-sm font-semibold w-16 text-right shrink-0">
                 {formatCurrency(containerTotal)}
               </span>
-              {/* Spacer to align with item rows that have a × button */}
               <div className="h-6 w-6 shrink-0" />
             </div>
           )}
@@ -217,7 +273,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
                 </button>
               )}
             </div>
-
             {showDropdown && (
               <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
                 {searchResults.map((p) => (
@@ -233,7 +288,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
                 ))}
               </div>
             )}
-
             {hasNoResults && (
               <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm px-3 py-2">
                 <p className="text-xs text-muted-foreground">No products found</p>
@@ -275,6 +329,43 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
         <div className="flex items-baseline justify-between border-t border-border pt-3">
           <span className="text-sm font-medium text-muted-foreground">Total</span>
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
+        </div>
+
+        {/* Payment */}
+        <div className="border-t border-border pt-3 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
+
+          {/* Payment mode pills */}
+          <div className="flex gap-1.5">
+            {PAYMENT_MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setPaymentMode(m.value)}
+                className={cn(pillBase, paymentMode === m.value ? pillActive : pillInactive)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Amount paid */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground flex-1">Amount Paid</span>
+            <CurrencyInput
+              value={amountReceived}
+              onChange={(v) => setAmountReceived(v ?? 0)}
+              className="w-36 h-8"
+            />
+          </div>
+
+          {/* Payment date — only for sales that already have a recorded payment */}
+          {showPaymentDate && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Payment Date</p>
+              <DatePickerInput value={paidAt} onChange={setPaidAt} max={todayPH} />
+            </div>
+          )}
         </div>
 
         {/* Actions */}

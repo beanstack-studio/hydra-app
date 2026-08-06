@@ -78,6 +78,15 @@ export interface SaleInsert {
   items?: CartItem[]
 }
 
+export interface EditSaleUpdate {
+  items: CartItem[]
+  discount: number
+  saleDate: string
+  paymentMode: PaymentMode
+  amountReceived: number
+  paidAt: string | null
+}
+
 export interface PaymentRecord {
   id: string
   sale_id: string

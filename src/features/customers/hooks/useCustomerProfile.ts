@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import type { Customer, CustomerInput } from '../types'
-import type { SaleWithPayments, PaymentMode, CartItem } from '@/features/sales/types'
+import type { SaleWithPayments, PaymentMode, CartItem, EditSaleUpdate } from '@/features/sales/types'
 
 type BulkPaymentMode = 'cash' | 'gcash' | 'maya'
 
@@ -25,7 +25,7 @@ interface UseCustomerProfileReturn {
     paidAt: string,
   ) => Promise<void>
   updateCustomer: (id: string, input: Partial<CustomerInput>) => Promise<void>
-  updateSaleItems: (saleId: string, items: CartItem[], discount: number) => Promise<void>
+  updateSaleItems: (saleId: string, update: EditSaleUpdate) => Promise<void>
 }
 
 export function useCustomerProfile(customerId: string | undefined): UseCustomerProfileReturn {
@@ -190,10 +190,11 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
   }, [fetchData])
 
   const updateSaleItems = useCallback(async (
-    saleId: string, items: CartItem[], discount: number
+    saleId: string, update: EditSaleUpdate
   ) => {
     const sale = sales.find((s) => s.id === saleId)
     if (!sale) throw new Error('Sale not found')
+    const { items, discount, saleDate, paymentMode, amountReceived, paidAt } = update
     const firstItem = items[0]
     if (!firstItem) throw new Error('At least one item is required')
     const containerTotal = sale.container_enabled ? sale.container_qty * sale.container_price : 0
@@ -210,6 +211,10 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
         product_total: firstItem.qty * firstItem.price,
         discount_amount: discount,
         total_amount: newTotal,
+        sale_date: saleDate,
+        payment_mode: paymentMode,
+        amount_received: amountReceived,
+        ...(paidAt !== null ? { paid_at: paidAt } : {}),
       })
       .eq('id', saleId)
       .eq('station_id', stationId)
