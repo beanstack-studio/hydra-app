@@ -50,6 +50,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   const [cartItems,       setCartItems]       = useState<CartItem[]>([])
   const [discount,        setDiscount]        = useState(0)
   const [showDiscount,    setShowDiscount]    = useState(false)
+  const [showAddItem,     setShowAddItem]     = useState(false)
   const [searchQuery,     setSearchQuery]     = useState('')
   const [saleDate,        setSaleDate]        = useState(todayPH)
   const [paymentMode,     setPaymentMode]     = useState<PaymentMode>('cash')
@@ -61,13 +62,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   // Mode determination: owner on an unfulfilled sale → editable; everything else → view-only
   const isFulfilled = sale ? (sale.order_type !== 'walk-in' && !!sale.fulfilled_at) : false
   const readOnly    = !isOwner || isFulfilled
-
-  // Auto-adjust Payment Date when Sale Date is moved later than it
-  useEffect(() => {
-    if (showPaymentDate && paidAt < saleDate) {
-      setPaidAt(saleDate)
-    }
-  }, [saleDate, showPaymentDate, paidAt])
 
   // Populate from sale whenever modal opens
   useEffect(() => {
@@ -81,6 +75,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     const d = sale.discount_amount ?? 0
     setDiscount(d)
     setShowDiscount(d > 0)
+    setShowAddItem(false)
     setSearchQuery('')
 
     setSaleDate(sale.sale_date ?? todayPH)
@@ -107,6 +102,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
       setCartItems([])
       setDiscount(0)
       setShowDiscount(false)
+      setShowAddItem(false)
       setSearchQuery('')
       setSaleDate(todayPH)
       setPaymentMode('cash')
@@ -129,15 +125,15 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   }, [searchQuery, activeProducts, cartItems])
 
   // Pre-compute derived values above JSX
-  const containerTotal  = sale && sale.container_enabled ? sale.container_qty * sale.container_price : 0
-  const itemsTotal      = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0)
-  const grandTotal      = Math.max(0, itemsTotal + containerTotal - discount)
-  const liveBal         = Math.max(0, grandTotal - amountReceived)
+  const containerTotal   = sale && sale.container_enabled ? sale.container_qty * sale.container_price : 0
+  const itemsTotal       = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0)
+  const grandTotal       = Math.max(0, itemsTotal + containerTotal - discount)
+  const liveBal          = Math.max(0, grandTotal - amountReceived)
   const liveIsPaidInFull = liveBal === 0 && cartItems.length > 0
-  const showDropdown   = searchResults.length > 0
-  const hasNoResults   = searchQuery.trim().length > 0 && searchResults.length === 0
-  const customerLabel  = sale?.customer_name || 'Unknown'
-  const orderTypeLabel = sale ? (ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type) : '—'
+  const showDropdown     = searchResults.length > 0
+  const hasNoResults     = searchQuery.trim().length > 0 && searchResults.length === 0
+  const customerLabel    = sale?.customer_name || 'Unknown'
+  const orderTypeLabel   = sale ? (ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type) : '—'
   const modalTitle       = readOnly
     ? `Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
     : `Edit Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
@@ -162,6 +158,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
       { product_id: product.id, product_name: product.name, qty: 1, price: product.price },
     ])
     setSearchQuery('')
+    setShowAddItem(false)
   }
 
   const handleSave = async () => {
@@ -169,16 +166,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     if (cartItems.length === 0) {
       toast({ title: 'Add at least one item', variant: 'destructive' })
       return
-    }
-    if (showPaymentDate) {
-      if (paidAt < saleDate) {
-        toast({ title: 'Payment Date cannot be before Sale Date', variant: 'destructive' })
-        return
-      }
-      if (paidAt > todayPH) {
-        toast({ title: 'Payment Date cannot be in the future', variant: 'destructive' })
-        return
-      }
     }
     setIsSaving(true)
     try {
@@ -214,26 +201,26 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     >
       <div className="space-y-4">
 
-        {/* Read-only context — Customer + Order Type */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-muted/50 px-4 py-3 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">Customer</p>
-            <p className="font-medium">{customerLabel}</p>
+        {/* TASK 1 — Two-column header: Customer + Order Type (left) | Sale Date (right) */}
+        <div className="grid grid-cols-2 gap-x-4 rounded-lg bg-muted/50 px-4 py-3 text-sm">
+          <div className="space-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Customer</p>
+              <p className="font-medium">{customerLabel}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Order Type</p>
+              <p className="font-medium">{orderTypeLabel}</p>
+            </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Order Type</p>
-            <p className="font-medium">{orderTypeLabel}</p>
+            <p className="text-xs text-muted-foreground mb-1">Sale Date</p>
+            {readOnly ? (
+              <p className="font-medium">{formatDate(saleDate)}</p>
+            ) : (
+              <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+            )}
           </div>
-        </div>
-
-        {/* Sale Date */}
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
-          {readOnly ? (
-            <p className="text-sm font-medium">{formatDate(saleDate)}</p>
-          ) : (
-            <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
-          )}
         </div>
 
         {/* Items */}
@@ -246,11 +233,9 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
               <span className="text-sm text-muted-foreground">{formatCurrency(item.qty * item.price)}</span>
             </div>
           ) : (
+            /* TASK 2 — single-line item row, no "₱XX ea" subtitle */
             <div key={item.product_id} className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{item.product_name}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} ea</p>
-              </div>
+              <span className="flex-1 min-w-0 text-sm font-medium truncate">{item.product_name}</span>
               <div className="flex items-center gap-1 shrink-0">
                 <Button
                   type="button"
@@ -295,48 +280,67 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
             </div>
           )}
 
-          {/* Add product search — editable mode only */}
+          {/* TASK 3 — "+ Add Item" pattern, editable mode only */}
           {!readOnly && (
-            <div className="relative pt-1">
+            !showAddItem ? (
+              <button
+                type="button"
+                onClick={() => setShowAddItem(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors duration-150"
+              >
+                <Plus className="h-3 w-3" /> Add Item
+              </button>
+            ) : (
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Search product to add…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                />
-                {searchQuery && (
+                <div className="flex items-center gap-2">
+                  {/* Search input — flex-1, same slot as product name */}
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Search product…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-6 h-7 text-xs"
+                      autoFocus
+                    />
+                  </div>
+                  {/* Qty placeholder — stepper hidden until product selected */}
+                  <span className="w-6 text-center text-sm text-muted-foreground shrink-0">1</span>
+                  {/* Price placeholder — ₱0.00 until product selected */}
+                  <span className="w-16 text-right text-sm text-muted-foreground shrink-0">
+                    {formatCurrency(0)}
+                  </span>
+                  {/* Cancel add-item row */}
                   <button
                     type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => setSearchQuery('')}
+                    className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    onClick={() => { setShowAddItem(false); setSearchQuery('') }}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
+                </div>
+                {showDropdown && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
+                    {searchResults.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
+                        onClick={() => addProduct(p)}
+                      >
+                        <span className="text-sm font-medium">{p.name}</span>
+                        <span className="text-xs text-muted-foreground">{formatCurrency(p.price)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {hasNoResults && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm px-3 py-2">
+                    <p className="text-xs text-muted-foreground">No products found</p>
+                  </div>
                 )}
               </div>
-              {showDropdown && (
-                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
-                  {searchResults.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
-                      onClick={() => addProduct(p)}
-                    >
-                      <span className="text-sm font-medium">{p.name}</span>
-                      <span className="text-xs text-muted-foreground">{formatCurrency(p.price)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {hasNoResults && (
-                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm px-3 py-2">
-                  <p className="text-xs text-muted-foreground">No products found</p>
-                </div>
-              )}
-            </div>
+            )
           )}
         </div>
 
@@ -415,7 +419,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
             </>
           ) : (
             <>
-              {/* Payment mode pills */}
+              {/* Payment mode pills — still editable (correcting method is a legitimate use case) */}
               <div className="flex gap-1.5">
                 {PAYMENT_MODES.map((m) => (
                   <button
@@ -429,17 +433,23 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
                 ))}
               </div>
 
-              {/* Amount paid */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground flex-1">Amount Paid</span>
-                <CurrencyInput
-                  value={amountReceived}
-                  onChange={(v) => setAmountReceived(v ?? 0)}
-                  className="w-36 h-8"
-                />
-              </div>
+              {/* TASK 4 — Amount Paid: read-only in editable mode */}
+              {amountReceived > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount Paid</span>
+                  <span className="text-sm font-medium">{formatCurrency(amountReceived)}</span>
+                </div>
+              )}
 
-              {/* Live Balance Due */}
+              {/* TASK 4 — Payment Date: read-only in editable mode */}
+              {showPaymentDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Payment Date</span>
+                  <span className="text-sm font-medium">{formatDate(paidAt)}</span>
+                </div>
+              )}
+
+              {/* Live Balance Due — recalculates as items/discount change against fixed Amount Paid */}
               {liveBal > 0 && (
                 <div className="flex items-baseline justify-between">
                   <span className="text-sm text-muted-foreground">Balance due</span>
@@ -448,14 +458,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
               )}
               {liveIsPaidInFull && (
                 <p className="text-sm font-semibold text-right text-green-600">✓ Paid in full</p>
-              )}
-
-              {/* Payment date — only for sales that already have a recorded payment */}
-              {showPaymentDate && (
-                <div className="space-y-1.5">
-                  <p className="text-xs text-muted-foreground">Payment Date</p>
-                  <DatePickerInput value={paidAt} onChange={setPaidAt} min={saleDate} max={todayPH} />
-                </div>
               )}
             </>
           )}
