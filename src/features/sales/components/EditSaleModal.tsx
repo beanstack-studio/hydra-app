@@ -47,6 +47,13 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   const [showPaymentDate, setShowPaymentDate] = useState(false)
   const [isSaving,        setIsSaving]        = useState(false)
 
+  // Auto-adjust Payment Date when Sale Date is moved later than it
+  useEffect(() => {
+    if (showPaymentDate && paidAt < saleDate) {
+      setPaidAt(saleDate)
+    }
+  }, [saleDate, showPaymentDate, paidAt])
+
   // Populate from sale whenever modal opens
   useEffect(() => {
     if (!isOpen || !sale) return
@@ -140,6 +147,16 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
     if (cartItems.length === 0) {
       toast({ title: 'Add at least one item', variant: 'destructive' })
       return
+    }
+    if (showPaymentDate) {
+      if (paidAt < saleDate) {
+        toast({ title: 'Payment Date cannot be before Sale Date', variant: 'destructive' })
+        return
+      }
+      if (paidAt > todayPH) {
+        toast({ title: 'Payment Date cannot be in the future', variant: 'destructive' })
+        return
+      }
     }
     setIsSaving(true)
     try {
@@ -363,7 +380,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
           {showPaymentDate && (
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground">Payment Date</p>
-              <DatePickerInput value={paidAt} onChange={setPaidAt} max={todayPH} />
+              <DatePickerInput value={paidAt} onChange={setPaidAt} min={saleDate} max={todayPH} />
             </div>
           )}
         </div>
