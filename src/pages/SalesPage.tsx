@@ -6,7 +6,6 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { SearchInput } from '@/components/shared/SearchInput'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { SaleModal } from '@/features/sales/components/SaleModal'
-import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
 import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
@@ -72,7 +71,6 @@ export default function SalesPage() {
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
-  const [editingSale,       setEditingSale]       = useState<Sale | null>(null)
   const [deletingSale,      setDeletingSale]      = useState<Sale | null>(null)
   const [isDeleting,        setIsDeleting]        = useState(false)
   // Raw input value — debounced 300 ms before passing to the hook so we
@@ -206,7 +204,6 @@ export default function SalesPage() {
             setSelectedSale(null)
             setPayingSale(sale)
           }}
-          onEdit={setEditingSale}
           onDelete={setDeletingSale}
           hiddenKeys={hiddenKeys}
           columnWidths={columnWidths}
@@ -215,17 +212,6 @@ export default function SalesPage() {
           onColumnReorder={onColumnReorder}
         />
       )}
-
-      {/* Sale detail modal */}
-      <SaleDetailModal
-        sale={selectedSale}
-        isOpen={!!selectedSale}
-        onClose={() => setSelectedSale(null)}
-        onReschedule={handleRescheduleClick}
-        onConfirmFulfillment={handleConfirmFulfillment}
-        customerPhone={customers.find((c) => c.id === selectedSale?.customer_id)?.phone ?? null}
-        customerAddress={customers.find((c) => c.id === selectedSale?.customer_id)?.address ?? null}
-      />
 
       {/* Reschedule modal */}
       <RescheduleModal
@@ -236,11 +222,11 @@ export default function SalesPage() {
         stationSettings={settings?.stationSettings ?? null}
       />
 
-      {/* Edit sale modal */}
+      {/* Unified sale modal — editable for owner on unfulfilled sales, view-only otherwise */}
       <EditSaleModal
-        sale={editingSale}
-        isOpen={!!editingSale}
-        onClose={() => setEditingSale(null)}
+        sale={selectedSale}
+        isOpen={!!selectedSale}
+        onClose={() => setSelectedSale(null)}
         products={settings?.products ?? []}
         onSave={updateSaleItems}
       />

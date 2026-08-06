@@ -6,8 +6,9 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatCurrency, PH_TZ, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, PH_TZ, cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useAuthStore } from '@/stores/authStore'
 import type { Sale, CartItem, PaymentMode, EditSaleUpdate } from '../types'
 import type { Product } from '@/features/settings/types'
 
@@ -23,6 +24,13 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'maya',  label: 'Maya'  },
 ]
 
+const PAYMENT_LABELS: Record<PaymentMode, string> = {
+  cash:  'Cash',
+  gcash: 'GCash',
+  maya:  'Maya',
+  utang: 'Utang',
+}
+
 interface EditSaleModalProps {
   sale: Sale | null
   isOpen: boolean
@@ -33,6 +41,8 @@ interface EditSaleModalProps {
 
 export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditSaleModalProps) {
   const { toast } = useToast()
+  const role    = useAuthStore((s) => s.role)
+  const isOwner = role === 'owner' || role === 'super_admin'
 
   const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
 
@@ -46,6 +56,10 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   const [paidAt,          setPaidAt]          = useState(todayPH)
   const [showPaymentDate, setShowPaymentDate] = useState(false)
   const [isSaving,        setIsSaving]        = useState(false)
+
+  // Mode determination: owner on an unfulfilled sale → editable; everything else → view-only
+  const isFulfilled = sale ? (sale.order_type !== 'walk-in' && !!sale.fulfilled_at) : false
+  const readOnly    = !isOwner || isFulfilled
 
   // Auto-adjust Payment Date when Sale Date is moved later than it
   useEffect(() => {
@@ -121,6 +135,9 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   const hasNoResults   = searchQuery.trim().length > 0 && searchResults.length === 0
   const customerLabel  = sale?.customer_name || 'Unknown'
   const orderTypeLabel = sale ? (ORDER_TYPE_LABEL[sale.order_type] ?? sale.order_type) : '—'
+  const modalTitle     = readOnly
+    ? `Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
+    : `Edit Sale #${sale?.id.slice(-6).toUpperCase() ?? ''}`
 
   const pillBase     = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
   const pillActive   = 'bg-primary text-primary-foreground border-primary'
@@ -143,7 +160,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
   }
 
   const handleSave = async () => {
-    if (!sale) return
+    if (!sale || readOnly) return
     if (cartItems.length === 0) {
       toast({ title: 'Add at least one item', variant: 'destructive' })
       return
@@ -187,12 +204,12 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit Sale #${sale.id.slice(-6).toUpperCase()}`}
+      title={modalTitle}
       size="sm"
     >
       <div className="space-y-4">
 
-        {/* Read-only context */}
+        {/* Read-only context — Customer + Order Type */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-muted/50 px-4 py-3 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">Customer</p>
@@ -207,14 +224,23 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
         {/* Sale Date */}
         <div className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
-          <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+          {readOnly ? (
+            <p className="text-sm font-medium">{formatDate(saleDate)}</p>
+          ) : (
+            <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+          )}
         </div>
 
         {/* Items */}
         <div className="border-t border-border pt-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
 
-          {cartItems.map((item) => (
+          {cartItems.map((item) => readOnly ? (
+            <div key={item.product_id} className="flex items-center justify-between">
+              <span className="text-sm font-medium">{item.product_name} ×{item.qty}</span>
+              <span className="text-sm text-muted-foreground">{formatCurrency(item.qty * item.price)}</span>
+            </div>
+          ) : (
             <div key={item.product_id} className="flex items-center gap-2">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{item.product_name}</p>
@@ -256,91 +282,94 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
             </div>
           ))}
 
-          {/* Container fee — read-only */}
+          {/* Container fee — read-only in both modes */}
           {sale.container_enabled && sale.container_qty > 0 && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">Container ×{sale.container_qty}</p>
-                <p className="text-xs">{formatCurrency(sale.container_price)} ea</p>
-              </div>
-              <span className="text-sm font-semibold w-16 text-right shrink-0">
-                {formatCurrency(containerTotal)}
-              </span>
-              <div className="h-6 w-6 shrink-0" />
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-sm">Container ×{sale.container_qty}</span>
+              <span className="text-sm">{formatCurrency(containerTotal)}</span>
             </div>
           )}
 
-          {/* Add product search */}
-          <div className="relative pt-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search product to add…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-sm"
-              />
-              {searchQuery && (
+          {/* Add product search — editable mode only */}
+          {!readOnly && (
+            <div className="relative pt-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search product to add…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {showDropdown && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
+                  {searchResults.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
+                      onClick={() => addProduct(p)}
+                    >
+                      <span className="text-sm font-medium">{p.name}</span>
+                      <span className="text-xs text-muted-foreground">{formatCurrency(p.price)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {hasNoResults && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm px-3 py-2">
+                  <p className="text-xs text-muted-foreground">No products found</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Discount — editable mode shows toggle/input; view-only shows text only if > 0 */}
+        {(!readOnly || discount > 0) && (
+          <div className="border-t border-border pt-3 space-y-2">
+            {readOnly ? (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Discount</span>
+                <span className="text-sm font-medium text-destructive">−{formatCurrency(discount)}</span>
+              </div>
+            ) : !showDiscount ? (
+              <button
+                type="button"
+                onClick={() => setShowDiscount(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors duration-150"
+              >
+                <Plus className="h-3 w-3" /> Add Discount
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground flex-1">Discount</span>
+                <CurrencyInput
+                  value={discount}
+                  onChange={(v) => setDiscount(v ?? 0)}
+                  className="w-28 h-8"
+                />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => { setShowDiscount(false); setDiscount(0) }}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
-              )}
-            </div>
-            {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg">
-                {searchResults.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-accent text-left"
-                    onClick={() => addProduct(p)}
-                  >
-                    <span className="text-sm font-medium">{p.name}</span>
-                    <span className="text-xs text-muted-foreground">{formatCurrency(p.price)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {hasNoResults && (
-              <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm px-3 py-2">
-                <p className="text-xs text-muted-foreground">No products found</p>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Discount */}
-        <div className="border-t border-border pt-3 space-y-2">
-          {!showDiscount ? (
-            <button
-              type="button"
-              onClick={() => setShowDiscount(true)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors duration-150"
-            >
-              <Plus className="h-3 w-3" /> Add Discount
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground flex-1">Discount</span>
-              <CurrencyInput
-                value={discount}
-                onChange={(v) => setDiscount(v ?? 0)}
-                className="w-28 h-8"
-              />
-              <button
-                type="button"
-                onClick={() => { setShowDiscount(false); setDiscount(0) }}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Grand total */}
         <div className="flex items-baseline justify-between border-t border-border pt-3">
@@ -348,56 +377,95 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave }: EditS
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
+        {/* Balance due — view-only only, when there is an outstanding amount */}
+        {readOnly && sale.balance_due > 0 && (
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-muted-foreground">Balance Due</span>
+            <span className="text-base font-semibold text-destructive">{formatCurrency(sale.balance_due)}</span>
+          </div>
+        )}
+
         {/* Payment */}
         <div className="border-t border-border pt-3 space-y-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
 
-          {/* Payment mode pills */}
-          <div className="flex gap-1.5">
-            {PAYMENT_MODES.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setPaymentMode(m.value)}
-                className={cn(pillBase, paymentMode === m.value ? pillActive : pillInactive)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          {readOnly ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Method</span>
+                <span className="text-sm font-medium">{PAYMENT_LABELS[paymentMode]}</span>
+              </div>
+              {amountReceived > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount Paid</span>
+                  <span className="text-sm font-medium">{formatCurrency(amountReceived)}</span>
+                </div>
+              )}
+              {showPaymentDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Payment Date</span>
+                  <span className="text-sm font-medium">{formatDate(paidAt)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Payment mode pills */}
+              <div className="flex gap-1.5">
+                {PAYMENT_MODES.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setPaymentMode(m.value)}
+                    className={cn(pillBase, paymentMode === m.value ? pillActive : pillInactive)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
 
-          {/* Amount paid */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground flex-1">Amount Paid</span>
-            <CurrencyInput
-              value={amountReceived}
-              onChange={(v) => setAmountReceived(v ?? 0)}
-              className="w-36 h-8"
-            />
-          </div>
+              {/* Amount paid */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground flex-1">Amount Paid</span>
+                <CurrencyInput
+                  value={amountReceived}
+                  onChange={(v) => setAmountReceived(v ?? 0)}
+                  className="w-36 h-8"
+                />
+              </div>
 
-          {/* Payment date — only for sales that already have a recorded payment */}
-          {showPaymentDate && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">Payment Date</p>
-              <DatePickerInput value={paidAt} onChange={setPaidAt} min={saleDate} max={todayPH} />
-            </div>
+              {/* Payment date — only for sales that already have a recorded payment */}
+              {showPaymentDate && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Payment Date</p>
+                  <DatePickerInput value={paidAt} onChange={setPaidAt} min={saleDate} max={todayPH} />
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 pt-1">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            disabled={isSaving || cartItems.length === 0}
-            onClick={() => { void handleSave() }}
-          >
-            {isSaving ? 'Saving…' : 'Save Changes'}
-          </Button>
+          {readOnly ? (
+            <Button type="button" className="flex-1" onClick={onClose}>
+              Close
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={isSaving || cartItems.length === 0}
+                onClick={() => { void handleSave() }}
+              >
+                {isSaving ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </>
+          )}
         </div>
 
       </div>

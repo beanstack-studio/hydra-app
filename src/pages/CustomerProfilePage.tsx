@@ -11,7 +11,6 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
-import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { EditSaleModal } from '@/features/sales/components/EditSaleModal'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
@@ -81,9 +80,8 @@ export default function CustomerProfilePage() {
   const { data: settings } = useSettings()
 
   // ── Sort state ────────────────────────────────────────────────────────────
-  const [payingSale,       setPayingSale]       = useState<SaleWithPayments | null>(null)
-  const [viewingSale,      setViewingSale]      = useState<SaleWithPayments | null>(null)
-  const [editingOrderSale, setEditingOrderSale] = useState<SaleWithPayments | null>(null)
+  const [payingSale,        setPayingSale]        = useState<SaleWithPayments | null>(null)
+  const [selectedOrderSale, setSelectedOrderSale] = useState<SaleWithPayments | null>(null)
   const [isEditOpen,  setIsEditOpen]  = useState(false)
   const [sortKey,     setSortKey]     = useState<OrderSortKey>('date')
   const [sortDir,     setSortDir]     = useState<SortDir>('desc')
@@ -331,28 +329,6 @@ export default function CustomerProfilePage() {
         </div>
       ),
     },
-    {
-      key: 'actions',
-      header: '',
-      render: (sale) => {
-        if (!isOwner) return null
-        const isFulfilled = sale.order_type !== 'walk-in' && !!sale.fulfilled_at
-        return (
-          <div className="flex items-center justify-end">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              title={isFulfilled ? 'Cannot edit a delivered/picked-up sale' : 'Edit sale'}
-              disabled={isFulfilled}
-              onClick={(e) => { e.stopPropagation(); setEditingOrderSale(sale) }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        )
-      },
-    },
   ]
 
   const activeColumns: Column<SaleWithPayments>[] = selectionMode
@@ -523,7 +499,7 @@ export default function CustomerProfilePage() {
               columns={activeColumns}
               data={sortedSales}
               rowKey={(sale) => sale.id}
-              onRowClick={selectionMode ? undefined : (sale) => setViewingSale(sale)}
+              onRowClick={selectionMode ? undefined : (sale) => setSelectedOrderSale(sale)}
               hiddenKeys={hiddenKeys}
               sortKey={sortKey}
               sortDir={sortDir}
@@ -636,20 +612,11 @@ export default function CustomerProfilePage() {
         onRecord={handlePayment}
       />
 
-      {/* ── Sale detail modal (row click) ── */}
-      <SaleDetailModal
-        sale={viewingSale}
-        isOpen={!!viewingSale}
-        onClose={() => setViewingSale(null)}
-        customerPhone={customer?.phone ?? null}
-        customerAddress={customer?.address ?? null}
-      />
-
-      {/* ── Edit sale modal (owner only) ── */}
+      {/* ── Unified sale modal — editable for owner on unfulfilled sales, view-only otherwise ── */}
       <EditSaleModal
-        sale={editingOrderSale}
-        isOpen={!!editingOrderSale}
-        onClose={() => setEditingOrderSale(null)}
+        sale={selectedOrderSale}
+        isOpen={!!selectedOrderSale}
+        onClose={() => setSelectedOrderSale(null)}
         products={settings?.products ?? []}
         onSave={updateSaleItems}
       />
