@@ -10,6 +10,7 @@ import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
 import { SaleTable } from '@/features/sales/components/SaleTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
 import { RescheduleModal } from '@/features/sales/components/RescheduleModal'
+import { EditSaleModal } from '@/features/sales/components/EditSaleModal'
 import { useSales } from '@/features/sales/hooks/useSales'
 import { useCustomers } from '@/features/customers/hooks/useCustomers'
 import { useSettings } from '@/features/settings/hooks/useSettings'
@@ -86,7 +87,7 @@ export default function SalesPage() {
 
   // Search and filters are applied server-side so they work across ALL sales,
   // not just the ~1000 rows Supabase returns without an explicit limit.
-  const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment } = useSales({ search, filterValues })
+  const { data: sales, isLoading: salesLoading, error: salesError, addSale, deleteSale, recordPayment, rescheduleOrder, confirmFulfillment, updateSaleItems } = useSales({ search, filterValues })
   const { data: customers } = useCustomers()
   const { data: settings, isLoading: settingsLoading } = useSettings()
 
@@ -233,6 +234,15 @@ export default function SalesPage() {
         onClose={() => setReschedulingSale(null)}
         onReschedule={rescheduleOrder}
         stationSettings={settings?.stationSettings ?? null}
+      />
+
+      {/* Edit sale modal */}
+      <EditSaleModal
+        sale={editingSale}
+        isOpen={!!editingSale}
+        onClose={() => setEditingSale(null)}
+        products={settings?.products ?? []}
+        onSave={updateSaleItems}
       />
 
       {/* Delete confirm modal */}

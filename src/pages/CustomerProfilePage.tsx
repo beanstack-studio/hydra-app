@@ -12,10 +12,12 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { Column } from '@/components/shared/DataTable'
 import { RecordPaymentModal } from '@/features/sales/components/RecordPaymentModal'
 import { SaleDetailModal } from '@/features/sales/components/SaleDetailModal'
+import { EditSaleModal } from '@/features/sales/components/EditSaleModal'
 import { CustomerModal } from '@/features/customers/components/CustomerModal'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import type { ExportColumnDef } from '@/components/shared/ExportModal'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerProfile'
+import { useSettings } from '@/features/settings/hooks/useSettings'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { formatCurrency, formatDate, formatExportAmount, formatPhone, PH_TZ, cn } from '@/lib/utils'
@@ -75,7 +77,8 @@ export default function CustomerProfilePage() {
   const isOwner = role === 'owner' || role === 'super_admin'
   const plan    = usePlan()
   const isPro   = plan !== 'free'
-  const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer } = useCustomerProfile(id)
+  const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer, updateSaleItems } = useCustomerProfile(id)
+  const { data: settings } = useSettings()
 
   // ── Sort state ────────────────────────────────────────────────────────────
   const [payingSale,       setPayingSale]       = useState<SaleWithPayments | null>(null)
@@ -640,6 +643,15 @@ export default function CustomerProfilePage() {
         onClose={() => setViewingSale(null)}
         customerPhone={customer?.phone ?? null}
         customerAddress={customer?.address ?? null}
+      />
+
+      {/* ── Edit sale modal (owner only) ── */}
+      <EditSaleModal
+        sale={editingOrderSale}
+        isOpen={!!editingOrderSale}
+        onClose={() => setEditingOrderSale(null)}
+        products={settings?.products ?? []}
+        onSave={updateSaleItems}
       />
 
       {customer && (

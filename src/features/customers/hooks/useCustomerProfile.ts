@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import type { Customer, CustomerInput } from '../types'
-import type { SaleWithPayments, PaymentMode } from '@/features/sales/types'
+import type { SaleWithPayments, PaymentMode, CartItem } from '@/features/sales/types'
 
 type BulkPaymentMode = 'cash' | 'gcash' | 'maya'
 
@@ -25,6 +25,7 @@ interface UseCustomerProfileReturn {
     paidAt: string,
   ) => Promise<void>
   updateCustomer: (id: string, input: Partial<CustomerInput>) => Promise<void>
+  updateSaleItems: (saleId: string, items: CartItem[], discount: number) => Promise<void>
 }
 
 export function useCustomerProfile(customerId: string | undefined): UseCustomerProfileReturn {
@@ -188,5 +189,33 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
     await fetchData()
   }, [fetchData])
 
-  return { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer }
+  const updateSaleItems = useCallback(async (
+    saleId: string, items: CartItem[], discount: number
+  ) => {
+    const sale = sales.find((s) => s.id === saleId)
+    if (!sale) throw new Error('Sale not found')
+    const firstItem = items[0]
+    if (!firstItem) throw new Error('At least one item is required')
+    const containerTotal = sale.container_enabled ? sale.container_qty * sale.container_price : 0
+    const itemsTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0)
+    const newTotal = Math.max(0, itemsTotal + containerTotal - discount)
+    const { error: e } = await supabase
+      .from('sales')
+      .update({
+        items,
+        product_id: firstItem.product_id,
+        product_name: firstItem.product_name,
+        qty: firstItem.qty,
+        price_per_piece: firstItem.price,
+        product_total: firstItem.qty * firstItem.price,
+        discount_amount: discount,
+        total_amount: newTotal,
+      })
+      .eq('id', saleId)
+      .eq('station_id', stationId)
+    if (e) throw new Error(e.message)
+    await fetchData()
+  }, [sales, stationId, fetchData])
+
+  return { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer, updateSaleItems }
 }
