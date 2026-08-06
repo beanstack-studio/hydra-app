@@ -1,98 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import type { Sale, SaleInsert, PaymentMode } from '../types'
-
-async function restoreLinkedSupplies(stationId: string, productId: string, qtySold: number) {
-  const { data: junctionLinks } = await supabase
-    .from('supply_product_links')
-    .select('supply_id, units_per_sale')
-    .eq('station_id', stationId)
-    .eq('product_id', productId)
-
-  const handledIds = new Set((junctionLinks ?? []).map((l: { supply_id: string }) => l.supply_id))
-
-  const { data: directLinked } = await supabase
-    .from('supplies')
-    .select('id, qty, units_per_sale')
-    .eq('station_id', stationId)
-    .eq('linked_product_id', productId)
-
-  const toRestore: { supply_id: string; units_per_sale: number }[] = [
-    ...(junctionLinks ?? []).map((l: { supply_id: string; units_per_sale: number }) => ({ supply_id: l.supply_id, units_per_sale: l.units_per_sale })),
-    ...(directLinked ?? [])
-      .filter((s: { id: string }) => !handledIds.has(s.id))
-      .map((s: { id: string; units_per_sale: number }) => ({ supply_id: s.id, units_per_sale: s.units_per_sale })),
-  ]
-
-  if (toRestore.length === 0) return
-
-  const supplyIds = toRestore.map((l) => l.supply_id)
-  const { data: currentQtys } = await supabase
-    .from('supplies')
-    .select('id, qty')
-    .in('id', supplyIds)
-
-  const qtyMap = new Map((currentQtys ?? []).map((s: { id: string; qty: number }) => [s.id, s.qty]))
-
-  await Promise.all(
-    toRestore.map((l) => {
-      const currentQty = qtyMap.get(l.supply_id) ?? 0
-      const newQty = currentQty + qtySold * l.units_per_sale
-      return supabase.from('supplies').update({ qty: newQty }).eq('id', l.supply_id)
-    })
-  )
-}
-
-async function deductLinkedSupplies(stationId: string, productId: string, qtySold: number) {
-  // Check supply_product_links junction table first (multi-link, post-migration)
-  const { data: junctionLinks } = await supabase
-    .from('supply_product_links')
-    .select('supply_id, units_per_sale')
-    .eq('station_id', stationId)
-    .eq('product_id', productId)
-
-  const handledIds = new Set((junctionLinks ?? []).map((l: { supply_id: string }) => l.supply_id))
-
-  // Also check direct linked_product_id (backward compat, skip already handled)
-  const { data: directLinked } = await supabase
-    .from('supplies')
-    .select('id, qty, units_per_sale')
-    .eq('station_id', stationId)
-    .eq('linked_product_id', productId)
-
-  const toDeduct: { supply_id: string; units_per_sale: number }[] = [
-    ...(junctionLinks ?? []).map((l: { supply_id: string; units_per_sale: number }) => ({ supply_id: l.supply_id, units_per_sale: l.units_per_sale })),
-    ...(directLinked ?? [])
-      .filter((s: { id: string }) => !handledIds.has(s.id))
-      .map((s: { id: string; units_per_sale: number }) => ({ supply_id: s.id, units_per_sale: s.units_per_sale })),
-  ]
-
-  if (toDeduct.length === 0) return
-
-  const supplyIds = toDeduct.map((l) => l.supply_id)
-  const { data: currentQtys } = await supabase
-    .from('supplies')
-    .select('id, qty')
-    .in('id', supplyIds)
-
-  const qtyMap = new Map((currentQtys ?? []).map((s: { id: string; qty: number }) => [s.id, s.qty]))
-
-  await Promise.all(
-    toDeduct.map((l) => {
-      const currentQty = qtyMap.get(l.supply_id) ?? 0
-      const newQty = Math.max(0, currentQty - qtySold * l.units_per_sale)
-      return supabase.from('supplies').update({ qty: newQty }).eq('id', l.supply_id)
-    })
-  )
-}
+import { restoreLinkedSupplies, deductLinkedSupplies } from '@/lib/supplySync'
+import { deriveStatus } from '../types'
+import type { Sale, SaleInsert, PaymentMode, CartItem, EditSaleUpdate } from '../types'
 
 interface UseSalesOptions {
   search?: string
   filterValues?: Record<string, string>
 }
-
-import type { CartItem, EditSaleUpdate } from '../types'
 
 interface UseSalesReturn {
   data: Sale[]
@@ -335,6 +251,13 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
     const containerTotal = sale.container_enabled ? sale.container_qty * sale.container_price : 0
     const itemsTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0)
     const newTotal = Math.max(0, itemsTotal + containerTotal - discount)
+
+    // Recalculate status from new total and amount paid.
+    // balance_due is a DB computed column (total_amount - amount_received),
+    // so it updates automatically; we only need to write status explicitly.
+    const newBalanceDue = newTotal - amountReceived
+    const newStatus = deriveStatus(newBalanceDue, newTotal)
+
     const { error: e } = await supabase
       .from('sales')
       .update({
@@ -349,11 +272,40 @@ export function useSales(options?: UseSalesOptions): UseSalesReturn {
         sale_date: saleDate,
         payment_mode: paymentMode,
         amount_received: amountReceived,
+        status: newStatus,
         ...(paidAt !== null ? { paid_at: paidAt } : {}),
       })
       .eq('id', saleId)
       .eq('station_id', stationId)
     if (e) throw new Error(e.message)
+
+    // Sync inventory: compute per-item delta and restore/deduct only the difference.
+    if (stationId) {
+      const beforeItems = sale.items && sale.items.length > 0
+        ? sale.items
+        : [{ product_id: sale.product_id, qty: sale.qty }]
+
+      const beforeMap = new Map<string, number>()
+      for (const item of beforeItems) {
+        if (item.product_id) beforeMap.set(item.product_id, item.qty)
+      }
+      const afterMap = new Map<string, number>()
+      for (const item of items) {
+        if (item.product_id) afterMap.set(item.product_id, item.qty)
+      }
+
+      const allIds = new Set([...beforeMap.keys(), ...afterMap.keys()])
+      await Promise.all(
+        [...allIds].map(async (productId) => {
+          const before = beforeMap.get(productId) ?? 0
+          const after = afterMap.get(productId) ?? 0
+          const delta = after - before
+          if (delta < 0) return restoreLinkedSupplies(stationId, productId, Math.abs(delta))
+          if (delta > 0) return deductLinkedSupplies(stationId, productId, delta)
+        })
+      )
+    }
+
     await fetchData()
   }, [data, fetchData, stationId])
 

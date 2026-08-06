@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { restoreLinkedSupplies, deductLinkedSupplies } from '@/lib/supplySync'
+import { deriveStatus } from '@/features/sales/types'
 import type { Customer, CustomerInput } from '../types'
 import type { SaleWithPayments, PaymentMode, CartItem, EditSaleUpdate } from '@/features/sales/types'
 
@@ -200,6 +202,13 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
     const containerTotal = sale.container_enabled ? sale.container_qty * sale.container_price : 0
     const itemsTotal = items.reduce((sum, i) => sum + i.qty * i.price, 0)
     const newTotal = Math.max(0, itemsTotal + containerTotal - discount)
+
+    // Recalculate status from new total and amount paid.
+    // balance_due is a DB computed column (total_amount - amount_received),
+    // so it updates automatically; we only need to write status explicitly.
+    const newBalanceDue = newTotal - amountReceived
+    const newStatus = deriveStatus(newBalanceDue, newTotal)
+
     const { error: e } = await supabase
       .from('sales')
       .update({
@@ -214,11 +223,40 @@ export function useCustomerProfile(customerId: string | undefined): UseCustomerP
         sale_date: saleDate,
         payment_mode: paymentMode,
         amount_received: amountReceived,
+        status: newStatus,
         ...(paidAt !== null ? { paid_at: paidAt } : {}),
       })
       .eq('id', saleId)
       .eq('station_id', stationId)
     if (e) throw new Error(e.message)
+
+    // Sync inventory: compute per-item delta and restore/deduct only the difference.
+    if (stationId) {
+      const beforeItems = sale.items && sale.items.length > 0
+        ? sale.items
+        : [{ product_id: sale.product_id, qty: sale.qty }]
+
+      const beforeMap = new Map<string, number>()
+      for (const item of beforeItems) {
+        if (item.product_id) beforeMap.set(item.product_id, item.qty)
+      }
+      const afterMap = new Map<string, number>()
+      for (const item of items) {
+        if (item.product_id) afterMap.set(item.product_id, item.qty)
+      }
+
+      const allIds = new Set([...beforeMap.keys(), ...afterMap.keys()])
+      await Promise.all(
+        [...allIds].map(async (productId) => {
+          const before = beforeMap.get(productId) ?? 0
+          const after = afterMap.get(productId) ?? 0
+          const delta = after - before
+          if (delta < 0) return restoreLinkedSupplies(stationId, productId, Math.abs(delta))
+          if (delta > 0) return deductLinkedSupplies(stationId, productId, delta)
+        })
+      )
+    }
+
     await fetchData()
   }, [sales, stationId, fetchData])
 
