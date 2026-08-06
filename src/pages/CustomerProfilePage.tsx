@@ -78,8 +78,9 @@ export default function CustomerProfilePage() {
   const { customer, sales, isLoading, error, recordPayment, recordBulkPayment, updateCustomer } = useCustomerProfile(id)
 
   // ── Sort state ────────────────────────────────────────────────────────────
-  const [payingSale,   setPayingSale]   = useState<SaleWithPayments | null>(null)
-  const [viewingSale,  setViewingSale]  = useState<SaleWithPayments | null>(null)
+  const [payingSale,       setPayingSale]       = useState<SaleWithPayments | null>(null)
+  const [viewingSale,      setViewingSale]      = useState<SaleWithPayments | null>(null)
+  const [editingOrderSale, setEditingOrderSale] = useState<SaleWithPayments | null>(null)
   const [isEditOpen,  setIsEditOpen]  = useState(false)
   const [sortKey,     setSortKey]     = useState<OrderSortKey>('date')
   const [sortDir,     setSortDir]     = useState<SortDir>('desc')
@@ -326,6 +327,28 @@ export default function CustomerProfilePage() {
           )}
         </div>
       ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (sale) => {
+        if (!isOwner) return null
+        const isFulfilled = sale.order_type !== 'walk-in' && !!sale.fulfilled_at
+        return (
+          <div className="flex items-center justify-end">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              title={isFulfilled ? 'Cannot edit a delivered/picked-up sale' : 'Edit sale'}
+              disabled={isFulfilled}
+              onClick={(e) => { e.stopPropagation(); setEditingOrderSale(sale) }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 

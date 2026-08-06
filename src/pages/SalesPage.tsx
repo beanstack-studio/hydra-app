@@ -71,6 +71,7 @@ export default function SalesPage() {
   const [selectedSale,      setSelectedSale]      = useState<Sale | null>(null)
   const [payingSale,        setPayingSale]        = useState<Sale | null>(null)
   const [reschedulingSale,  setReschedulingSale]  = useState<Sale | null>(null)
+  const [editingSale,       setEditingSale]       = useState<Sale | null>(null)
   const [deletingSale,      setDeletingSale]      = useState<Sale | null>(null)
   const [isDeleting,        setIsDeleting]        = useState(false)
   // Raw input value — debounced 300 ms before passing to the hook so we
@@ -204,6 +205,7 @@ export default function SalesPage() {
             setSelectedSale(null)
             setPayingSale(sale)
           }}
+          onEdit={setEditingSale}
           onDelete={setDeletingSale}
           hiddenKeys={hiddenKeys}
           columnWidths={columnWidths}

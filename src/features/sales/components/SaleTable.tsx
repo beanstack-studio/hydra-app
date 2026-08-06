@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShoppingCart, Trash2 } from 'lucide-react'
+import { Pencil, ShoppingCart, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/shared/DataTable'
 import type { ColumnConfig } from '@/components/shared/DataTable'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -51,6 +51,7 @@ interface SaleTableProps {
   sales: Sale[]
   onSelect: (sale: Sale) => void
   onPay?: (sale: Sale) => void
+  onEdit?: (sale: Sale) => void
   onDelete?: (sale: Sale) => void
   hiddenKeys?: Set<string>
   columnWidths?: Record<string, number>
@@ -63,6 +64,7 @@ export function SaleTable({
   sales,
   onSelect,
   onPay,
+  onEdit,
   onDelete,
   hiddenKeys,
   columnWidths,
@@ -215,22 +217,37 @@ export function SaleTable({
     {
       key: 'actions',
       header: '',
-      className: 'w-12',
-      render: (s: Sale) => (
-        <div className="flex items-center justify-end">
-          {isOwner && onDelete && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              title="Delete sale"
-              onClick={(e) => { e.stopPropagation(); onDelete(s) }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      ),
+      className: 'w-20',
+      render: (s: Sale) => {
+        const isFulfilled = s.order_type !== 'walk-in' && !!s.fulfilled_at
+        return (
+          <div className="flex items-center justify-end gap-0.5">
+            {isOwner && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                title={isFulfilled ? 'Cannot edit a delivered/picked-up sale' : 'Edit sale'}
+                disabled={isFulfilled}
+                onClick={(e) => { e.stopPropagation(); onEdit?.(s) }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {isOwner && onDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                title="Delete sale"
+                onClick={(e) => { e.stopPropagation(); onDelete(s) }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        )
+      },
     },
   ]
 
