@@ -201,20 +201,20 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     >
       <div className="space-y-4">
 
-        {/* TASK 1 — Two-column header: Customer + Order Type (left) | Sale Date (right) */}
-        <div className="grid grid-cols-2 gap-x-4 rounded-lg bg-muted/50 px-4 py-3 text-sm">
-          <div className="space-y-2">
+        {/* Two-column header: Customer + Order Type (left) | Sale Date (right) */}
+        <div className="grid grid-cols-2 gap-x-4 items-start rounded-lg bg-muted/50 px-4 py-3 text-sm">
+          <div className="space-y-2 min-w-0">
             <div>
               <p className="text-xs text-muted-foreground">Customer</p>
-              <p className="font-medium">{customerLabel}</p>
+              <p className="font-medium truncate">{customerLabel}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Order Type</p>
               <p className="font-medium">{orderTypeLabel}</p>
             </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Sale Date</p>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Sale Date</p>
             {readOnly ? (
               <p className="font-medium">{formatDate(saleDate)}</p>
             ) : (
@@ -304,8 +304,13 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
                       autoFocus
                     />
                   </div>
-                  {/* Qty placeholder — stepper hidden until product selected */}
-                  <span className="w-6 text-center text-sm text-muted-foreground shrink-0">1</span>
+                  {/* Stepper placeholder — invisible ±buttons flank visible qty so search input
+                      aligns exactly with product-name flex-1 in regular item rows above */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <div className="h-6 w-6 invisible" />
+                    <span className="w-6 text-center text-sm text-muted-foreground">1</span>
+                    <div className="h-6 w-6 invisible" />
+                  </div>
                   {/* Price placeholder — ₱0.00 until product selected */}
                   <span className="w-16 text-right text-sm text-muted-foreground shrink-0">
                     {formatCurrency(0)}
