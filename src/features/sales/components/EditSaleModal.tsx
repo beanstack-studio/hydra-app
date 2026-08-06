@@ -129,9 +129,11 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   }, [searchQuery, activeProducts, cartItems])
 
   // Pre-compute derived values above JSX
-  const containerTotal = sale && sale.container_enabled ? sale.container_qty * sale.container_price : 0
-  const itemsTotal     = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0)
-  const grandTotal     = Math.max(0, itemsTotal + containerTotal - discount)
+  const containerTotal  = sale && sale.container_enabled ? sale.container_qty * sale.container_price : 0
+  const itemsTotal      = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0)
+  const grandTotal      = Math.max(0, itemsTotal + containerTotal - discount)
+  const liveBal         = Math.max(0, grandTotal - amountReceived)
+  const liveIsPaidInFull = liveBal === 0 && cartItems.length > 0
   const showDropdown   = searchResults.length > 0
   const hasNoResults   = searchQuery.trim().length > 0 && searchResults.length === 0
   const customerLabel  = sale?.customer_name || 'Unknown'
@@ -436,6 +438,17 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
                   className="w-36 h-8"
                 />
               </div>
+
+              {/* Live Balance Due */}
+              {liveBal > 0 && (
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-muted-foreground">Balance due</span>
+                  <span className="text-base font-semibold text-destructive">{formatCurrency(liveBal)}</span>
+                </div>
+              )}
+              {liveIsPaidInFull && (
+                <p className="text-sm font-semibold text-right text-green-600">✓ Paid in full</p>
+              )}
 
               {/* Payment date — only for sales that already have a recorded payment */}
               {showPaymentDate && (
