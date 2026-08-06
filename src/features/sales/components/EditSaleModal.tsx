@@ -6,7 +6,7 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatCurrency, formatDate, formatTime, PH_TZ, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, formatTime, PH_TZ } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import type { Sale, CartItem, PaymentMode, EditSaleUpdate } from '../types'
@@ -17,12 +17,6 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   delivery:  'Delivery',
   pickup:    'Pickup',
 }
-
-const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
-  { value: 'cash',  label: 'Cash'  },
-  { value: 'gcash', label: 'GCash' },
-  { value: 'maya',  label: 'Maya'  },
-]
 
 const PAYMENT_LABELS: Record<PaymentMode, string> = {
   cash:  'Cash',
@@ -140,10 +134,6 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   const isScheduledOrder = sale ? (sale.order_type === 'delivery' || sale.order_type === 'pickup') : false
   const orderLabel       = sale?.order_type === 'delivery' ? 'Delivery' : 'Pickup'
 
-  const pillBase     = 'flex-1 rounded-md py-1.5 text-xs font-medium border transition-all duration-150'
-  const pillActive   = 'bg-primary text-primary-foreground border-primary'
-  const pillInactive = 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-foreground'
-
   const setQty = (productId: string, qty: number) => {
     if (qty <= 0) {
       setCartItems((prev) => prev.filter((i) => i.product_id !== productId))
@@ -201,26 +191,26 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     >
       <div className="space-y-4">
 
-        {/* Two-column header: Customer + Order Type (left) | Sale Date (right) */}
-        <div className="grid grid-cols-2 gap-x-4 items-start rounded-lg bg-muted/50 px-4 py-3 text-sm">
-          <div className="space-y-2 min-w-0">
-            <div>
-              <p className="text-xs text-muted-foreground">Customer</p>
-              <p className="font-medium truncate">{customerLabel}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Order Type</p>
-              <p className="font-medium">{orderTypeLabel}</p>
-            </div>
-          </div>
+        {/* Customer + Order Type — flush-left, no card */}
+        <div className="grid grid-cols-2 gap-x-4 items-start text-sm">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Sale Date</p>
-            {readOnly ? (
-              <p className="font-medium">{formatDate(saleDate)}</p>
-            ) : (
-              <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
-            )}
+            <p className="text-xs text-muted-foreground">Customer</p>
+            <p className="font-medium truncate">{customerLabel}</p>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Order Type</p>
+            <p className="font-medium">{orderTypeLabel}</p>
+          </div>
+        </div>
+
+        {/* Sale Date — section style matching Items/Total */}
+        <div className="border-t border-border pt-3 space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
+          {readOnly ? (
+            <p className="text-sm font-medium">{formatDate(saleDate)}</p>
+          ) : (
+            <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+          )}
         </div>
 
         {/* Items */}
@@ -391,80 +381,39 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
-        {/* Balance due — view-only only, when there is an outstanding amount */}
-        {readOnly && sale.balance_due > 0 && (
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Balance Due</span>
-            <span className="text-base font-semibold text-destructive">{formatCurrency(sale.balance_due)}</span>
-          </div>
-        )}
-
-        {/* Payment */}
+        {/* Payment — read-only in both modes; identical display */}
         <div className="border-t border-border pt-3 space-y-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
 
-          {readOnly ? (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Method</span>
-                <span className="text-sm font-medium">{PAYMENT_LABELS[paymentMode]}</span>
+          {/* 2-column grid: Method | Date (row 1), Amount Paid full-width (row 2) */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Method</p>
+              <p className="font-medium">{PAYMENT_LABELS[paymentMode]}</p>
+            </div>
+            {showPaymentDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">Payment Date</p>
+                <p className="font-medium">{formatDate(paidAt)}</p>
               </div>
-              {amountReceived > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Amount Paid</span>
-                  <span className="text-sm font-medium">{formatCurrency(amountReceived)}</span>
-                </div>
-              )}
-              {showPaymentDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Payment Date</span>
-                  <span className="text-sm font-medium">{formatDate(paidAt)}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Payment mode pills — still editable (correcting method is a legitimate use case) */}
-              <div className="flex gap-1.5">
-                {PAYMENT_MODES.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setPaymentMode(m.value)}
-                    className={cn(pillBase, paymentMode === m.value ? pillActive : pillInactive)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+            )}
+            {amountReceived > 0 && (
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground">Amount Paid</p>
+                <p className="font-medium">{formatCurrency(amountReceived)}</p>
               </div>
+            )}
+          </div>
 
-              {/* TASK 4 — Amount Paid: read-only in editable mode */}
-              {amountReceived > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Amount Paid</span>
-                  <span className="text-sm font-medium">{formatCurrency(amountReceived)}</span>
-                </div>
-              )}
-
-              {/* TASK 4 — Payment Date: read-only in editable mode */}
-              {showPaymentDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Payment Date</span>
-                  <span className="text-sm font-medium">{formatDate(paidAt)}</span>
-                </div>
-              )}
-
-              {/* Live Balance Due — recalculates as items/discount change against fixed Amount Paid */}
-              {liveBal > 0 && (
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm text-muted-foreground">Balance due</span>
-                  <span className="text-base font-semibold text-destructive">{formatCurrency(liveBal)}</span>
-                </div>
-              )}
-              {liveIsPaidInFull && (
-                <p className="text-sm font-semibold text-right text-green-600">✓ Paid in full</p>
-              )}
-            </>
+          {/* Balance Due — prominent, below grid; live in editable, same formula in view-only */}
+          {liveBal > 0 && (
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Balance due</span>
+              <span className="text-base font-semibold text-destructive">{formatCurrency(liveBal)}</span>
+            </div>
+          )}
+          {liveIsPaidInFull && (
+            <p className="text-sm font-semibold text-right text-green-600">✓ Paid in full</p>
           )}
         </div>
 
