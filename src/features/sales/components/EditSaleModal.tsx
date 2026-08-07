@@ -191,19 +191,23 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     >
       <div className="space-y-4">
 
-        {/* Header row: Customer · Order Type (left) | Sale Date (right) */}
-        <div className="grid grid-cols-2 gap-x-4 items-start text-sm">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Customer</p>
-            <p className="font-medium truncate">{customerLabel} · {orderTypeLabel}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Sale date</p>
-            {readOnly ? (
-              <p className="font-medium">{formatDate(saleDate)}</p>
-            ) : (
-              <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
-            )}
+        {/* Details */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Details</p>
+          <div className="grid grid-cols-2 gap-x-4 items-start text-sm">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Customer</p>
+              <p className="font-medium truncate">{customerLabel}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{orderTypeLabel}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Sale Date</p>
+              {readOnly ? (
+                <p className="font-medium">{formatDate(saleDate)}</p>
+              ) : (
+                <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+              )}
+            </div>
           </div>
         </div>
 
@@ -338,7 +342,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           <div className="border-t border-border pt-3 space-y-2">
             {readOnly ? (
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Discount</span>
+                <span className="text-xs text-muted-foreground">Discount</span>
                 <span className="text-sm font-medium text-destructive">−{formatCurrency(discount)}</span>
               </div>
             ) : !showDiscount ? (
@@ -351,7 +355,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground flex-1">Discount</span>
+                <span className="text-xs text-muted-foreground flex-1">Discount</span>
                 <CurrencyInput
                   value={discount}
                   onChange={(v) => setDiscount(v ?? 0)}
@@ -371,7 +375,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
 
         {/* Grand total */}
         <div className="flex items-baseline justify-between border-t border-border pt-3">
-          <span className="text-sm text-muted-foreground">Total</span>
+          <span className="text-xs text-muted-foreground">Total</span>
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
@@ -382,7 +386,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           {/* Column headers */}
           <div className="grid grid-cols-3 gap-x-3 text-xs text-muted-foreground">
             <span>Date</span>
-            <span>Method</span>
+            <span className="text-center">Method</span>
             <span className="text-right">Amount</span>
           </div>
 
@@ -391,7 +395,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
             <span className="font-medium">
               {showPaymentDate ? formatDate(paidAt) : '—'}
             </span>
-            <span className="font-medium">{PAYMENT_LABELS[paymentMode]}</span>
+            <span className="font-medium text-center">{PAYMENT_LABELS[paymentMode]}</span>
             <span className="font-medium text-right">
               {amountReceived > 0 ? formatCurrency(amountReceived) : '—'}
             </span>
@@ -400,7 +404,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           {/* Balance Due — prominent line below payment rows */}
           {liveBal > 0 && (
             <div className="flex items-baseline justify-between border-t border-border pt-2">
-              <span className="text-sm text-muted-foreground">Balance due</span>
+              <span className="text-xs text-muted-foreground">Balance Due</span>
               <span className="text-base font-semibold text-destructive">{formatCurrency(liveBal)}</span>
             </div>
           )}
