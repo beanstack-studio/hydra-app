@@ -52,10 +52,13 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   const [paidAt,          setPaidAt]          = useState(todayPH)
   const [showPaymentDate, setShowPaymentDate] = useState(false)
   const [isSaving,        setIsSaving]        = useState(false)
+  const [fulfilledAck,    setFulfilledAck]    = useState(false)
 
-  // Mode determination: owner on an unfulfilled sale → editable; everything else → view-only
+  // Mode determination: owner → always editable; staff → always view-only.
+  // Fulfilled sales are still editable for owners (with an acknowledgment checkpoint);
+  // the delivery/pickup record itself is kept locked separately via isFulfilled.
   const isFulfilled = sale ? (sale.order_type !== 'walk-in' && !!sale.fulfilled_at) : false
-  const readOnly    = !isOwner || isFulfilled
+  const readOnly    = !isOwner
 
   // Populate from sale whenever modal opens
   useEffect(() => {
@@ -103,6 +106,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
       setAmountReceived(0)
       setPaidAt(todayPH)
       setShowPaymentDate(false)
+      setFulfilledAck(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -468,8 +472,8 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
             Print Receipt
           </Button>
 
-          {/* Reschedule — editable mode + delivery/pickup + onReschedule wired by parent */}
-          {!readOnly && isScheduledOrder && onReschedule && (
+          {/* Reschedule — editable mode + unfulfilled delivery/pickup + onReschedule wired by parent */}
+          {!readOnly && !isFulfilled && isScheduledOrder && onReschedule && (
             <Button
               type="button"
               variant="outline"
@@ -479,6 +483,21 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
               <CalendarClock className="h-4 w-4" />
               Reschedule
             </Button>
+          )}
+
+          {/* Acknowledgment checkpoint — fulfilled sales in editable mode only */}
+          {!readOnly && isFulfilled && (
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={fulfilledAck}
+                onChange={(e) => setFulfilledAck(e.target.checked)}
+                className="h-4 w-4 rounded border-border accent-primary cursor-pointer mt-0.5 shrink-0"
+              />
+              <span className="text-xs text-muted-foreground leading-snug">
+                This sale was already {orderLabel === 'Delivery' ? 'delivered' : 'picked up'}. I'm correcting order details only — not the {orderLabel.toLowerCase()} record.
+              </span>
+            </label>
           )}
 
           {/* Cancel / Save  —or—  Close */}
@@ -495,7 +514,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
                 <Button
                   type="button"
                   className="flex-1"
-                  disabled={isSaving || cartItems.length === 0}
+                  disabled={isSaving || cartItems.length === 0 || (isFulfilled && !fulfilledAck)}
                   onClick={() => { void handleSave() }}
                 >
                   {isSaving ? 'Saving…' : 'Save Changes'}
