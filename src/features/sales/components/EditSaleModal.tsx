@@ -6,10 +6,11 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate, formatTime, PH_TZ } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
-import type { Sale, CartItem, PaymentMode, EditSaleUpdate } from '../types'
+import type { Sale, CartItem, PaymentMode, EditSaleUpdate, PaymentRecord } from '../types'
 import type { Product } from '@/features/settings/types'
 
 const ORDER_TYPE_LABEL: Record<string, string> = {
@@ -36,8 +37,9 @@ interface EditSaleModalProps {
 
 export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onReschedule }: EditSaleModalProps) {
   const { toast } = useToast()
-  const role    = useAuthStore((s) => s.role)
-  const isOwner = role === 'owner' || role === 'super_admin'
+  const role      = useAuthStore((s) => s.role)
+  const stationId = useAuthStore((s) => s.stationId)
+  const isOwner   = role === 'owner' || role === 'super_admin'
 
   const todayPH = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
 
@@ -53,6 +55,8 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
   const [showPaymentDate, setShowPaymentDate] = useState(false)
   const [isSaving,        setIsSaving]        = useState(false)
   const [fulfilledAck,    setFulfilledAck]    = useState(false)
+  const [payments,        setPayments]        = useState<PaymentRecord[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
 
   // Mode determination: owner → always editable; staff → always view-only.
   // Fulfilled sales are still editable for owners (with an acknowledgment checkpoint);
@@ -107,9 +111,34 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
       setPaidAt(todayPH)
       setShowPaymentDate(false)
       setFulfilledAck(false)
+      setPayments([])
+      setPaymentsLoading(true) // true so next open shows loading immediately
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
+
+  // Fetch payment history whenever the modal opens for a sale
+  useEffect(() => {
+    if (!isOpen || !sale || !stationId) return
+    let cancelled = false
+    setPaymentsLoading(true)
+    setPayments([]);
+    (async () => {
+      const { data, error } = await supabase
+        .from('sale_payments')
+        .select('*')
+        .eq('sale_id', sale.id)
+        .eq('station_id', stationId)
+        .order('paid_at', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (cancelled) return
+      if (!error) setPayments((data ?? []) as PaymentRecord[])
+      setPaymentsLoading(false)
+    })()
+    return () => { cancelled = true }
+  // sale.id is the meaningful identity — re-fetch when the sale changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, sale?.id, stationId])
 
   const activeProducts = useMemo(() => products.filter((p) => p.is_active), [products])
 
@@ -383,27 +412,43 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
-        {/* Payment — 3-column layout: Date | Method | Amount (list-ready) */}
+        {/* Payment History */}
         <div className="border-t border-border pt-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
 
-          {/* Column headers */}
-          <div className="grid grid-cols-3 gap-x-3 text-xs text-muted-foreground">
-            <span>Date</span>
-            <span className="text-center">Method</span>
-            <span className="text-right">Amount</span>
-          </div>
+          {paymentsLoading ? (
+            <p className="text-xs text-muted-foreground">Loading…</p>
+          ) : payments.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No payments recorded yet.</p>
+          ) : (
+            <>
+              {/* Column headers */}
+              <div className="grid grid-cols-3 gap-x-3 text-xs text-muted-foreground">
+                <span>Date</span>
+                <span className="text-center">Method</span>
+                <span className="text-right">Amount</span>
+              </div>
 
-          {/* Payment row — one for now; add more rows here when multi-payment lands */}
-          <div className="grid grid-cols-3 gap-x-3 items-baseline text-sm">
-            <span className="font-medium">
-              {showPaymentDate ? formatDate(paidAt) : '—'}
-            </span>
-            <span className="font-medium text-center">{PAYMENT_LABELS[paymentMode]}</span>
-            <span className="font-medium text-right">
-              {amountReceived > 0 ? formatCurrency(amountReceived) : '—'}
-            </span>
-          </div>
+              {/* One row per payment event */}
+              {payments.map((p) => {
+                const isBulk = p.remarks === 'Bulk payment' || p.remarks === 'Partial bulk payment'
+                return (
+                  <div key={p.id} className="grid grid-cols-3 gap-x-3 items-baseline text-sm">
+                    <span className="font-medium">{formatDate(p.paid_at)}</span>
+                    <span className="font-medium text-center">{PAYMENT_LABELS[p.payment_mode]}</span>
+                    <span className="font-medium text-right">
+                      {isBulk && (
+                        <span className="inline-block text-[10px] font-medium text-muted-foreground bg-muted px-1 py-0.5 rounded leading-none mr-1.5">
+                          Bulk
+                        </span>
+                      )}
+                      {formatCurrency(p.amount)}
+                    </span>
+                  </div>
+                )
+              })}
+            </>
+          )}
 
           {/* Balance Due — prominent line below payment rows */}
           {liveBal > 0 && (
