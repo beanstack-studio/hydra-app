@@ -191,29 +191,19 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
     >
       <div className="space-y-4">
 
-        {/* Customer + Order Type — flush-left, no card */}
+        {/* Header row: Customer · Order Type (left) | Sale Date (right) */}
         <div className="grid grid-cols-2 gap-x-4 items-start text-sm">
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Customer</p>
-            <p className="font-medium truncate">{customerLabel}</p>
+            <p className="font-medium truncate">{customerLabel} · {orderTypeLabel}</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Order Type</p>
-            <p className="font-medium">{orderTypeLabel}</p>
-          </div>
-        </div>
-
-        {/* Sale Date — half-width, left column only */}
-        <div className="border-t border-border pt-3">
-          <div className="grid grid-cols-2 gap-x-4">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
-              {readOnly ? (
-                <p className="text-sm font-medium">{formatDate(saleDate)}</p>
-              ) : (
-                <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
-              )}
-            </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Sale date</p>
+            {readOnly ? (
+              <p className="font-medium">{formatDate(saleDate)}</p>
+            ) : (
+              <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+            )}
           </div>
         </div>
 
@@ -381,7 +371,7 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
 
         {/* Grand total */}
         <div className="flex items-baseline justify-between border-t border-border pt-3">
-          <span className="text-sm font-medium text-muted-foreground">Total</span>
+          <span className="text-sm text-muted-foreground">Total</span>
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
