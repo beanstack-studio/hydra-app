@@ -203,14 +203,18 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           </div>
         </div>
 
-        {/* Sale Date — section style matching Items/Total */}
-        <div className="border-t border-border pt-3 space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
-          {readOnly ? (
-            <p className="text-sm font-medium">{formatDate(saleDate)}</p>
-          ) : (
-            <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
-          )}
+        {/* Sale Date — half-width, left column only */}
+        <div className="border-t border-border pt-3">
+          <div className="grid grid-cols-2 gap-x-4">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sale Date</p>
+              {readOnly ? (
+                <p className="text-sm font-medium">{formatDate(saleDate)}</p>
+              ) : (
+                <DatePickerInput value={saleDate} onChange={setSaleDate} max={todayPH} />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Items */}
@@ -381,33 +385,31 @@ export function EditSaleModal({ sale, isOpen, onClose, products, onSave, onResch
           <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
         </div>
 
-        {/* Payment — read-only in both modes; identical display */}
-        <div className="border-t border-border pt-3 space-y-3">
+        {/* Payment — 3-column layout: Date | Method | Amount (list-ready) */}
+        <div className="border-t border-border pt-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
 
-          {/* 2-column grid: Method | Date (row 1), Amount Paid full-width (row 2) */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Method</p>
-              <p className="font-medium">{PAYMENT_LABELS[paymentMode]}</p>
-            </div>
-            {showPaymentDate && (
-              <div>
-                <p className="text-xs text-muted-foreground">Payment Date</p>
-                <p className="font-medium">{formatDate(paidAt)}</p>
-              </div>
-            )}
-            {amountReceived > 0 && (
-              <div className="col-span-2">
-                <p className="text-xs text-muted-foreground">Amount Paid</p>
-                <p className="font-medium">{formatCurrency(amountReceived)}</p>
-              </div>
-            )}
+          {/* Column headers */}
+          <div className="grid grid-cols-3 gap-x-3 text-xs text-muted-foreground">
+            <span>Date</span>
+            <span>Method</span>
+            <span className="text-right">Amount</span>
           </div>
 
-          {/* Balance Due — prominent, below grid; live in editable, same formula in view-only */}
+          {/* Payment row — one for now; add more rows here when multi-payment lands */}
+          <div className="grid grid-cols-3 gap-x-3 items-baseline text-sm">
+            <span className="font-medium">
+              {showPaymentDate ? formatDate(paidAt) : '—'}
+            </span>
+            <span className="font-medium">{PAYMENT_LABELS[paymentMode]}</span>
+            <span className="font-medium text-right">
+              {amountReceived > 0 ? formatCurrency(amountReceived) : '—'}
+            </span>
+          </div>
+
+          {/* Balance Due — prominent line below payment rows */}
           {liveBal > 0 && (
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between border-t border-border pt-2">
               <span className="text-sm text-muted-foreground">Balance due</span>
               <span className="text-base font-semibold text-destructive">{formatCurrency(liveBal)}</span>
             </div>
