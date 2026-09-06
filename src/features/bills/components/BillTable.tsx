@@ -120,15 +120,15 @@ export function BillTable() {
         />
       ) : (
         <div className="rounded-lg border border-border overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm table-fixed">
+          <table className="w-full min-w-[768px] text-sm table-fixed">
             <colgroup>
-              <col className="w-1/4" />
+              <col className="w-[31%]" />
               <col className="w-[13%]" />
               <col className="w-[9%]" />
               <col className="w-[13%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
               <col className="w-[12%]" />
-              <col className="w-[13%]" />
-              <col className="w-[15%]" />
             </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/30">
@@ -145,12 +145,13 @@ export function BillTable() {
               <tbody key={key}>
                 {/* Month group header row */}
                 <tr className={cn(groupIdx > 0 && 'border-t-2 border-border')}>
-                  <td colSpan={7} className="px-4 py-3 bg-muted/50 border-b border-border">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-foreground">{label}</span>
-                      <span className="text-xs text-muted-foreground">{formatCurrency(total)}</span>
-                    </div>
+                  <td colSpan={5} className="px-4 py-3 bg-muted/50 border-b border-border">
+                    <span className="text-sm font-semibold text-foreground">{label}</span>
                   </td>
+                  <td className="px-3 py-3 bg-muted/50 border-b border-border">
+                    <span className="text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(total)}</span>
+                  </td>
+                  <td className="bg-muted/50 border-b border-border" />
                 </tr>
                 {bills.map((bill, idx) => (
                   <tr
