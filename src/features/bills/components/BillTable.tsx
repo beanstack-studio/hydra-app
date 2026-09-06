@@ -7,7 +7,7 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
@@ -119,104 +119,103 @@ export function BillTable() {
           description="Add electricity, water, internet or rent bills."
         />
       ) : (
-        <div className="space-y-6">
-          {groups.map(({ key, label, month, year, bills, total }) => (
-            <div key={key}>
-              {/* Month group header */}
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-                <span className="text-xs text-muted-foreground">{formatCurrency(total)}</span>
-              </div>
-
-              <div className="rounded-lg border border-border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className={thClass}>Type</th>
-                      <th className={thClass}>Due Date</th>
-                      <th className={thClass}>Status</th>
-                      <th className={thClass}>Date Paid</th>
-                      <th className={thClass}>Via</th>
-                      <th className={thClass}>Amount</th>
-                      <th className={thClass}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bills.map((bill, idx) => (
-                      <tr
-                        key={bill.id}
-                        onClick={isOwner ? () => { setEditingBill(bill); setIsFormOpen(true) } : undefined}
-                        className={[
-                          'border-b border-border last:border-0 transition-colors duration-150',
-                          isOwner ? 'cursor-pointer hover:bg-muted/40' : '',
-                          idx % 2 === 1 ? 'bg-muted/10' : '',
-                        ].join(' ')}
+        <div className="rounded-lg border border-border overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className={thClass}>Type</th>
+                <th className={thClass}>Due Date</th>
+                <th className={thClass}>Status</th>
+                <th className={thClass}>Date Paid</th>
+                <th className={thClass}>Via</th>
+                <th className={thClass}>Amount</th>
+                <th className={thClass}></th>
+              </tr>
+            </thead>
+            {groups.map(({ key, label, bills, total }, groupIdx) => (
+              <tbody key={key}>
+                {/* Month group header row */}
+                <tr className={cn(groupIdx > 0 && 'border-t-2 border-border')}>
+                  <td colSpan={7} className="px-3 py-2 bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-foreground">{label}</span>
+                      <span className="text-xs text-muted-foreground">{formatCurrency(total)}</span>
+                    </div>
+                  </td>
+                </tr>
+                {bills.map((bill, idx) => (
+                  <tr
+                    key={bill.id}
+                    onClick={isOwner ? () => { setEditingBill(bill); setIsFormOpen(true) } : undefined}
+                    className={cn(
+                      'border-b border-border last:border-0 transition-colors duration-150',
+                      isOwner && 'cursor-pointer hover:bg-muted/40',
+                      idx % 2 === 1 && 'bg-muted/10',
+                    )}
+                  >
+                    <td className={tdClass}>
+                      <span className="font-medium">{BILL_TYPE_LABELS[bill.bill_type] ?? bill.bill_type}</span>
+                      {bill.description && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[160px]">{bill.description}</p>
+                      )}
+                    </td>
+                    <td className={tdClass}>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {bill.due_date ? formatDate(bill.due_date) : '—'}
+                      </span>
+                    </td>
+                    <td className={tdClass}>
+                      {bill.date_paid
+                        ? <Badge variant="success">Paid</Badge>
+                        : <Badge variant="destructive">Unpaid</Badge>
+                      }
+                    </td>
+                    <td className={tdClass}>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {bill.date_paid ? formatDate(bill.date_paid) : '—'}
+                      </span>
+                    </td>
+                    <td className={tdClass}>
+                      <span className="text-muted-foreground">
+                        {bill.payment_method ? PAYMENT_METHOD_LABELS[bill.payment_method] : '—'}
+                      </span>
+                    </td>
+                    <td className={tdClass}>
+                      <span className="font-semibold">{formatCurrency(bill.amount)}</span>
+                    </td>
+                    <td className={tdClass}>
+                      <div
+                        className="flex items-center gap-1 justify-end"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <td className={tdClass}>
-                          <span className="font-medium">{BILL_TYPE_LABELS[bill.bill_type] ?? bill.bill_type}</span>
-                          {bill.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{bill.description}</p>
-                          )}
-                        </td>
-                        <td className={tdClass}>
-                          <span className="text-muted-foreground whitespace-nowrap">
-                            {bill.due_date ? formatDate(bill.due_date) : '—'}
-                          </span>
-                        </td>
-                        <td className={tdClass}>
-                          {bill.date_paid
-                            ? <Badge variant="success">Paid</Badge>
-                            : <Badge variant="destructive">Unpaid</Badge>
-                          }
-                        </td>
-                        <td className={tdClass}>
-                          <span className="text-muted-foreground whitespace-nowrap">
-                            {bill.date_paid ? formatDate(bill.date_paid) : '—'}
-                          </span>
-                        </td>
-                        <td className={tdClass}>
-                          <span className="text-muted-foreground">
-                            {bill.payment_method ? PAYMENT_METHOD_LABELS[bill.payment_method] : '—'}
-                          </span>
-                        </td>
-                        <td className={tdClass}>
-                          <span className="font-semibold">{formatCurrency(bill.amount)}</span>
-                        </td>
-                        <td className={tdClass}>
-                          <div
-                            className="flex items-center gap-1 justify-end"
-                            onClick={(e) => e.stopPropagation()}
+                        {!bill.date_paid && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-primary hover:text-primary"
+                            title="Mark as paid"
+                            onClick={() => setPayingBill(bill)}
                           >
-                            {!bill.date_paid && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 text-primary hover:text-primary"
-                                title="Mark as paid"
-                                onClick={() => setPayingBill(bill)}
-                              >
-                                <CreditCard className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {isOwner && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => setDeletingBill(bill)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+                            <CreditCard className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {isOwner && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeletingBill(bill)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
         </div>
       )}
 
