@@ -120,16 +120,25 @@ export function BillTable() {
         />
       ) : (
         <div className="rounded-lg border border-border overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm table-fixed">
+            <colgroup>
+              <col className="w-1/4" />
+              <col className="w-[13%]" />
+              <col className="w-[9%]" />
+              <col className="w-[13%]" />
+              <col className="w-[12%]" />
+              <col className="w-[13%]" />
+              <col className="w-[15%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className={cn(thClass, 'w-full')}>Type</th>
+                <th className={thClass}>Type</th>
                 <th className={thClass}>Due Date</th>
                 <th className={thClass}>Status</th>
                 <th className={thClass}>Date Paid</th>
                 <th className={thClass}>Via</th>
-                <th className={cn(thClass, 'w-px')}>Amount</th>
-                <th className={cn(thClass, 'w-24')}></th>
+                <th className={thClass}>Amount</th>
+                <th className={thClass}></th>
               </tr>
             </thead>
             {groups.map(({ key, label, bills, total }, groupIdx) => (
