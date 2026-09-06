@@ -1,5 +1,6 @@
 export type BillType = 'electricity' | 'water' | 'internet' | 'rent' | 'other' | 'maintenance' | 'bank'
 export type BillPaymentMethod = 'cash' | 'credit_card' | 'gcash' | 'maya' | 'other'
+export type RecurrenceCadence = 'monthly' | 'quarterly' | 'custom'
 
 export interface Bill {
   id: string
@@ -15,6 +16,11 @@ export interface Bill {
   payment_method: BillPaymentMethod | null
   bill_receipt_url: string | null
   payment_receipt_url: string | null
+  is_recurring: boolean
+  recurrence_cadence: RecurrenceCadence | null
+  recurrence_interval_months: number | null
+  reminder_day: number | null
+  payment_cap: number | null
   created_at: string
   updated_at: string
 }
@@ -30,4 +36,9 @@ export type BillInput = {
   description?: string | null
   bill_receipt_url?: string | null
   payment_receipt_url?: string | null
+  is_recurring?: boolean
+  recurrence_cadence?: RecurrenceCadence | null
+  recurrence_interval_months?: number | null
+  reminder_day?: number | null
+  payment_cap?: number | null
 }

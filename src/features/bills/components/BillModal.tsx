@@ -8,10 +8,12 @@ import { DatePickerInput } from '@/components/shared/DatePickerInput'
 import { CurrencyInput } from '@/components/shared/CurrencyInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { nowPH } from '@/lib/utils'
-import type { Bill, BillInput, BillType, BillPaymentMethod } from '../types'
+import { cn, nowPH } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+import type { Bill, BillInput, BillType, BillPaymentMethod, RecurrenceCadence } from '../types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +60,13 @@ const PAYMENT_METHODS: { value: BillPaymentMethod; label: string }[] = [
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 
+function toIntOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'number' && isNaN(v)) return null
+  const n = typeof v === 'number' ? v : parseInt(String(v), 10)
+  return isNaN(n) ? null : n
+}
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const billSchema = z.object({
@@ -68,6 +77,23 @@ const billSchema = z.object({
   date_paid:      z.string().nullable(),
   payment_method: z.string().nullable(),
   description:    z.string().nullable(),
+  is_recurring:   z.boolean(),
+  recurrence_cadence: z.enum(['monthly', 'quarterly', 'custom']).nullable(),
+  recurrence_interval_months: z.preprocess(toIntOrNull, z.number().int().min(1).nullable()),
+  reminder_day:  z.preprocess(toIntOrNull, z.number().int().min(1).max(31).nullable()),
+  payment_cap:   z.preprocess(toIntOrNull, z.number().int().min(1).nullable()),
+}).superRefine((data, ctx) => {
+  if (data.is_recurring) {
+    if (!data.recurrence_cadence) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['recurrence_cadence'], message: 'Select a cadence' })
+    }
+    if (data.recurrence_cadence === 'custom' && data.recurrence_interval_months == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['recurrence_interval_months'], message: 'Enter interval in months' })
+    }
+    if (data.reminder_day == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reminder_day'], message: 'Enter a reminder day (1–31)' })
+    }
+  }
 })
 
 type BillSchema = z.infer<typeof billSchema>
@@ -158,6 +184,7 @@ function AttachRow({
 
 export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalProps) {
   const { toast } = useToast()
+  const isOwner = useAuthStore((s) => s.role) === 'owner'
 
   const billFileRef     = useRef<HTMLInputElement>(null)
   const paymentFileRef  = useRef<HTMLInputElement>(null)
@@ -180,13 +207,20 @@ export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalP
     formState: { errors, isSubmitting },
   } = useForm<BillSchema>({
     resolver: zodResolver(billSchema),
-    defaultValues: { bill_type: '', period: defaultPeriod, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' },
+    defaultValues: {
+      bill_type: '', period: defaultPeriod, amount: 0,
+      due_date: '', date_paid: '', payment_method: '', description: '',
+      is_recurring: false, recurrence_cadence: null,
+      recurrence_interval_months: null, reminder_day: null, payment_cap: null,
+    },
   })
 
-  const dueDate       = watch('due_date')
-  const datePaid      = watch('date_paid')
-  const paymentMethod = watch('payment_method')
-  const period        = watch('period')
+  const dueDate           = watch('due_date')
+  const datePaid          = watch('date_paid')
+  const paymentMethod     = watch('payment_method')
+  const period            = watch('period')
+  const isRecurring       = watch('is_recurring') ?? false
+  const recurrenceCadence = watch('recurrence_cadence')
 
   const periodOptions = generatePeriodOptions(bill?.month, bill?.year)
 
@@ -207,9 +241,17 @@ export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalP
         date_paid:      bill.date_paid ?? '',
         payment_method: bill.payment_method ?? '',
         description:    bill.description ?? '',
+        is_recurring:               bill.is_recurring,
+        recurrence_cadence:         bill.recurrence_cadence ?? null,
+        recurrence_interval_months: bill.recurrence_interval_months ?? null,
+        reminder_day:               bill.reminder_day ?? null,
+        payment_cap:                bill.payment_cap ?? null,
       })
     } else {
-      reset({ bill_type: '', period: freshDefault, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' })
+      reset({
+        bill_type: '', period: freshDefault, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '',
+        is_recurring: false, recurrence_cadence: null, recurrence_interval_months: null, reminder_day: null, payment_cap: null,
+      })
     }
   }, [bill, isOpen, reset])
 
@@ -238,6 +280,11 @@ export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalP
         description:    values.description || null,
         bill_receipt_url:     !keepBillReceipt && !billFile ? null : undefined,
         payment_receipt_url:  !keepPaymentReceipt && !paymentFile ? null : undefined,
+        is_recurring:               values.is_recurring,
+        recurrence_cadence:         values.is_recurring ? values.recurrence_cadence : null,
+        recurrence_interval_months: values.is_recurring && values.recurrence_cadence === 'custom' ? values.recurrence_interval_months : null,
+        reminder_day:               values.is_recurring ? values.reminder_day : null,
+        payment_cap:                values.is_recurring ? values.payment_cap : null,
       }
 
       if (bill) {
@@ -377,6 +424,111 @@ export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalP
           <Label htmlFor="bill-remarks">Remarks</Label>
           <Textarea id="bill-remarks" placeholder="Optional notes…" rows={2} {...register('description')} />
         </div>
+
+        {/* ── Recurring (owner-only) ───────────────────────────────────── */}
+        {isOwner && (
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium leading-none">Make this recurring</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Auto-remind on a schedule</p>
+              </div>
+              <Controller
+                name="is_recurring"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    id="bill-recurring"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+
+            {isRecurring && (
+              <div className="space-y-3 pt-2 border-t border-border">
+
+                {/* Cadence pills */}
+                <div className="space-y-1.5">
+                  <Label>Cadence <span className="text-destructive">*</span></Label>
+                  <div className="flex gap-2">
+                    {(['monthly', 'quarterly', 'custom'] as const).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setValue('recurrence_cadence', c, { shouldValidate: true })}
+                        className={cn(
+                          'flex-1 rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors duration-150',
+                          recurrenceCadence === c
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background text-foreground hover:border-foreground',
+                        )}
+                      >
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.recurrence_cadence && (
+                    <p className="text-xs text-destructive">{errors.recurrence_cadence.message}</p>
+                  )}
+                </div>
+
+                {/* Custom interval */}
+                {recurrenceCadence === 'custom' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bill-interval">Interval (months) <span className="text-destructive">*</span></Label>
+                    <input
+                      id="bill-interval"
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 3"
+                      {...register('recurrence_interval_months', { valueAsNumber: true })}
+                      className={selectClass}
+                    />
+                    {errors.recurrence_interval_months && (
+                      <p className="text-xs text-destructive">{errors.recurrence_interval_months.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Reminder day + Payment cap */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bill-reminder">Reminder Day <span className="text-destructive">*</span></Label>
+                    <input
+                      id="bill-reminder"
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="Day 1–31"
+                      {...register('reminder_day', { valueAsNumber: true })}
+                      className={selectClass}
+                    />
+                    {errors.reminder_day && (
+                      <p className="text-xs text-destructive">{errors.reminder_day.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bill-cap">Payment Cap</Label>
+                    <input
+                      id="bill-cap"
+                      type="number"
+                      min={1}
+                      placeholder="# of payments"
+                      {...register('payment_cap', { valueAsNumber: true })}
+                      className={selectClass}
+                    />
+                    {errors.payment_cap && (
+                      <p className="text-xs text-destructive">{errors.payment_cap.message}</p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Actions ──────────────────────────────────────────────────── */}
         <div className="flex gap-2 pt-2">

@@ -76,6 +76,11 @@ export function useBills(): UseBillsReturn {
       payment_method: input.payment_method ?? null,
       bill_receipt_url: billReceiptUrl,
       payment_receipt_url: paymentReceiptUrl,
+      is_recurring: input.is_recurring ?? false,
+      recurrence_cadence: input.recurrence_cadence ?? null,
+      recurrence_interval_months: input.recurrence_interval_months ?? null,
+      reminder_day: input.reminder_day ?? null,
+      payment_cap: input.payment_cap ?? null,
     })
     if (e) throw new Error(e.message)
     await fetchData()
@@ -119,6 +124,11 @@ export function useBills(): UseBillsReturn {
       description: input.description ?? null,
       date_paid: input.date_paid ?? null,
       payment_method: input.payment_method ?? null,
+      is_recurring: input.is_recurring ?? false,
+      recurrence_cadence: input.recurrence_cadence ?? null,
+      recurrence_interval_months: input.recurrence_interval_months ?? null,
+      reminder_day: input.reminder_day ?? null,
+      payment_cap: input.payment_cap ?? null,
     }
     if (billReceiptUrl !== undefined) updateData.bill_receipt_url = billReceiptUrl
     if (paymentReceiptUrl !== undefined) updateData.payment_receipt_url = paymentReceiptUrl
