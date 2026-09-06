@@ -44,6 +44,7 @@ const CATEGORIES: { value: BillType; label: string }[] = [
   { value: 'water',       label: 'Water' },
   { value: 'internet',    label: 'Internet' },
   { value: 'rent',        label: 'Rent' },
+  { value: 'bank',        label: 'Bank' },
   { value: 'other',       label: 'Other' },
 ]
 

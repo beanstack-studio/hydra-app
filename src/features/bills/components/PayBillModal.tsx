@@ -19,6 +19,7 @@ const BILL_TYPE_LABELS: Record<string, string> = {
   water: 'Water',
   internet: 'Internet',
   rent: 'Rent',
+  bank: 'Bank',
   other: 'Other',
   maintenance: 'Maintenance',
 }

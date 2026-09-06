@@ -12,6 +12,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   bill_water:       'Water Bill',
   bill_internet:    'Internet',
   bill_rent:        'Rent',
+  bill_bank:        'Bank',
   bill_other:       'Other Bills',
   bill_maintenance: 'Maint. Bill',
 }

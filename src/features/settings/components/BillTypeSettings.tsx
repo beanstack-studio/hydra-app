@@ -1,4 +1,4 @@
-import { Zap, Droplets, Wifi, Home, ReceiptText } from 'lucide-react'
+import { Zap, Droplets, Wifi, Home, Landmark, ReceiptText } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface BillType {
@@ -13,6 +13,7 @@ const BILL_TYPES: BillType[] = [
   { key: 'water', label: 'Water', icon: <Droplets className="h-5 w-5" />, description: 'MCWD, LWUA, or local supply' },
   { key: 'internet', label: 'Internet', icon: <Wifi className="h-5 w-5" />, description: 'ISP monthly subscription' },
   { key: 'rent', label: 'Rent', icon: <Home className="h-5 w-5" />, description: 'Space or equipment rental' },
+  { key: 'bank', label: 'Bank', icon: <Landmark className="h-5 w-5" />, description: 'Loan installment or bank payment' },
   { key: 'other', label: 'Other', icon: <ReceiptText className="h-5 w-5" />, description: 'Any other recurring expense' },
 ]
 

@@ -1,4 +1,4 @@
-export type BillType = 'electricity' | 'water' | 'internet' | 'rent' | 'other' | 'maintenance'
+export type BillType = 'electricity' | 'water' | 'internet' | 'rent' | 'other' | 'maintenance' | 'bank'
 export type BillPaymentMethod = 'cash' | 'credit_card' | 'gcash' | 'maya' | 'other'
 
 export interface Bill {

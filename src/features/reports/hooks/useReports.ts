@@ -325,7 +325,7 @@ export function useReports(): UseReportsReturn {
       // Unions general expenses + bills (bills only available for monthly/ytd)
       const BILL_LABEL: Record<string, string> = {
         electricity: 'Electricity', water: 'Water', internet: 'Internet',
-        rent: 'Rent', maintenance: 'Maintenance', other: 'Other',
+        rent: 'Rent', bank: 'Bank', maintenance: 'Maintenance', other: 'Other',
       }
       const expenseRankMap = new Map<string, { total_amount: number; category: string }>()
       for (const e of expenses) {
