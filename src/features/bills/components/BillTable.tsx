@@ -11,6 +11,7 @@ import { cn, formatCurrency, formatDate, nowPH } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
+import { MONTHS, BILL_TYPE_LABELS, makeSeriesKey, computeRecurringState } from '../recurringAlerts'
 import type { Bill } from '../types'
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -20,21 +21,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   credit_card: 'Credit Card',
   other:       'Other',
 }
-
-const BILL_TYPE_LABELS: Record<string, string> = {
-  electricity: 'Electricity',
-  water:       'Water',
-  internet:    'Internet',
-  rent:        'Rent',
-  bank:        'Bank',
-  other:       'Other',
-  maintenance: 'Maintenance',
-}
-
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
 
 interface BillGroup {
   key: string
@@ -65,109 +51,6 @@ function groupBillsByMonth(bills: Bill[]): BillGroup[] {
   }
   // Already sorted desc by hook (year desc, month desc)
   return Array.from(map.values())
-}
-
-// ── Recurring alert helpers ────────────────────────────────────────────────────
-
-interface RecurringSeriesInfo {
-  key: string
-  label: string
-  reminderDay: number
-  paymentCap: number | null
-  paidCount: number
-  urgency: 'yellow' | 'red'
-  message: string
-}
-
-function makeSeriesKey(billType: string, description: string | null): string {
-  return `${billType}::${description ?? ''}`
-}
-
-function computeRecurringState(
-  bills: Bill[],
-  todayPH: Date,
-): {
-  alerts: RecurringSeriesInfo[]
-  progressByBillId: Map<string, string>
-  noCurrentPeriodBills: boolean
-} {
-  const currentMonth = todayPH.getMonth() + 1
-  const currentYear  = todayPH.getFullYear()
-  const todayDay     = todayPH.getDate()
-  const YELLOW_LEAD  = 5
-  const currentMonthLabel = `${MONTHS[todayPH.getMonth()]} ${currentYear}`
-
-  // Group all bills by (bill_type, description)
-  const seriesMap = new Map<string, Bill[]>()
-  for (const b of bills) {
-    const key = makeSeriesKey(b.bill_type, b.description)
-    const existing = seriesMap.get(key)
-    if (existing) { existing.push(b) } else { seriesMap.set(key, [b]) }
-  }
-
-  const alerts: RecurringSeriesInfo[] = []
-  const progressBySeriesKey = new Map<string, string>()
-
-  for (const [key, seriesBills] of seriesMap) {
-    // Series is only "active recurring" if at least one bill has is_recurring = true
-    const hasRecurringFlag = seriesBills.some((b) => b.is_recurring)
-    if (!hasRecurringFlag) continue
-
-    // Source of truth = most recent bill with is_recurring = true
-    const mostRecent = [...seriesBills]
-      .filter((b) => b.is_recurring)
-      .sort((a, b2) => b2.year !== a.year ? b2.year - a.year : b2.month - a.month)[0]
-
-    const reminderDay = mostRecent.reminder_day ?? 1
-    const paymentCap  = mostRecent.payment_cap ?? null
-    const paidCount   = seriesBills.length
-    const cappedOut   = paymentCap !== null && paidCount >= paymentCap
-
-    // Build progress string for capped series
-    if (paymentCap !== null) {
-      const suffix = cappedOut ? ' (complete)' : ''
-      progressBySeriesKey.set(key, `${paidCount} / ${paymentCap} payments${suffix}`)
-    }
-
-    if (cappedOut) continue
-
-    const hasCurrentPeriodBill = seriesBills.some(
-      (b) => b.month === currentMonth && b.year === currentYear,
-    )
-    if (hasCurrentPeriodBill) continue
-
-    // Determine urgency
-    const daysToReminder = reminderDay - todayDay
-    let urgency: 'yellow' | 'red' | null = null
-    if (daysToReminder <= 0) {
-      urgency = 'red'
-    } else if (daysToReminder <= YELLOW_LEAD) {
-      urgency = 'yellow'
-    }
-    if (!urgency) continue
-
-    const typeLabel = BILL_TYPE_LABELS[mostRecent.bill_type] ?? mostRecent.bill_type
-    const label     = mostRecent.description ? `${typeLabel} — ${mostRecent.description}` : typeLabel
-    const pluralDays = daysToReminder === 1 ? 'day' : 'days'
-    const message   = urgency === 'red'
-      ? `Reminder day (${reminderDay}) has passed — log ${currentMonthLabel} bill`
-      : `Due in ${daysToReminder} ${pluralDays} — log ${currentMonthLabel} bill`
-
-    alerts.push({ key, label, reminderDay, paymentCap, paidCount, urgency, message })
-  }
-
-  const noCurrentPeriodBills =
-    bills.length > 0 &&
-    !bills.some((b) => b.month === currentMonth && b.year === currentYear)
-
-  // Expand progress strings to per-bill-id for O(1) row lookup
-  const progressByBillId = new Map<string, string>()
-  for (const b of bills) {
-    const prog = progressBySeriesKey.get(makeSeriesKey(b.bill_type, b.description))
-    if (prog) progressByBillId.set(b.id, prog)
-  }
-
-  return { alerts, progressByBillId, noCurrentPeriodBills }
 }
 
 export function BillTable() {
