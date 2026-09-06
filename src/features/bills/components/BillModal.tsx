@@ -10,9 +10,34 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
+import { nowPH } from '@/lib/utils'
 import type { Bill, BillInput, BillType, BillPaymentMethod } from '../types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function generatePeriodOptions(billMonth?: number, billYear?: number): { value: string; label: string }[] {
+  const now = nowPH()
+  const options: { value: string; label: string }[] = []
+  for (let offset = -6; offset <= 3; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    const m = d.getMonth() + 1
+    const y = d.getFullYear()
+    options.push({ value: `${y}-${m}`, label: `${MONTHS[m - 1]} ${y}` })
+  }
+  // Ensure the bill's existing period is always present even if outside the window
+  if (billMonth !== undefined && billYear !== undefined) {
+    const key = `${billYear}-${billMonth}`
+    if (!options.some((o) => o.value === key)) {
+      options.unshift({ value: key, label: `${MONTHS[billMonth - 1]} ${billYear}` })
+    }
+  }
+  return options
+}
 
 const CATEGORIES: { value: BillType; label: string }[] = [
   { value: 'electricity', label: 'Electricity' },
@@ -36,6 +61,7 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 const billSchema = z.object({
   bill_type: z.string().min(1, 'Select a category'),
+  period:    z.string().min(1, 'Select a period'),
   amount:    z.number({ message: 'Enter a valid amount' }).min(0.01, 'Amount is required'),
   due_date:       z.string().nullable(),
   date_paid:      z.string().nullable(),
@@ -51,8 +77,6 @@ interface BillModalProps {
   isOpen: boolean
   onClose: () => void
   bill: Bill | null
-  month: number
-  year: number
   onAdd: (input: BillInput, billFile?: File, paymentFile?: File) => Promise<void>
   onUpdate: (id: string, input: Partial<BillInput>, billFile?: File, paymentFile?: File) => Promise<void>
 }
@@ -131,7 +155,7 @@ function AttachRow({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate }: BillModalProps) {
+export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalProps) {
   const { toast } = useToast()
 
   const billFileRef     = useRef<HTMLInputElement>(null)
@@ -141,6 +165,9 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
   const [paymentFile,         setPaymentFile]         = useState<File | null>(null)
   const [keepBillReceipt,     setKeepBillReceipt]     = useState(true)
   const [keepPaymentReceipt,  setKeepPaymentReceipt]  = useState(true)
+
+  const now = nowPH()
+  const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`
 
   const {
     register,
@@ -152,12 +179,15 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
     formState: { errors, isSubmitting },
   } = useForm<BillSchema>({
     resolver: zodResolver(billSchema),
-    defaultValues: { bill_type: '', amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' },
+    defaultValues: { bill_type: '', period: defaultPeriod, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' },
   })
 
   const dueDate       = watch('due_date')
   const datePaid      = watch('date_paid')
   const paymentMethod = watch('payment_method')
+  const period        = watch('period')
+
+  const periodOptions = generatePeriodOptions(bill?.month, bill?.year)
 
   useEffect(() => {
     if (!isOpen) return
@@ -165,9 +195,12 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
     setPaymentFile(null)
     setKeepBillReceipt(true)
     setKeepPaymentReceipt(true)
+    const freshNow = nowPH()
+    const freshDefault = `${freshNow.getFullYear()}-${freshNow.getMonth() + 1}`
     if (bill) {
       reset({
         bill_type:      bill.bill_type,
+        period:         `${bill.year}-${bill.month}`,
         amount:         bill.amount,
         due_date:       bill.due_date ?? '',
         date_paid:      bill.date_paid ?? '',
@@ -175,7 +208,7 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
         description:    bill.description ?? '',
       })
     } else {
-      reset({ bill_type: '', amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' })
+      reset({ bill_type: '', period: freshDefault, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '' })
     }
   }, [bill, isOpen, reset])
 
@@ -189,11 +222,15 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
 
   const onSubmit = handleSubmit(async (values) => {
     try {
+      const [yearStr, monthStr] = values.period.split('-')
+      const selectedYear  = parseInt(yearStr, 10)
+      const selectedMonth = parseInt(monthStr, 10)
+
       const input: BillInput = {
         bill_type:      values.bill_type as BillType,
         amount:         values.amount,
-        month,
-        year,
+        month:          selectedMonth,
+        year:           selectedYear,
         due_date:       values.due_date || null,
         date_paid:      values.date_paid || null,
         payment_method: (values.payment_method as BillPaymentMethod) || null,
@@ -226,16 +263,32 @@ export function BillModal({ isOpen, onClose, bill, month, year, onAdd, onUpdate 
     <Modal isOpen={isOpen} onClose={onClose} title={bill ? 'Edit Bill' : 'Add Bill'} size="sm">
       <form onSubmit={onSubmit} className="space-y-4">
 
-        {/* ── Category ─────────────────────────────────────────────────── */}
-        <div className="space-y-1.5">
-          <Label htmlFor="bill-category">Category <span className="text-destructive">*</span></Label>
-          <select id="bill-category" {...register('bill_type')} className={selectClass}>
-            <option value="" disabled>— Select —</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-          {errors.bill_type && <p className="text-xs text-destructive">{errors.bill_type.message}</p>}
+        {/* ── Category + Period ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="bill-category">Category <span className="text-destructive">*</span></Label>
+            <select id="bill-category" {...register('bill_type')} className={selectClass}>
+              <option value="" disabled>— Select —</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            {errors.bill_type && <p className="text-xs text-destructive">{errors.bill_type.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="bill-period">Period <span className="text-destructive">*</span></Label>
+            <select
+              id="bill-period"
+              value={period ?? ''}
+              onChange={(e) => setValue('period', e.target.value, { shouldValidate: true })}
+              className={selectClass}
+            >
+              {periodOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {errors.period && <p className="text-xs text-destructive">{errors.period.message}</p>}
+          </div>
         </div>
 
         {/* ── Due Date + Date Paid ─────────────────────────────────────── */}

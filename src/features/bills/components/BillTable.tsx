@@ -7,7 +7,7 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { formatCurrency, formatDate, nowPH } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
@@ -70,10 +70,6 @@ export function BillTable() {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
   const { data, isLoading, error, addBill, updateBill, deleteBill, payBill } = useBills()
-
-  const now = nowPH()
-  const currentMonth = now.getMonth() + 1
-  const currentYear  = now.getFullYear()
 
   const [editingBill,  setEditingBill]  = useState<Bill | null>(null)
   const [isFormOpen,   setIsFormOpen]   = useState(false)
@@ -228,8 +224,6 @@ export function BillTable() {
         isOpen={isFormOpen}
         onClose={() => { setIsFormOpen(false); setEditingBill(null) }}
         bill={editingBill}
-        month={editingBill?.month ?? currentMonth}
-        year={editingBill?.year ?? currentYear}
         onAdd={addBill}
         onUpdate={updateBill}
       />
