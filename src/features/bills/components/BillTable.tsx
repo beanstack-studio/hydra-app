@@ -123,20 +123,20 @@ export function BillTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className={thClass}>Type</th>
+                <th className={cn(thClass, 'w-full')}>Type</th>
                 <th className={thClass}>Due Date</th>
                 <th className={thClass}>Status</th>
                 <th className={thClass}>Date Paid</th>
                 <th className={thClass}>Via</th>
-                <th className={thClass}>Amount</th>
-                <th className={thClass}></th>
+                <th className={cn(thClass, 'w-px')}>Amount</th>
+                <th className={cn(thClass, 'w-24')}></th>
               </tr>
             </thead>
             {groups.map(({ key, label, bills, total }, groupIdx) => (
               <tbody key={key}>
                 {/* Month group header row */}
                 <tr className={cn(groupIdx > 0 && 'border-t-2 border-border')}>
-                  <td colSpan={7} className="px-3 py-2 bg-muted/20">
+                  <td colSpan={7} className="px-4 py-3 bg-muted/50 border-b border-border">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold text-foreground">{label}</span>
                       <span className="text-xs text-muted-foreground">{formatCurrency(total)}</span>
@@ -156,7 +156,7 @@ export function BillTable() {
                     <td className={tdClass}>
                       <span className="font-medium">{BILL_TYPE_LABELS[bill.bill_type] ?? bill.bill_type}</span>
                       {bill.description && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[160px]">{bill.description}</p>
+                        <p className="text-xs text-muted-foreground truncate">{bill.description}</p>
                       )}
                     </td>
                     <td className={tdClass}>
