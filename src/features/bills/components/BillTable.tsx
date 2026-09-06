@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Plus, Trash2, CreditCard } from 'lucide-react'
+import { FileText, Plus, Trash2, CreditCard, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/shared/Modal'
@@ -7,7 +7,7 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { BillModal } from './BillModal'
 import { PayBillModal } from './PayBillModal'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, nowPH } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
@@ -67,6 +67,109 @@ function groupBillsByMonth(bills: Bill[]): BillGroup[] {
   return Array.from(map.values())
 }
 
+// ── Recurring alert helpers ────────────────────────────────────────────────────
+
+interface RecurringSeriesInfo {
+  key: string
+  label: string
+  reminderDay: number
+  paymentCap: number | null
+  paidCount: number
+  urgency: 'yellow' | 'red'
+  message: string
+}
+
+function makeSeriesKey(billType: string, description: string | null): string {
+  return `${billType}::${description ?? ''}`
+}
+
+function computeRecurringState(
+  bills: Bill[],
+  todayPH: Date,
+): {
+  alerts: RecurringSeriesInfo[]
+  progressByBillId: Map<string, string>
+  noCurrentPeriodBills: boolean
+} {
+  const currentMonth = todayPH.getMonth() + 1
+  const currentYear  = todayPH.getFullYear()
+  const todayDay     = todayPH.getDate()
+  const YELLOW_LEAD  = 5
+  const currentMonthLabel = `${MONTHS[todayPH.getMonth()]} ${currentYear}`
+
+  // Group all bills by (bill_type, description)
+  const seriesMap = new Map<string, Bill[]>()
+  for (const b of bills) {
+    const key = makeSeriesKey(b.bill_type, b.description)
+    const existing = seriesMap.get(key)
+    if (existing) { existing.push(b) } else { seriesMap.set(key, [b]) }
+  }
+
+  const alerts: RecurringSeriesInfo[] = []
+  const progressBySeriesKey = new Map<string, string>()
+
+  for (const [key, seriesBills] of seriesMap) {
+    // Series is only "active recurring" if at least one bill has is_recurring = true
+    const hasRecurringFlag = seriesBills.some((b) => b.is_recurring)
+    if (!hasRecurringFlag) continue
+
+    // Source of truth = most recent bill with is_recurring = true
+    const mostRecent = [...seriesBills]
+      .filter((b) => b.is_recurring)
+      .sort((a, b2) => b2.year !== a.year ? b2.year - a.year : b2.month - a.month)[0]
+
+    const reminderDay = mostRecent.reminder_day ?? 1
+    const paymentCap  = mostRecent.payment_cap ?? null
+    const paidCount   = seriesBills.length
+    const cappedOut   = paymentCap !== null && paidCount >= paymentCap
+
+    // Build progress string for capped series
+    if (paymentCap !== null) {
+      const suffix = cappedOut ? ' (complete)' : ''
+      progressBySeriesKey.set(key, `${paidCount} / ${paymentCap} payments${suffix}`)
+    }
+
+    if (cappedOut) continue
+
+    const hasCurrentPeriodBill = seriesBills.some(
+      (b) => b.month === currentMonth && b.year === currentYear,
+    )
+    if (hasCurrentPeriodBill) continue
+
+    // Determine urgency
+    const daysToReminder = reminderDay - todayDay
+    let urgency: 'yellow' | 'red' | null = null
+    if (daysToReminder <= 0) {
+      urgency = 'red'
+    } else if (daysToReminder <= YELLOW_LEAD) {
+      urgency = 'yellow'
+    }
+    if (!urgency) continue
+
+    const typeLabel = BILL_TYPE_LABELS[mostRecent.bill_type] ?? mostRecent.bill_type
+    const label     = mostRecent.description ? `${typeLabel} — ${mostRecent.description}` : typeLabel
+    const pluralDays = daysToReminder === 1 ? 'day' : 'days'
+    const message   = urgency === 'red'
+      ? `Reminder day (${reminderDay}) has passed — log ${currentMonthLabel} bill`
+      : `Due in ${daysToReminder} ${pluralDays} — log ${currentMonthLabel} bill`
+
+    alerts.push({ key, label, reminderDay, paymentCap, paidCount, urgency, message })
+  }
+
+  const noCurrentPeriodBills =
+    bills.length > 0 &&
+    !bills.some((b) => b.month === currentMonth && b.year === currentYear)
+
+  // Expand progress strings to per-bill-id for O(1) row lookup
+  const progressByBillId = new Map<string, string>()
+  for (const b of bills) {
+    const prog = progressBySeriesKey.get(makeSeriesKey(b.bill_type, b.description))
+    if (prog) progressByBillId.set(b.id, prog)
+  }
+
+  return { alerts, progressByBillId, noCurrentPeriodBills }
+}
+
 export function BillTable() {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
@@ -79,6 +182,11 @@ export function BillTable() {
   const [payingBill,   setPayingBill]   = useState<Bill | null>(null)
 
   const groups = groupBillsByMonth(data)
+
+  const today = nowPH()
+  const currentMonthLabel = `${MONTHS[today.getMonth()]} ${today.getFullYear()}`
+  const { alerts, progressByBillId, noCurrentPeriodBills } = computeRecurringState(data, today)
+  const hasAlerts = alerts.length > 0 || noCurrentPeriodBills
 
   const handleDelete = async () => {
     if (!deletingBill) return
@@ -102,6 +210,48 @@ export function BillTable() {
   return (
     <div className="space-y-4 w-full">
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {/* ── Recurring bill reminders ─────────────────────────────────── */}
+      {hasAlerts && (
+        <div className="space-y-2">
+          {noCurrentPeriodBills && (
+            <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/50 px-4 py-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No bills logged for{' '}
+                <span className="font-medium text-foreground">{currentMonthLabel}</span> yet.
+              </p>
+            </div>
+          )}
+          {alerts.map((alert) => (
+            <div
+              key={alert.key}
+              className={cn(
+                'flex items-start gap-2.5 rounded-lg border px-4 py-3',
+                alert.urgency === 'red'
+                  ? 'border-red-400/40 bg-red-500/10'
+                  : 'border-yellow-400/40 bg-yellow-400/10',
+              )}
+            >
+              <AlertTriangle className={cn(
+                'h-4 w-4 shrink-0 mt-0.5',
+                alert.urgency === 'red' ? 'text-red-500' : 'text-yellow-500',
+              )} />
+              <div>
+                <p className={cn(
+                  'text-sm font-medium',
+                  alert.urgency === 'red'
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-yellow-700 dark:text-yellow-500',
+                )}>
+                  {alert.label}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add button */}
       {isOwner && (
@@ -168,6 +318,9 @@ export function BillTable() {
                       <span className="font-medium">{BILL_TYPE_LABELS[bill.bill_type] ?? bill.bill_type}</span>
                       {bill.description && (
                         <p className="text-xs text-muted-foreground truncate">{bill.description}</p>
+                      )}
+                      {progressByBillId.get(bill.id) && (
+                        <p className="text-xs text-muted-foreground">{progressByBillId.get(bill.id)}</p>
                       )}
                     </td>
                     <td className={tdClass}>
