@@ -146,10 +146,10 @@ export function BillTable() {
                 {/* Month group header row */}
                 <tr className={cn(groupIdx > 0 && 'border-t-2 border-border')}>
                   <td colSpan={5} className="px-4 py-3 bg-muted/50 border-b border-border">
-                    <span className="text-sm font-semibold text-foreground">{label}</span>
+                    <span className="text-sm font-semibold text-primary">{label}</span>
                   </td>
                   <td className="px-3 py-3 bg-muted/50 border-b border-border">
-                    <span className="text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(total)}</span>
+                    <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(total)}</span>
                   </td>
                   <td className="bg-muted/50 border-b border-border" />
                 </tr>
