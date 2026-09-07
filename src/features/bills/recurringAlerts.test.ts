@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeRecurringState, isCurrentMonthDue } from './recurringAlerts'
+import { computeRecurringState, computeUnpaidDueAlerts, isCurrentMonthDue } from './recurringAlerts'
 import type { Bill, BillType, RecurrenceCadence } from './types'
 
 // ── Test helper ───────────────────────────────────────────────────────────────
@@ -15,6 +15,9 @@ function makeBill(overrides: {
   recurrence_interval_months?: number | null
   reminder_day?: number | null
   payment_cap?: number | null
+  due_date?: string | null
+  date_paid?: string | null
+  amount?: number
 }): Bill {
   return {
     station_id:               'station-1',
@@ -310,5 +313,187 @@ describe('noCurrentPeriodBills', () => {
     const today = new Date(2026, 1, 5)
     const { noCurrentPeriodBills } = computeRecurringState([], today)
     expect(noCurrentPeriodBills).toBe(false)
+  })
+})
+
+// ── computeUnpaidDueAlerts ────────────────────────────────────────────────────
+// Independent of recurring cadence — triggered solely by due_date + unpaid status.
+// Yellow window: 1–5 calendar days before due date.
+// Red: due date is today (daysUntilDue = 0) or has already passed.
+
+describe('computeUnpaidDueAlerts — yellow zone (1–5 days before due)', () => {
+  it('yellow when due date is exactly 5 days away (boundary)', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 11)  // Sep 11 → 5 days before Sep 16
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('yellow')
+    expect(alerts[0].label).toBe('Electricity')
+    expect(alerts[0].id).toBe('e1')
+    expect(alerts[0].amount).toBe(500)
+    expect(alerts[0].dueDate).toBe('2026-09-16')
+  })
+
+  it('yellow when due date is 4 days away', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 12)  // Sep 12 → 4 days before Sep 16
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('yellow')
+  })
+
+  it('yellow when due date is 1 day away (boundary)', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 15)  // Sep 15 → 1 day before Sep 16
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('yellow')
+  })
+
+  it('includes description in label for bills with description', () => {
+    const bill = makeBill({
+      id: 'b1', bill_type: 'bank', month: 9, year: 2026,
+      description: 'Car Loan', due_date: '2026-09-16',
+    })
+    const today = new Date(2026, 8, 12)  // Sep 12 → within window
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].label).toBe('Bank — Car Loan')
+  })
+})
+
+describe('computeUnpaidDueAlerts — red zone (today or overdue)', () => {
+  it('red when due date is today (daysUntilDue = 0)', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 16)  // Sep 16 — exact due date
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('red')
+  })
+
+  it('red when due date passed yesterday', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 17)  // Sep 17 — one day late
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('red')
+  })
+
+  it('red when due date passed weeks ago', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-01' })
+    const today = new Date(2026, 8, 20)  // Sep 20 — 19 days overdue
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('red')
+  })
+})
+
+describe('computeUnpaidDueAlerts — skip conditions', () => {
+  it('skips bill with no due_date set', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026 })
+    // due_date defaults to null
+    const today = new Date(2026, 8, 20)
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(0)
+  })
+
+  it('skips bill that is already paid (date_paid set)', () => {
+    const bill = makeBill({
+      id: 'e1', bill_type: 'electricity', month: 9, year: 2026,
+      due_date: '2026-09-16', date_paid: '2026-09-10',
+    })
+    const today = new Date(2026, 8, 20)  // Sep 20 — past due, but already paid
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(0)
+  })
+
+  it('skips bill whose due date is 6 days away (outside window)', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-16' })
+    const today = new Date(2026, 8, 10)  // Sep 10 → 6 days before Sep 16
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(0)
+  })
+
+  it('skips bill whose due date is far in the future', () => {
+    const bill = makeBill({ id: 'e1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-12-31' })
+    const today = new Date(2026, 8, 7)   // Sep 7 — months away
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(0)
+  })
+})
+
+describe('computeUnpaidDueAlerts — independent of recurring cadence', () => {
+  it('alerts on a non-recurring bill with a due date in window', () => {
+    // One-off bill (is_recurring = false) should still alert on due_date
+    const bill = makeBill({
+      id: 'r1', bill_type: 'rent', month: 9, year: 2026,
+      is_recurring: false, due_date: '2026-09-16',
+    })
+    const today = new Date(2026, 8, 12)  // Sep 12 → 4 days before
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('yellow')
+  })
+
+  it('alerts on a recurring bill whose cadence is not currently due but has unpaid due_date', () => {
+    // Quarterly bill — current month is NOT a scheduled due month.
+    // But the logged bill itself is unpaid and overdue → should still alert.
+    const bill = makeBill({
+      id: 'q1', bill_type: 'water', month: 9, year: 2026,
+      is_recurring: true, recurrence_cadence: 'quarterly',
+      due_date: '2026-09-05',
+    })
+    const today = new Date(2026, 8, 20)  // Sep 20 — 15 days past due
+    const alerts = computeUnpaidDueAlerts([bill], today)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].urgency).toBe('red')
+  })
+})
+
+describe('computeUnpaidDueAlerts — multiple bills', () => {
+  it('returns one alert per qualifying unpaid bill, mixed urgency', () => {
+    const bills = [
+      // Red: already past due
+      makeBill({ id: 'b1', bill_type: 'electricity', month: 9, year: 2026, due_date: '2026-09-01', amount: 1200 }),
+      // Yellow: 3 days away
+      makeBill({ id: 'b2', bill_type: 'water',       month: 9, year: 2026, due_date: '2026-09-10', amount: 300 }),
+      // Skip: no due date
+      makeBill({ id: 'b3', bill_type: 'internet',    month: 9, year: 2026 }),
+      // Skip: paid
+      makeBill({ id: 'b4', bill_type: 'rent',        month: 9, year: 2026, due_date: '2026-09-01', date_paid: '2026-09-01' }),
+      // Skip: 10 days away
+      makeBill({ id: 'b5', bill_type: 'other',       month: 9, year: 2026, due_date: '2026-09-17' }),
+    ]
+    const today = new Date(2026, 8, 7)   // Sep 7
+
+    const alerts = computeUnpaidDueAlerts(bills, today)
+    expect(alerts).toHaveLength(2)
+
+    const red = alerts.find((a) => a.id === 'b1')
+    expect(red?.urgency).toBe('red')
+    expect(red?.amount).toBe(1200)
+
+    const yellow = alerts.find((a) => a.id === 'b2')
+    expect(yellow?.urgency).toBe('yellow')
+    expect(yellow?.amount).toBe(300)
+  })
+})
+
+describe('computeRecurringState — unpaidDueAlerts included in return', () => {
+  it('returns unpaidDueAlerts alongside recurring alerts', () => {
+    const recurringBill = makeBill({
+      id: 'rec', bill_type: 'electricity', month: 8, year: 2026,
+      is_recurring: true, recurrence_cadence: 'monthly', reminder_day: 15,
+    })
+    const unpaidBill = makeBill({
+      id: 'unp', bill_type: 'water', month: 9, year: 2026,
+      due_date: '2026-09-10',  // 3 days away → yellow
+    })
+    const today = new Date(2026, 8, 7)   // Sep 7: 8 days before reminder_day 15 → no recurring alert yet
+    const { alerts, unpaidDueAlerts } = computeRecurringState([recurringBill, unpaidBill], today)
+    expect(alerts).toHaveLength(0)        // recurring: 8 days out, no alert
+    expect(unpaidDueAlerts).toHaveLength(1)
+    expect(unpaidDueAlerts[0].id).toBe('unp')
+    expect(unpaidDueAlerts[0].urgency).toBe('yellow')
   })
 })

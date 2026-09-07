@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
 import { MONTHS, BILL_TYPE_LABELS, makeSeriesKey, computeRecurringState } from '../recurringAlerts'
-import type { RecurringSeriesInfo } from '../recurringAlerts'
+import type { RecurringSeriesInfo, UnpaidDueAlert } from '../recurringAlerts'
 import type { BillPrefill } from './BillModal'
 import type { Bill } from '../types'
 
@@ -71,8 +71,8 @@ export function BillTable() {
 
   const today = nowPH()
   const currentMonthLabel = `${MONTHS[today.getMonth()]} ${today.getFullYear()}`
-  const { alerts, progressByBillId, noCurrentPeriodBills } = computeRecurringState(data, today)
-  const hasAlerts = alerts.length > 0 || noCurrentPeriodBills
+  const { alerts, progressByBillId, noCurrentPeriodBills, unpaidDueAlerts } = computeRecurringState(data, today)
+  const hasAlerts = alerts.length > 0 || noCurrentPeriodBills || unpaidDueAlerts.length > 0
 
   const handleDelete = async () => {
     if (!deletingBill) return
@@ -169,6 +169,40 @@ export function BillTable() {
                   Log bill
                 </Button>
               )}
+            </div>
+          ))}
+
+          {/* ── Unpaid due-date alerts ─────────────────────────────────────
+              Distinct from "log this" banners above — these mean "pay this."
+              Triggered solely by due_date + unpaid status, independent of
+              recurring cadence. */}
+          {unpaidDueAlerts.map((alert: UnpaidDueAlert) => (
+            <div
+              key={`unpaid-due-${alert.id}`}
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg border px-4 py-3',
+                alert.urgency === 'red'
+                  ? 'border-red-400/40 bg-red-500/10'
+                  : 'border-yellow-400/40 bg-yellow-400/10',
+              )}
+            >
+              <AlertTriangle className={cn(
+                'h-4 w-4 shrink-0',
+                alert.urgency === 'red' ? 'text-red-500' : 'text-yellow-500',
+              )} />
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  'text-sm font-medium',
+                  alert.urgency === 'red'
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-yellow-700 dark:text-yellow-500',
+                )}>
+                  {alert.label}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatCurrency(alert.amount)} due {formatDate(alert.dueDate)}, still unpaid
+                </p>
+              </div>
             </div>
           ))}
         </div>

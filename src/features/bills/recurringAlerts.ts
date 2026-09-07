@@ -65,6 +65,77 @@ export interface RecurringSeriesInfo {
   recurrence_interval_months: number | null
 }
 
+/**
+ * A distinct alert type for bills that exist, are unpaid, and have a
+ * due_date approaching or already passed. Independent of recurring cadence —
+ * triggered solely by due_date + payment status.
+ *
+ * Urgency mirrors the recurring-alert convention (YELLOW_LEAD = 5 days):
+ *   yellow – due date is 1–5 calendar days away
+ *   red    – due date is today or already passed (daysUntilDue ≤ 0)
+ */
+export interface UnpaidDueAlert {
+  id: string
+  label: string   // "Electricity" or "Electricity — Description"
+  amount: number
+  dueDate: string // raw date string from DB, e.g. "2026-09-16"
+  urgency: 'yellow' | 'red'
+}
+
+/**
+ * Scans all bills for unpaid entries with a due_date within the alert
+ * window. Completely independent of recurring-cadence logic — any bill
+ * (recurring or not) that is unpaid and has a due_date qualifies.
+ *
+ * Skips bills with no due_date (never assume a deadline that wasn't set).
+ * Skips bills with date_paid set.
+ */
+export function computeUnpaidDueAlerts(
+  bills: Bill[],
+  todayPH: Date,
+): UnpaidDueAlert[] {
+  const YELLOW_LEAD = 5
+  const todayNorm = new Date(
+    todayPH.getFullYear(),
+    todayPH.getMonth(),
+    todayPH.getDate(),
+  )
+  const results: UnpaidDueAlert[] = []
+
+  for (const bill of bills) {
+    if (bill.date_paid) continue  // already paid
+    if (!bill.due_date) continue  // no due date set — skip entirely
+
+    const dueParts = bill.due_date.split('-')
+    if (dueParts.length < 3) continue
+    const dueNorm = new Date(
+      Number(dueParts[0]),
+      Number(dueParts[1]) - 1,
+      Number(dueParts[2]),
+    )
+    const daysUntilDue = Math.round(
+      (dueNorm.getTime() - todayNorm.getTime()) / 86_400_000,
+    )
+
+    let urgency: 'yellow' | 'red' | null = null
+    if (daysUntilDue <= 0) {
+      urgency = 'red'    // today or overdue
+    } else if (daysUntilDue <= YELLOW_LEAD) {
+      urgency = 'yellow' // 1–5 days out
+    }
+    if (!urgency) continue
+
+    const typeLabel = BILL_TYPE_LABELS[bill.bill_type] ?? bill.bill_type
+    const label = bill.description
+      ? `${typeLabel} — ${bill.description}`
+      : typeLabel
+
+    results.push({ id: bill.id, label, amount: bill.amount, dueDate: bill.due_date, urgency })
+  }
+
+  return results
+}
+
 export function computeRecurringState(
   bills: Bill[],
   todayPH: Date,
@@ -72,6 +143,7 @@ export function computeRecurringState(
   alerts: RecurringSeriesInfo[]
   progressByBillId: Map<string, string>
   noCurrentPeriodBills: boolean
+  unpaidDueAlerts: UnpaidDueAlert[]
 } {
   const currentMonth      = todayPH.getMonth() + 1
   const currentYear       = todayPH.getFullYear()
@@ -171,5 +243,9 @@ export function computeRecurringState(
     if (prog) progressByBillId.set(b.id, prog)
   }
 
-  return { alerts, progressByBillId, noCurrentPeriodBills }
+  // Unpaid due-date alerts are a separate, independent check — not part of
+  // recurring-cadence logic. Computed here so callers get everything in one call.
+  const unpaidDueAlerts = computeUnpaidDueAlerts(bills, todayPH)
+
+  return { alerts, progressByBillId, noCurrentPeriodBills, unpaidDueAlerts }
 }
