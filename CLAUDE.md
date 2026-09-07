@@ -497,6 +497,25 @@ Full scheduling + pay computation for staff members.
 
 ---
 
+## ⚠️ DATABASE WRITE SAFETY — TEST STATION ONLY ⚠️
+
+Any SQL that inserts, updates, or deletes data for the purpose of
+testing or verification must **only ever target the Test Station**:
+
+- **Test Station** `d32dce16-e4aa-4893-a9c5-4a35042b8bbc` — safe for test writes
+- **MD Cool Bliss** `c378be27-9b45-4464-b8ef-61cc0fbb8bee` — real customer, **never write test data here**
+- Any other station not listed above — treat as a real customer, **never write test data**
+
+This rule is absolute. "Temporarily" and "cleaned up afterward" are not exceptions.
+Real customer data must never be touched for any testing or verification purpose.
+
+**Before running any SQL that writes to the database:**
+1. State explicitly which `station_id` the query targets
+2. Confirm it is `d32dce16-e4aa-4893-a9c5-4a35042b8bbc` (Test Station) — not just that the query itself is approved
+3. If it is not the Test Station, do not run it
+
+---
+
 ## ⚠️ PRE-IMPLEMENTATION SCAN — MANDATORY BEFORE EVERY SINGLE TASK ⚠️
 
 **BEFORE WRITING A SINGLE LINE OF CODE, SCAN THE ENTIRE CODEBASE FOR:**
