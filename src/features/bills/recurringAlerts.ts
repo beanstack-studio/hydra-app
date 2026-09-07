@@ -1,3 +1,4 @@
+import { ordinal } from '@/lib/utils'
 import type { Bill, BillType, RecurrenceCadence } from './types'
 
 export const MONTHS = [
@@ -147,7 +148,7 @@ export function computeRecurringState(
       : typeLabel
     const pluralDays = daysToReminder === 1 ? 'day' : 'days'
     const message    = urgency === 'red'
-      ? `Reminder day (${reminderDay}) has passed — log ${currentMonthLabel} bill`
+      ? `Reminder day (the ${ordinal(reminderDay)}) has passed — log ${currentMonthLabel} bill`
       : `Due in ${daysToReminder} ${pluralDays} — log ${currentMonthLabel} bill`
 
     alerts.push({

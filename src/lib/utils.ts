@@ -105,3 +105,17 @@ export const toTitleCase = (str: string): string =>
       ? word
       : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   )
+
+// Returns the English ordinal string for a positive integer.
+// 1 → "1st", 2 → "2nd", 3 → "3rd", 11–13 → "11th"/"12th"/"13th", etc.
+export const ordinal = (n: number): string => {
+  const mod100 = n % 100
+  const mod10  = n % 10
+  const suffix =
+    mod100 >= 11 && mod100 <= 13 ? 'th'
+    : mod10  === 1               ? 'st'
+    : mod10  === 2               ? 'nd'
+    : mod10  === 3               ? 'rd'
+    :                              'th'
+  return `${n}${suffix}`
+}
