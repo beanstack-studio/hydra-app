@@ -15,6 +15,8 @@ import { TeamSettings } from '@/features/settings/components/TeamSettings'
 import { MaintenanceTable } from '@/features/maintenance/components/MaintenanceTable'
 import { BackwashCard } from '@/features/maintenance/components/BackwashCard'
 import { FilterReplacementCard } from '@/features/maintenance/components/FilterReplacementCard'
+import { BacteriologicalTestCard } from '@/features/maintenance/components/BacteriologicalTestCard'
+import { PhysicalChemicalTestCard } from '@/features/maintenance/components/PhysicalChemicalTestCard'
 import { PlanSettings } from '@/features/settings/components/PlanSettings'
 import { AccountSettings } from '@/features/settings/components/AccountSettings'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +24,8 @@ import { cn } from '@/lib/utils'
 import { UpgradeWall } from '@/components/shared/UpgradeWall'
 import { useBackwashStore } from '@/stores/backwashStore'
 import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
+import { useBacteriologicalTestStore } from '@/stores/bacteriologicalTestStore'
+import { usePhysicalChemicalTestStore } from '@/stores/physicalChemicalTestStore'
 
 type Section = 'business' | 'products' | 'maintenance' | 'team' | 'plan' | 'account'
 
@@ -158,10 +162,11 @@ export default function SettingsPage() {
         if (isFree) return <UpgradeWall title="Maintenance" feature="Maintenance" showTitle={false} />
         return (
           <div className="space-y-8">
-            {/* Grid: single column on mobile, 2-column on lg+ (ready for a second card) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <BackwashCard />
               <FilterReplacementCard />
+              <BacteriologicalTestCard />
+              <PhysicalChemicalTestCard />
             </div>
             <div>
               <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
@@ -210,18 +215,27 @@ export default function SettingsPage() {
     const SECTION_FREE_LOCKED = new Set(['maintenance', 'team'])
     const isLocked = isFree && SECTION_FREE_LOCKED.has(section.id)
 
-    // Maintenance badge — shown when backwash or filter replacement needs attention
+    // Maintenance badge — shown when any configured tracker needs attention
     const backwashZone        = useBackwashStore((s) => s.zone)
     const backwashLoaded      = useBackwashStore((s) => s.isLoaded)
     const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
     const filterZone          = useFilterReplacementStore((s) => s.zone)
     const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
+    const bacteZone           = useBacteriologicalTestStore((s) => s.zone)
+    const bacteConfigured     = useBacteriologicalTestStore((s) => s.isConfigured)
+    const physChemZone        = usePhysicalChemicalTestStore((s) => s.zone)
+    const physChemConfigured  = usePhysicalChemicalTestStore((s) => s.isConfigured)
     const showMaintenanceBadge = section.id === 'maintenance' && !isLocked && (
       (backwashLoaded && backwashConfigured && backwashZone !== 'green') ||
-      (filterConfigured && filterZone !== 'green')
+      (filterConfigured  && filterZone   !== 'green') ||
+      (bacteConfigured   && bacteZone    !== 'green') ||
+      (physChemConfigured && physChemZone !== 'green')
     )
     const maintenanceBadgeClass =
-      (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
+      (backwashConfigured && backwashZone === 'red') ||
+      (filterConfigured   && filterZone   === 'red') ||
+      (bacteConfigured    && bacteZone    === 'red') ||
+      (physChemConfigured && physChemZone === 'red')
         ? 'bg-red-500'
         : 'bg-yellow-400'
 

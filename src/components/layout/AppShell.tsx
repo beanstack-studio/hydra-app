@@ -6,12 +6,18 @@ import { BottomNav } from './BottomNav'
 import { ReminderModal } from '@/components/shared/ReminderModal'
 import { BackwashAlertModal } from '@/components/shared/BackwashAlertModal'
 import { FilterReplacementAlertModal } from '@/components/shared/FilterReplacementAlertModal'
+import { BacteriologicalTestAlertModal } from '@/components/shared/BacteriologicalTestAlertModal'
+import { PhysicalChemicalTestAlertModal } from '@/components/shared/PhysicalChemicalTestAlertModal'
 import { startReminderPolling, stopReminderPolling } from '@/lib/reminders'
 import { useBackwashTracker } from '@/features/maintenance/hooks/useBackwashTracker'
 import { useFilterReplacement } from '@/features/maintenance/hooks/useFilterReplacement'
+import { useBacteriologicalTest } from '@/features/maintenance/hooks/useBacteriologicalTest'
+import { usePhysicalChemicalTest } from '@/features/maintenance/hooks/usePhysicalChemicalTest'
 import { useBillsBadge } from '@/features/bills/hooks/useBillsBadge'
 import { useBackwashStore } from '@/stores/backwashStore'
 import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
+import { useBacteriologicalTestStore } from '@/stores/bacteriologicalTestStore'
+import { usePhysicalChemicalTestStore } from '@/stores/physicalChemicalTestStore'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { cn } from '@/lib/utils'
@@ -27,6 +33,16 @@ function BackwashDataLoader() {
 
 function FilterReplacementDataLoader() {
   useFilterReplacement()
+  return null
+}
+
+function BacteriologicalTestDataLoader() {
+  useBacteriologicalTest()
+  return null
+}
+
+function PhysicalChemicalTestDataLoader() {
+  usePhysicalChemicalTest()
   return null
 }
 
@@ -132,6 +148,8 @@ export function AppShell() {
   const [hasUpdate,               setHasUpdate]               = useState(false)
   const [backwashAlertDismissed,  setBackwashAlertDismissed]  = useState(false)
   const [filterAlertDismissed,    setFilterAlertDismissed]    = useState(false)
+  const [bacteAlertDismissed,     setBacteAlertDismissed]     = useState(false)
+  const [physChemAlertDismissed,  setPhysChemAlertDismissed]  = useState(false)
   const [sidebarCollapsed,        setSidebarCollapsed]        = useState<boolean>(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
@@ -149,12 +167,26 @@ export function AppShell() {
   const backwashRound         = useBackwashStore((s) => s.roundCount)
   const showBackwashAlert     = backwashLoaded && backwashConfigured && backwashZone === 'red' && backwashAlertEnabled && !backwashAlertDismissed
 
-  // Filter replacement alert — same gates; shown after backwash alert is dismissed
+  // Filter replacement alert — shown after backwash alert is dismissed
   const filterLoaded          = useFilterReplacementStore((s) => s.isLoaded)
   const filterConfigured      = useFilterReplacementStore((s) => s.isConfigured)
   const filterZone            = useFilterReplacementStore((s) => s.zone)
   const filterAlertEnabled    = useFilterReplacementStore((s) => s.alertEnabled)
   const showFilterAlert       = !showBackwashAlert && filterLoaded && filterConfigured && filterZone === 'red' && filterAlertEnabled && !filterAlertDismissed
+
+  // Bacteriological test alert — shown after filter alert is dismissed
+  const bacteLoaded           = useBacteriologicalTestStore((s) => s.isLoaded)
+  const bacteConfigured       = useBacteriologicalTestStore((s) => s.isConfigured)
+  const bacteZone             = useBacteriologicalTestStore((s) => s.zone)
+  const bacteAlertEnabled     = useBacteriologicalTestStore((s) => s.alertEnabled)
+  const showBacteAlert        = !showBackwashAlert && !showFilterAlert && bacteLoaded && bacteConfigured && bacteZone === 'red' && bacteAlertEnabled && !bacteAlertDismissed
+
+  // Physical & chemical test alert — shown after bacteriological alert is dismissed
+  const physChemLoaded        = usePhysicalChemicalTestStore((s) => s.isLoaded)
+  const physChemConfigured    = usePhysicalChemicalTestStore((s) => s.isConfigured)
+  const physChemZone          = usePhysicalChemicalTestStore((s) => s.zone)
+  const physChemAlertEnabled  = usePhysicalChemicalTestStore((s) => s.alertEnabled)
+  const showPhysChemAlert     = !showBackwashAlert && !showFilterAlert && !showBacteAlert && physChemLoaded && physChemConfigured && physChemZone === 'red' && physChemAlertEnabled && !physChemAlertDismissed
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
@@ -202,6 +234,8 @@ export function AppShell() {
       {/* Loads maintenance and bills data into global stores on app mount */}
       <BackwashDataLoader />
       <FilterReplacementDataLoader />
+      <BacteriologicalTestDataLoader />
+      <PhysicalChemicalTestDataLoader />
       <BillsBadgeLoader />
 
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
@@ -240,6 +274,16 @@ export function AppShell() {
       {showFilterAlert && (
         <FilterReplacementAlertModal
           onDismiss={() => setFilterAlertDismissed(true)}
+        />
+      )}
+      {showBacteAlert && (
+        <BacteriologicalTestAlertModal
+          onDismiss={() => setBacteAlertDismissed(true)}
+        />
+      )}
+      {showPhysChemAlert && (
+        <PhysicalChemicalTestAlertModal
+          onDismiss={() => setPhysChemAlertDismissed(true)}
         />
       )}
     </div>

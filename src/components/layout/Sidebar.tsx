@@ -21,6 +21,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { useBackwashStore } from '@/stores/backwashStore'
 import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
+import { useBacteriologicalTestStore } from '@/stores/bacteriologicalTestStore'
+import { usePhysicalChemicalTestStore } from '@/stores/physicalChemicalTestStore'
 import { useBillsBadgeStore } from '@/stores/billsBadgeStore'
 import { supabase } from '@/lib/supabase'
 
@@ -84,15 +86,24 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
   const filterZone          = useFilterReplacementStore((s) => s.zone)
   const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
+  const bacteZone           = useBacteriologicalTestStore((s) => s.zone)
+  const bacteConfigured     = useBacteriologicalTestStore((s) => s.isConfigured)
+  const physChemZone        = usePhysicalChemicalTestStore((s) => s.zone)
+  const physChemConfigured  = usePhysicalChemicalTestStore((s) => s.isConfigured)
   const billsBadgeZone      = useBillsBadgeStore((s) => s.zone)
 
   // Badge only shows when the card is both loaded AND configured AND in a non-green zone.
   // Unconfigured cards contribute nothing to the badge — they have their own "Set up" CTA.
-  const showBackwashBadge = backwashLoaded && backwashConfigured && backwashZone !== 'green'
-  const showFilterBadge   = filterConfigured && filterZone !== 'green'
-  const showMaintenanceBadge = showBackwashBadge || showFilterBadge
+  const showBackwashBadge    = backwashLoaded && backwashConfigured && backwashZone !== 'green'
+  const showFilterBadge      = filterConfigured && filterZone !== 'green'
+  const showBacteBadge       = bacteConfigured && bacteZone !== 'green'
+  const showPhysChemBadge    = physChemConfigured && physChemZone !== 'green'
+  const showMaintenanceBadge = showBackwashBadge || showFilterBadge || showBacteBadge || showPhysChemBadge
   const maintenanceBadgeClass =
-    (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
+    (backwashConfigured && backwashZone === 'red') ||
+    (filterConfigured   && filterZone   === 'red') ||
+    (bacteConfigured    && bacteZone    === 'red') ||
+    (physChemConfigured && physChemZone === 'red')
       ? 'bg-red-500'
       : 'bg-yellow-400'
 
