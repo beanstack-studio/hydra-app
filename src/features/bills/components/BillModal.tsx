@@ -100,10 +100,23 @@ type BillSchema = z.infer<typeof billSchema>
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+/** Pre-fill values sourced from a recurring series; used by the "Log this bill" banner button. */
+export interface BillPrefill {
+  bill_type: BillType
+  description: string | null
+  is_recurring: boolean
+  recurrence_cadence: RecurrenceCadence | null
+  recurrence_interval_months: number | null
+  reminder_day: number | null
+  payment_cap: number | null
+}
+
 interface BillModalProps {
   isOpen: boolean
   onClose: () => void
   bill: Bill | null
+  /** When set and bill is null, pre-fills the add form for the series. */
+  prefill?: BillPrefill | null
   onAdd: (input: BillInput, billFile?: File, paymentFile?: File) => Promise<void>
   onUpdate: (id: string, input: Partial<BillInput>, billFile?: File, paymentFile?: File) => Promise<void>
 }
@@ -182,7 +195,7 @@ function AttachRow({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalProps) {
+export function BillModal({ isOpen, onClose, bill, prefill, onAdd, onUpdate }: BillModalProps) {
   const { toast } = useToast()
   const isOwner = useAuthStore((s) => s.role) === 'owner'
 
@@ -249,11 +262,21 @@ export function BillModal({ isOpen, onClose, bill, onAdd, onUpdate }: BillModalP
       })
     } else {
       reset({
-        bill_type: '', period: freshDefault, amount: 0, due_date: '', date_paid: '', payment_method: '', description: '',
-        is_recurring: false, recurrence_cadence: null, recurrence_interval_months: null, reminder_day: null, payment_cap: null,
+        bill_type:      prefill?.bill_type ?? '',
+        period:         freshDefault,
+        amount:         0,
+        due_date:       '',
+        date_paid:      '',
+        payment_method: '',
+        description:    prefill?.description ?? '',
+        is_recurring:               prefill?.is_recurring ?? false,
+        recurrence_cadence:         prefill?.recurrence_cadence ?? null,
+        recurrence_interval_months: prefill?.recurrence_interval_months ?? null,
+        reminder_day:               prefill?.reminder_day ?? null,
+        payment_cap:                prefill?.payment_cap ?? null,
       })
     }
-  }, [bill, isOpen, reset])
+  }, [bill, isOpen, prefill, reset])
 
   const existingBillReceiptName = bill?.bill_receipt_url
     ? (bill.bill_receipt_url.split('/').pop()?.replace(/^\d+-/, '') ?? 'bill')

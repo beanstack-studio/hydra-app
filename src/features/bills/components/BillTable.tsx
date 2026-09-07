@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useBills } from '../hooks/useBills'
 import { MONTHS, BILL_TYPE_LABELS, makeSeriesKey, computeRecurringState } from '../recurringAlerts'
+import type { RecurringSeriesInfo } from '../recurringAlerts'
+import type { BillPrefill } from './BillModal'
 import type { Bill } from '../types'
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -63,6 +65,7 @@ export function BillTable() {
   const [deletingBill, setDeletingBill] = useState<Bill | null>(null)
   const [isDeleting,   setIsDeleting]   = useState(false)
   const [payingBill,   setPayingBill]   = useState<Bill | null>(null)
+  const [prefillData,  setPrefillData]  = useState<BillPrefill | null>(null)
 
   const groups = groupBillsByMonth(data)
 
@@ -83,6 +86,26 @@ export function BillTable() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  const handleLogBill = (alert: RecurringSeriesInfo) => {
+    setPrefillData({
+      bill_type:                  alert.bill_type,
+      description:                alert.description,
+      is_recurring:               true,
+      recurrence_cadence:         alert.recurrence_cadence,
+      recurrence_interval_months: alert.recurrence_interval_months,
+      reminder_day:               alert.reminderDay,
+      payment_cap:                alert.paymentCap,
+    })
+    setEditingBill(null)
+    setIsFormOpen(true)
+  }
+
+  const handleCloseForm = () => {
+    setIsFormOpen(false)
+    setEditingBill(null)
+    setPrefillData(null)
   }
 
   const thClass = 'px-3 py-2 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap'
@@ -110,17 +133,17 @@ export function BillTable() {
             <div
               key={alert.key}
               className={cn(
-                'flex items-start gap-2.5 rounded-lg border px-4 py-3',
+                'flex items-center gap-2.5 rounded-lg border px-4 py-3',
                 alert.urgency === 'red'
                   ? 'border-red-400/40 bg-red-500/10'
                   : 'border-yellow-400/40 bg-yellow-400/10',
               )}
             >
               <AlertTriangle className={cn(
-                'h-4 w-4 shrink-0 mt-0.5',
+                'h-4 w-4 shrink-0',
                 alert.urgency === 'red' ? 'text-red-500' : 'text-yellow-500',
               )} />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className={cn(
                   'text-sm font-medium',
                   alert.urgency === 'red'
@@ -131,6 +154,21 @@ export function BillTable() {
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
               </div>
+              {isOwner && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn(
+                    'shrink-0 text-xs font-medium h-7 px-2.5',
+                    alert.urgency === 'red'
+                      ? 'text-red-700 hover:text-red-800 hover:bg-red-500/15 dark:text-red-400 dark:hover:text-red-300'
+                      : 'text-yellow-700 hover:text-yellow-800 hover:bg-yellow-400/15 dark:text-yellow-500 dark:hover:text-yellow-400',
+                  )}
+                  onClick={() => handleLogBill(alert)}
+                >
+                  Log bill
+                </Button>
+              )}
             </div>
           ))}
         </div>
@@ -139,7 +177,7 @@ export function BillTable() {
       {/* Add button */}
       {isOwner && (
         <div className="flex justify-end">
-          <Button size="sm" onClick={() => { setEditingBill(null); setIsFormOpen(true) }}>
+          <Button size="sm" onClick={() => { setPrefillData(null); setEditingBill(null); setIsFormOpen(true) }}>
             <Plus className="h-4 w-4 mr-1" />
             Add Bill
           </Button>
@@ -190,7 +228,7 @@ export function BillTable() {
                 {bills.map((bill, idx) => (
                   <tr
                     key={bill.id}
-                    onClick={isOwner ? () => { setEditingBill(bill); setIsFormOpen(true) } : undefined}
+                    onClick={isOwner ? () => { setPrefillData(null); setEditingBill(bill); setIsFormOpen(true) } : undefined}
                     className={cn(
                       'border-b border-border last:border-0 transition-colors duration-150',
                       isOwner && 'cursor-pointer hover:bg-muted/40',
@@ -268,8 +306,9 @@ export function BillTable() {
 
       <BillModal
         isOpen={isFormOpen}
-        onClose={() => { setIsFormOpen(false); setEditingBill(null) }}
+        onClose={handleCloseForm}
         bill={editingBill}
+        prefill={prefillData}
         onAdd={addBill}
         onUpdate={updateBill}
       />

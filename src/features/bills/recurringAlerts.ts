@@ -1,4 +1,4 @@
-import type { Bill } from './types'
+import type { Bill, BillType, RecurrenceCadence } from './types'
 
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -56,6 +56,12 @@ export interface RecurringSeriesInfo {
   paidCount: number
   urgency: 'yellow' | 'red'
   message: string
+  // Fields sourced from the most-recent bill in the series, used to pre-fill
+  // the Add Bill modal so the new entry matches the series exactly.
+  bill_type: BillType
+  description: string | null
+  recurrence_cadence: RecurrenceCadence | null
+  recurrence_interval_months: number | null
 }
 
 export function computeRecurringState(
@@ -144,7 +150,13 @@ export function computeRecurringState(
       ? `Reminder day (${reminderDay}) has passed — log ${currentMonthLabel} bill`
       : `Due in ${daysToReminder} ${pluralDays} — log ${currentMonthLabel} bill`
 
-    alerts.push({ key, label, reminderDay, paymentCap, paidCount, urgency, message })
+    alerts.push({
+      key, label, reminderDay, paymentCap, paidCount, urgency, message,
+      bill_type:                  mostRecent.bill_type,
+      description:                mostRecent.description,
+      recurrence_cadence:         mostRecent.recurrence_cadence,
+      recurrence_interval_months: mostRecent.recurrence_interval_months,
+    })
   }
 
   const noCurrentPeriodBills =
