@@ -1,21 +1,20 @@
 import { useEffect } from 'react'
-import { toZonedTime } from 'date-fns-tz'
+import { formatInTimeZone } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { useBillsBadgeStore } from '@/stores/billsBadgeStore'
-import { computeRecurringState } from '../recurringAlerts'
 import { PH_TZ } from '@/lib/utils'
-import type { Bill } from '../types'
+import type { BillsBadgeZone } from '@/stores/billsBadgeStore'
 
 /**
- * Fetches monthly_bills for the current station and derives the Expenses nav
- * badge zone, written into useBillsBadgeStore so Sidebar / BottomNav can read
- * it without a prop-drilling chain.
+ * Derives the Expenses nav badge zone via the get_bills_badge_zone() RPC
+ * (runs entirely in Postgres — no PostgREST 1 000-row cap) and writes the
+ * result into useBillsBadgeStore so Sidebar / BottomNav / ExpensesPage tab
+ * can all read it without prop-drilling.
  *
- * Zone derivation (matches BillTable alert logic exactly):
- *   red    – at least one recurring alert is red
- *   yellow – at least one recurring alert is yellow, OR no bills logged this period
- *   green  – no badge needed
+ * A Realtime subscription on monthly_bills re-fires the RPC on every
+ * INSERT / UPDATE / DELETE so the badge updates immediately within the
+ * same session when a bill is logged, edited, or paid — no page reload needed.
  */
 export function useBillsBadge(): void {
   const stationId = useAuthStore((s) => s.stationId)
@@ -24,30 +23,36 @@ export function useBillsBadge(): void {
   useEffect(() => {
     if (!stationId) return
 
-    let cancelled = false
-
     const run = async () => {
-      const { data } = await supabase
-        .from('monthly_bills')
-        .select('*')
-        .eq('station_id', stationId)
-
-      if (cancelled) return
-
-      const bills = (data ?? []) as Bill[]
-      const today = toZonedTime(new Date(), PH_TZ)
-      const { alerts, noCurrentPeriodBills } = computeRecurringState(bills, today)
-
-      if (alerts.some((a) => a.urgency === 'red')) {
-        setZone('red')
-      } else if (alerts.some((a) => a.urgency === 'yellow') || noCurrentPeriodBills) {
-        setZone('yellow')
-      } else {
-        setZone('green')
+      const todayStr = formatInTimeZone(new Date(), PH_TZ, 'yyyy-MM-dd')
+      const { data } = await supabase.rpc('get_bills_badge_zone', {
+        p_station_id: stationId,
+        p_today:      todayStr,
+      })
+      const zone = data as BillsBadgeZone | null
+      if (zone === 'red' || zone === 'yellow' || zone === 'green') {
+        setZone(zone)
       }
     }
 
     void run()
-    return () => { cancelled = true }
+
+    // Re-derive the badge zone whenever any bill changes in this session.
+    // Covers addBill, updateBill, payBill, deleteBill — no page reload needed.
+    const channel = supabase
+      .channel(`bills-badge-${stationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  '*',
+          schema: 'public',
+          table:  'monthly_bills',
+          filter: `station_id=eq.${stationId}`,
+        },
+        () => { void run() },
+      )
+      .subscribe()
+
+    return () => { void supabase.removeChannel(channel) }
   }, [stationId, setZone])
 }
