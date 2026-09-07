@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import type { FilterGroup } from '@/components/shared/FilterButton'
 import { TableOptionsButton } from '@/components/shared/TableOptionsButton'
 import { useTablePrefs } from '@/hooks/useTablePrefs'
 import type { Expense, ExpensePaymentMethod } from '@/features/expenses/types'
+import { useBillsBadgeStore } from '@/stores/billsBadgeStore'
 
 const EXPENSE_STATIC_FILTER_GROUPS: FilterGroup[] = [
   {
@@ -73,7 +74,8 @@ export default function ExpensesPage() {
   const { hiddenKeys, toggleColumn, columnWidths, onColumnResize, columnOrder, onColumnReorder, filterValues: expenseFilters, setFilterValues: setExpenseFilters } = useTablePrefs('expenses', ['remarks'])
   const plan    = usePlan()
   const isOwner = role === 'owner'
-  const isFree  = plan === 'free'
+  const isFree         = plan === 'free'
+  const billsBadgeZone = useBillsBadgeStore((s) => s.zone)
   const [activeTab,      setActiveTab]      = useState<Tab>('expenses')
   const [expenseSearch,  setExpenseSearch]  = useState('')
   const [isModalOpen,   setIsModalOpen]   = useState(false)
@@ -141,9 +143,16 @@ export default function ExpensesPage() {
     }
   }
 
-  const ALL_EXPENSE_TABS: { id: Tab; label: string; ownerOnly?: boolean }[] = [
+  const billsAlertBadge: ReactNode = billsBadgeZone !== 'green' ? (
+    <span className={cn(
+      'flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold leading-none',
+      billsBadgeZone === 'yellow' ? 'bg-yellow-400 text-yellow-950' : 'bg-red-500 text-white',
+    )}>!</span>
+  ) : null
+
+  const ALL_EXPENSE_TABS: { id: Tab; label: string; badge?: ReactNode; ownerOnly?: boolean }[] = [
     { id: 'expenses', label: 'General' },
-    { id: 'bills',    label: 'Bills' },
+    { id: 'bills',    label: 'Bills', badge: billsAlertBadge },
     { id: 'payroll',  label: 'Payroll', ownerOnly: true },
   ]
   const TABS = ALL_EXPENSE_TABS.filter((t) => !t.ownerOnly || isOwner)
@@ -223,13 +232,14 @@ export default function ExpensesPage() {
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex-none px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 whitespace-nowrap',
+              'flex-none flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 whitespace-nowrap',
               activeTab === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
             {tab.label}
+            {tab.badge}
           </button>
         ))}
       </div>
