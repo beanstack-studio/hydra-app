@@ -3,6 +3,7 @@ import { ShoppingCart, Receipt, Users, Package, BarChart, Settings } from 'lucid
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
+import { useBillsBadgeStore } from '@/stores/billsBadgeStore'
 
 const OWNER_NAV = [
   { to: '/sales',     label: 'Sales',     icon: ShoppingCart },
@@ -23,16 +24,19 @@ const STAFF_NAV = [
 const FREE_LOCKED = new Set(['/inventory', '/reports'])
 
 export function BottomNav() {
-  const role     = useAuthStore((s) => s.role)
-  const plan     = usePlan()
-  const navItems = role === 'owner' || role === 'super_admin' ? OWNER_NAV : STAFF_NAV
-  const isFree   = plan === 'free'
+  const role           = useAuthStore((s) => s.role)
+  const plan           = usePlan()
+  const navItems       = role === 'owner' || role === 'super_admin' ? OWNER_NAV : STAFF_NAV
+  const isFree         = plan === 'free'
+  const billsBadgeZone = useBillsBadgeStore((s) => s.zone)
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden">
       <div className="flex pb-safe">
         {navItems.map(({ to, icon: Icon }) => {
-          const isLocked = isFree && FREE_LOCKED.has(to)
+          const isLocked    = isFree && FREE_LOCKED.has(to)
+          const showDot     = to === '/expenses' && billsBadgeZone !== 'green'
+          const dotClass    = billsBadgeZone === 'red' ? 'bg-red-500' : 'bg-yellow-400'
           return (
             <NavLink
               key={to}
@@ -55,6 +59,12 @@ export function BottomNav() {
                       <span className="absolute -top-1.5 -right-2 text-[7px] font-bold bg-amber-500 text-white rounded px-0.5 leading-tight">
                         PRO
                       </span>
+                    )}
+                    {!isLocked && showDot && (
+                      <span className={cn(
+                        'absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-background',
+                        dotClass,
+                      )} />
                     )}
                   </div>
                 </>

@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { usePlan } from '@/hooks/usePlan'
 import { useBackwashStore } from '@/stores/backwashStore'
 import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
+import { useBillsBadgeStore } from '@/stores/billsBadgeStore'
 import { supabase } from '@/lib/supabase'
 
 const ALL_NAV_ITEMS = [
@@ -83,6 +84,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const backwashConfigured  = useBackwashStore((s) => s.isConfigured)
   const filterZone          = useFilterReplacementStore((s) => s.zone)
   const filterConfigured    = useFilterReplacementStore((s) => s.isConfigured)
+  const billsBadgeZone      = useBillsBadgeStore((s) => s.zone)
 
   // Badge only shows when the card is both loaded AND configured AND in a non-green zone.
   // Unconfigured cards contribute nothing to the badge — they have their own "Set up" CTA.
@@ -93,6 +95,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     (backwashConfigured && backwashZone === 'red') || (filterConfigured && filterZone === 'red')
       ? 'bg-red-500'
       : 'bg-yellow-400'
+
+  const showBillsBadge    = billsBadgeZone !== 'green'
+  const billsBadgeClass   = billsBadgeZone === 'red' ? 'bg-red-500' : 'bg-yellow-400'
 
   const onSettingsPage = location.pathname.startsWith('/settings')
   const activeSection  = onSettingsPage
@@ -184,7 +189,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         {/* Main nav items */}
         {navItems.map(({ to, label, icon: Icon }) => {
-          const isLocked = isFree && FREE_LOCKED_ROUTES.has(to)
+          const isLocked     = isFree && FREE_LOCKED_ROUTES.has(to)
+          const isBillsItem  = to === '/expenses'
+          const showDot      = isBillsItem && showBillsBadge
           return (
             <button
               key={to}
@@ -193,12 +200,24 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               className={mainNavClass(location.pathname.startsWith(to))}
               title={collapsed ? label : undefined}
             >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
+              {/* Wrap icon to allow collapsed badge dot */}
+              <div className="relative shrink-0">
+                <Icon className="h-[18px] w-[18px]" />
+                {collapsed && showDot && (
+                  <span className={cn(
+                    'absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full ring-2 ring-[hsl(191,72%,14%)]',
+                    billsBadgeClass,
+                  )} />
+                )}
+              </div>
               {!collapsed && label}
               {!collapsed && isLocked && (
                 <span className="ml-auto flex items-center gap-0.5 text-[9px] font-bold rounded px-1 py-0.5 bg-amber-500/25 text-amber-300">
                   <Lock className="h-2.5 w-2.5" />PRO
                 </span>
+              )}
+              {!collapsed && !isLocked && showDot && (
+                <span className={cn('ml-auto h-2 w-2 rounded-full shrink-0', billsBadgeClass)} />
               )}
             </button>
           )

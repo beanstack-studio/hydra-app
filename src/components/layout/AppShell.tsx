@@ -9,6 +9,7 @@ import { FilterReplacementAlertModal } from '@/components/shared/FilterReplaceme
 import { startReminderPolling, stopReminderPolling } from '@/lib/reminders'
 import { useBackwashTracker } from '@/features/maintenance/hooks/useBackwashTracker'
 import { useFilterReplacement } from '@/features/maintenance/hooks/useFilterReplacement'
+import { useBillsBadge } from '@/features/bills/hooks/useBillsBadge'
 import { useBackwashStore } from '@/stores/backwashStore'
 import { useFilterReplacementStore } from '@/stores/filterReplacementStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -26,6 +27,11 @@ function BackwashDataLoader() {
 
 function FilterReplacementDataLoader() {
   useFilterReplacement()
+  return null
+}
+
+function BillsBadgeLoader() {
+  useBillsBadge()
   return null
 }
 
@@ -193,9 +199,10 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Loads maintenance data into global stores on app mount */}
+      {/* Loads maintenance and bills data into global stores on app mount */}
       <BackwashDataLoader />
       <FilterReplacementDataLoader />
+      <BillsBadgeLoader />
 
       <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
       <div className={contentClass}>
