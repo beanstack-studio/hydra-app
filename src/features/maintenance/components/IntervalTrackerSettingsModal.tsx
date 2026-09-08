@@ -1,44 +1,45 @@
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/shared/Modal'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
+import { CadenceSettings } from './CadenceSettings'
+import type { CadenceConfig } from '../lib/cadenceUtils'
 
 interface IntervalTrackerSettingsModalProps {
   isOpen:        boolean
   onClose:       () => void
   title:         string
-  intervalDays:  number
+  cadenceConfig: CadenceConfig
   alertEnabled:  boolean
-  onSave:        (intervalDays: number, alertEnabled: boolean) => Promise<void>
+  onSave:        (cadenceConfig: CadenceConfig, alertEnabled: boolean) => Promise<void>
 }
 
 export function IntervalTrackerSettingsModal({
   isOpen,
   onClose,
   title,
-  intervalDays,
+  cadenceConfig,
   alertEnabled,
   onSave,
 }: IntervalTrackerSettingsModalProps) {
   const { toast } = useToast()
 
-  const [selectedInterval,  setSelectedInterval]  = useState(intervalDays)
+  const [localCadence,      setLocalCadence]      = useState<CadenceConfig>(cadenceConfig)
   const [localAlertEnabled, setLocalAlertEnabled] = useState(alertEnabled)
   const [isSaving,          setIsSaving]          = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
-    setSelectedInterval(intervalDays)
+    setLocalCadence(cadenceConfig)
     setLocalAlertEnabled(alertEnabled)
-  }, [isOpen, intervalDays, alertEnabled])
+  }, [isOpen, cadenceConfig, alertEnabled])
 
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await onSave(selectedInterval, localAlertEnabled)
+      await onSave(localCadence, localAlertEnabled)
       toast({ title: `${title} settings saved` })
       onClose()
     } catch (e) {
@@ -56,25 +57,8 @@ export function IntervalTrackerSettingsModal({
     <Modal isOpen={isOpen} onClose={onClose} title={`${title} Settings`} size="sm">
       <div className="space-y-5">
 
-        {/* Interval */}
-        <div className="space-y-1.5">
-          <Label htmlFor="it-interval">Test schedule</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Run test every</span>
-            <Input
-              id="it-interval"
-              type="number"
-              min={1}
-              step={1}
-              value={selectedInterval}
-              onChange={(e) =>
-                setSelectedInterval(Math.max(1, parseInt(e.target.value, 10) || 1))
-              }
-              className="w-20"
-            />
-            <span className="text-sm text-muted-foreground">days</span>
-          </div>
-        </div>
+        {/* Cadence configuration */}
+        <CadenceSettings value={localCadence} onChange={setLocalCadence} />
 
         {/* Login alert toggle */}
         <div className="space-y-1.5">

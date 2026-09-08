@@ -4,25 +4,33 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { usePhysicalChemicalTestStore } from '@/stores/physicalChemicalTestStore'
 import { PH_TZ } from '@/lib/utils'
+import {
+  computePeriodBasedTrackerState,
+  makeCadenceConfig,
+} from '../lib/cadenceUtils'
+import type { CadenceConfig, ScheduleType, FrequencyCadence } from '../lib/cadenceUtils'
 import { computeLabTestZone } from './useBacteriologicalTest'
 import type { LabTestZone } from './useBacteriologicalTest'
+
+export { makeCadenceConfig }
+export type { CadenceConfig }
 
 export const DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS = 180
 const DEFAULT_ALERT_ENABLED = true
 
 export interface UsePhysicalChemicalTestReturn {
-  lastTestedAt:  string | null
-  daysRemaining: number
-  cycleDays:     number
-  intervalDays:  number
-  alertEnabled:  boolean
-  isConfigured:  boolean
-  eventsTotal:   number
-  zone:          LabTestZone
-  isLoading:     boolean
-  error:         string | null
-  markAsCompleted:  (notes?: string) => Promise<void>
-  updateSettings:   (intervalDays: number, alertEnabled: boolean) => Promise<void>
+  lastTestedAt:    string | null
+  daysRemaining:   number
+  cycleDays:       number
+  cadenceConfig:   CadenceConfig
+  alertEnabled:    boolean
+  isConfigured:    boolean
+  eventsTotal:     number
+  zone:            LabTestZone
+  isLoading:       boolean
+  error:           string | null
+  markAsCompleted: (notes?: string) => Promise<void>
+  updateSettings:  (cadenceConfig: CadenceConfig, alertEnabled: boolean) => Promise<void>
 }
 
 export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
@@ -31,7 +39,7 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
   const [lastTestedAt,  setLastTestedAt]  = useState<string | null>(null)
   const [daysRemaining, setDaysRemaining] = useState(0)
   const [cycleDays,     setCycleDays]     = useState(DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS)
-  const [intervalDays,  setIntervalDays]  = useState(DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS)
+  const [cadenceConfig, setCadenceConfig] = useState<CadenceConfig>(makeCadenceConfig(DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS))
   const [alertEnabled,  setAlertEnabledState] = useState(DEFAULT_ALERT_ENABLED)
   const [isConfigured,  setIsConfiguredState] = useState(false)
   const [eventsTotal,   setEventsTotal]   = useState(0)
@@ -46,7 +54,10 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
       const phNow         = toZonedTime(new Date(), PH_TZ)
       const todayMidnight = new Date(phNow.getFullYear(), phNow.getMonth(), phNow.getDate())
 
-      const [logsRes, totalRes, settingsRes] = await Promise.all([
+      const thirteenMonthsAgo = new Date()
+      thirteenMonthsAgo.setMonth(thirteenMonthsAgo.getMonth() - 13)
+
+      const [logsRes, earliestRes, recentRes, totalRes, settingsRes] = await Promise.all([
         supabase
           .from('physical_chemical_test_logs')
           .select('tested_at')
@@ -55,50 +66,104 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
           .limit(1),
         supabase
           .from('physical_chemical_test_logs')
+          .select('tested_at')
+          .eq('station_id', stationId)
+          .order('tested_at', { ascending: true })
+          .limit(1),
+        supabase
+          .from('physical_chemical_test_logs')
+          .select('tested_at')
+          .eq('station_id', stationId)
+          .gte('tested_at', thirteenMonthsAgo.toISOString()),
+        supabase
+          .from('physical_chemical_test_logs')
           .select('*', { count: 'exact', head: true })
           .eq('station_id', stationId),
         supabase
           .from('station_settings')
-          .select('physical_chemical_test_interval_days, physical_chemical_test_alert_enabled')
+          .select(`
+            physical_chemical_test_interval_days,
+            physical_chemical_test_alert_enabled,
+            physical_chemical_test_schedule_type,
+            physical_chemical_test_due_day,
+            physical_chemical_test_due_week_number,
+            physical_chemical_test_due_weekday,
+            physical_chemical_test_frequency_cadence,
+            physical_chemical_test_frequency_interval_months
+          `)
           .eq('station_id', stationId)
           .maybeSingle(),
       ])
 
       if (logsRes.error) throw new Error(logsRes.error.message)
 
-      const configured = settingsRes.data?.physical_chemical_test_interval_days != null
+      const scheduleType: ScheduleType =
+        (settingsRes.data?.physical_chemical_test_schedule_type as ScheduleType | null | undefined) ?? 'day_count'
+      const configured =
+        settingsRes.data?.physical_chemical_test_interval_days != null ||
+        scheduleType !== 'day_count'
+
       if (!configured) {
         setIsConfiguredState(false)
-        setIntervalDays(DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS)
+        setCadenceConfig(makeCadenceConfig(DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS))
         setAlertEnabledState(DEFAULT_ALERT_ENABLED)
         usePhysicalChemicalTestStore.getState().setUnconfigured()
         return
       }
 
-      const fetchedInterval     = settingsRes.data!.physical_chemical_test_interval_days as number
       const fetchedAlertEnabled = (settingsRes.data?.physical_chemical_test_alert_enabled as boolean | null | undefined)
         ?? DEFAULT_ALERT_ENABLED
-      const fetchedLastAt       = (logsRes.data?.[0]?.tested_at as string | undefined) ?? null
+      const fetchedLastAt     = (logsRes.data?.[0]?.tested_at as string | undefined) ?? null
+      const fetchedEarliestAt = (earliestRes.data?.[0]?.tested_at as string | undefined) ?? null
+      const fetchedRecentTs   = ((recentRes.data ?? []) as { tested_at: string }[]).map((r) => r.tested_at)
+
+      const conf: CadenceConfig = {
+        scheduleType,
+        intervalDays:            (settingsRes.data?.physical_chemical_test_interval_days as number | null | undefined) ?? DEFAULT_PHYSICAL_CHEMICAL_INTERVAL_DAYS,
+        dueDayOfMonth:           (settingsRes.data?.physical_chemical_test_due_day as number | null | undefined) ?? 1,
+        dueWeekNumber:           (settingsRes.data?.physical_chemical_test_due_week_number as number | null | undefined) ?? 1,
+        dueWeekday:              (settingsRes.data?.physical_chemical_test_due_weekday as number | null | undefined) ?? 1,
+        frequencyCadence:        (settingsRes.data?.physical_chemical_test_frequency_cadence as FrequencyCadence | null | undefined) ?? 'monthly',
+        frequencyIntervalMonths: (settingsRes.data?.physical_chemical_test_frequency_interval_months as number | null | undefined) ?? 2,
+      }
 
       const MS_PER_DAY = 86_400_000
       let daysRem: number
+      let computedCycleDays: number
       let computedZone: LabTestZone
 
-      if (fetchedLastAt === null) {
-        daysRem      = 0
-        computedZone = 'red'
+      if (scheduleType !== 'day_count') {
+        const result = computePeriodBasedTrackerState({
+          config:           conf,
+          lastEventAt:      fetchedLastAt,
+          earliestEventAt:  fetchedEarliestAt,
+          recentTimestamps: fetchedRecentTs,
+          todayPH:          phNow,
+          phTz:             PH_TZ,
+        })
+        daysRem           = result.daysRemaining
+        computedCycleDays = result.cycleDays
+        computedZone      = result.zone
       } else {
-        const lastPH       = toZonedTime(new Date(fetchedLastAt), PH_TZ)
-        const lastMidnight = new Date(lastPH.getFullYear(), lastPH.getMonth(), lastPH.getDate())
-        const nextDue      = new Date(lastMidnight.getTime() + fetchedInterval * MS_PER_DAY)
-        daysRem            = Math.round((nextDue.getTime() - todayMidnight.getTime()) / MS_PER_DAY)
-        computedZone       = computeLabTestZone(daysRem)
+        const fetchedInterval = conf.intervalDays
+        if (fetchedLastAt === null) {
+          daysRem           = 0
+          computedCycleDays = fetchedInterval
+          computedZone      = 'red'
+        } else {
+          const lastPH       = toZonedTime(new Date(fetchedLastAt), PH_TZ)
+          const lastMidnight = new Date(lastPH.getFullYear(), lastPH.getMonth(), lastPH.getDate())
+          const nextDue      = new Date(lastMidnight.getTime() + fetchedInterval * MS_PER_DAY)
+          daysRem            = Math.round((nextDue.getTime() - todayMidnight.getTime()) / MS_PER_DAY)
+          computedCycleDays  = fetchedInterval
+          computedZone       = computeLabTestZone(daysRem)
+        }
       }
 
       setLastTestedAt(fetchedLastAt)
       setDaysRemaining(daysRem)
-      setCycleDays(fetchedInterval)
-      setIntervalDays(fetchedInterval)
+      setCycleDays(computedCycleDays)
+      setCadenceConfig(conf)
       setAlertEnabledState(fetchedAlertEnabled)
       setIsConfiguredState(true)
       setEventsTotal(totalRes.count ?? 0)
@@ -130,7 +195,7 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
   }, [stationId, fetchData])
 
   const updateSettings = useCallback(async (
-    newIntervalDays: number,
+    newCadence:      CadenceConfig,
     newAlertEnabled: boolean,
   ) => {
     if (!stationId) return
@@ -138,10 +203,16 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
       .from('station_settings')
       .upsert(
         {
-          station_id:                           stationId,
-          physical_chemical_test_interval_days:  newIntervalDays,
-          physical_chemical_test_alert_enabled:  newAlertEnabled,
-          updated_at:                            new Date().toISOString(),
+          station_id:                                           stationId,
+          physical_chemical_test_schedule_type:                 newCadence.scheduleType,
+          physical_chemical_test_interval_days:                 newCadence.scheduleType === 'day_count' ? newCadence.intervalDays : null,
+          physical_chemical_test_due_day:                       newCadence.scheduleType === 'date'      ? newCadence.dueDayOfMonth : null,
+          physical_chemical_test_due_week_number:               newCadence.scheduleType === 'weekday'   ? newCadence.dueWeekNumber : null,
+          physical_chemical_test_due_weekday:                   newCadence.scheduleType === 'weekday'   ? newCadence.dueWeekday    : null,
+          physical_chemical_test_frequency_cadence:             newCadence.scheduleType !== 'day_count' ? newCadence.frequencyCadence : null,
+          physical_chemical_test_frequency_interval_months:     newCadence.scheduleType !== 'day_count' && newCadence.frequencyCadence === 'custom' ? newCadence.frequencyIntervalMonths : null,
+          physical_chemical_test_alert_enabled:                 newAlertEnabled,
+          updated_at:                                           new Date().toISOString(),
         },
         { onConflict: 'station_id' },
       )
@@ -153,7 +224,7 @@ export function usePhysicalChemicalTest(): UsePhysicalChemicalTestReturn {
     lastTestedAt,
     daysRemaining,
     cycleDays,
-    intervalDays,
+    cadenceConfig,
     alertEnabled,
     isConfigured,
     eventsTotal,

@@ -6,30 +6,32 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
+import { CadenceSettings } from './CadenceSettings'
 import type { SupplyOption, FilterReplacementSupplyLink } from '../hooks/useFilterReplacement'
+import type { CadenceConfig } from '../lib/cadenceUtils'
 
 interface SupplyRow {
-  supply_id: string
-  qty: number
+  supply_id:  string
+  qty:        number
   inputValue: string   // text shown in the search input
 }
 
 const EMPTY_ROW: SupplyRow = { supply_id: '', qty: 1, inputValue: '' }
 
 interface FilterReplacementSettingsModalProps {
-  isOpen: boolean
-  onClose: () => void
-  intervalDays: number
-  alertEnabled: boolean
+  isOpen:         boolean
+  onClose:        () => void
+  cadenceConfig:  CadenceConfig
+  alertEnabled:   boolean
   linkedSupplies: FilterReplacementSupplyLink[]
-  supplies: SupplyOption[]
-  onSave: (intervalDays: number, supplies: FilterReplacementSupplyLink[], alertEnabled: boolean) => Promise<void>
+  supplies:       SupplyOption[]
+  onSave:         (cadenceConfig: CadenceConfig, supplies: FilterReplacementSupplyLink[], alertEnabled: boolean) => Promise<void>
 }
 
 export function FilterReplacementSettingsModal({
   isOpen,
   onClose,
-  intervalDays,
+  cadenceConfig,
   alertEnabled,
   linkedSupplies,
   supplies,
@@ -37,8 +39,8 @@ export function FilterReplacementSettingsModal({
 }: FilterReplacementSettingsModalProps) {
   const { toast } = useToast()
 
-  const [selectedInterval,    setSelectedInterval]    = useState(intervalDays)
-  const [localAlertEnabled,   setLocalAlertEnabled]   = useState(alertEnabled)
+  const [localCadence,     setLocalCadence]     = useState<CadenceConfig>(cadenceConfig)
+  const [localAlertEnabled, setLocalAlertEnabled] = useState(alertEnabled)
   const [supplyRows,       setSupplyRows]       = useState<SupplyRow[]>([{ ...EMPTY_ROW }])
   const [openDropdownIdx,  setOpenDropdownIdx]  = useState<number | null>(null)
   const [isSaving,         setIsSaving]         = useState(false)
@@ -49,7 +51,7 @@ export function FilterReplacementSettingsModal({
   // Sync state whenever the modal reopens or values change externally
   useEffect(() => {
     if (!isOpen) return
-    setSelectedInterval(intervalDays)
+    setLocalCadence(cadenceConfig)
     setLocalAlertEnabled(alertEnabled)
     setSupplyRows(linkedSupplies.length > 0
       ? linkedSupplies.map((l) => ({
@@ -60,7 +62,7 @@ export function FilterReplacementSettingsModal({
       : [{ ...EMPTY_ROW }]
     )
     setOpenDropdownIdx(null)
-  }, [isOpen, intervalDays, alertEnabled, linkedSupplies, supplies])
+  }, [isOpen, cadenceConfig, alertEnabled, linkedSupplies, supplies])
 
   // ── Row helpers ──────────────────────────────────────────────────────────────
 
@@ -73,8 +75,7 @@ export function FilterReplacementSettingsModal({
 
   // ── Type-ahead search ────────────────────────────────────────────────────────
   // Results shown from the FIRST keystroke (no minimum character requirement).
-  // When the field is focused but empty, shows the top-5 supplies alphabetically
-  // so the user can browse without typing.
+  // When the field is focused but empty, shows the top-5 supplies alphabetically.
 
   const getResults = (term: string, rowIndex: number): SupplyOption[] => {
     const taken = new Set(
@@ -84,9 +85,7 @@ export function FilterReplacementSettingsModal({
     )
     const available = supplies.filter((s) => !taken.has(s.id))
 
-    if (term.length === 0) {
-      return available.slice(0, 5)
-    }
+    if (term.length === 0) return available.slice(0, 5)
 
     const lower = term.toLowerCase()
     return available.filter((s) => s.name.toLowerCase().includes(lower)).slice(0, 5)
@@ -120,7 +119,7 @@ export function FilterReplacementSettingsModal({
       const validLinks: FilterReplacementSupplyLink[] = supplyRows
         .filter((r) => r.supply_id !== '')
         .map((r) => ({ supply_id: r.supply_id, qty: r.qty }))
-      await onSave(selectedInterval, validLinks, localAlertEnabled)
+      await onSave(localCadence, validLinks, localAlertEnabled)
       toast({ title: 'Filter replacement settings saved' })
       onClose()
     } catch (e) {
@@ -138,23 +137,8 @@ export function FilterReplacementSettingsModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Filter Replacement Settings" size="sm">
       <div className="space-y-5">
 
-        {/* Replacement interval — typed number input */}
-        <div className="space-y-1.5">
-          <Label htmlFor="fr-interval">Replacement schedule</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Replace filters every</span>
-            <Input
-              id="fr-interval"
-              type="number"
-              min={1}
-              step={1}
-              value={selectedInterval}
-              onChange={(e) => setSelectedInterval(Math.max(1, parseInt(e.target.value, 10) || 1))}
-              className="w-20"
-            />
-            <span className="text-sm text-muted-foreground">days</span>
-          </div>
-        </div>
+        {/* Cadence configuration — wear warning enabled for filter replacement */}
+        <CadenceSettings value={localCadence} onChange={setLocalCadence} showWearWarning />
 
         {/* Supply deduction — type-ahead search, multiple rows */}
         <div className="space-y-2">

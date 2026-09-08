@@ -15,7 +15,7 @@ export function PhysicalChemicalTestCard() {
     lastTestedAt,
     daysRemaining,
     cycleDays,
-    intervalDays,
+    cadenceConfig,
     alertEnabled,
     isConfigured,
     eventsTotal,
@@ -60,7 +60,7 @@ export function PhysicalChemicalTestCard() {
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           title="Physical & Chemical Test"
-          intervalDays={intervalDays}
+          cadenceConfig={cadenceConfig}
           alertEnabled={alertEnabled}
           onSave={updateSettings}
         />

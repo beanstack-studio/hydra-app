@@ -14,7 +14,7 @@ export function FilterReplacementCard() {
     lastReplacedAt,
     daysRemaining,
     cycleDays,
-    intervalDays,
+    cadenceConfig,
     alertEnabled,
     isConfigured,
     replacementsYtd,
@@ -58,7 +58,7 @@ export function FilterReplacementCard() {
         <FilterReplacementSettingsModal
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          intervalDays={intervalDays}
+          cadenceConfig={cadenceConfig}
           alertEnabled={alertEnabled}
           linkedSupplies={linkedSupplies}
           supplies={supplies}

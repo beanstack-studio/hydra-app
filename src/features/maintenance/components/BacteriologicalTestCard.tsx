@@ -15,7 +15,7 @@ export function BacteriologicalTestCard() {
     lastTestedAt,
     daysRemaining,
     cycleDays,
-    intervalDays,
+    cadenceConfig,
     alertEnabled,
     isConfigured,
     eventsTotal,
@@ -60,7 +60,7 @@ export function BacteriologicalTestCard() {
           isOpen={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           title="Bacteriological Test"
-          intervalDays={intervalDays}
+          cadenceConfig={cadenceConfig}
           alertEnabled={alertEnabled}
           onSave={updateSettings}
         />
