@@ -50,6 +50,27 @@ const PILL_BASE = 'px-3 py-1.5 text-xs font-medium rounded-md border transition-
 const PILL_ON   = 'bg-primary text-primary-foreground border-primary'
 const PILL_OFF  = 'bg-background text-foreground border-border hover:border-primary/50'
 
+// ── Summary sentence helpers ──────────────────────────────────────────────────
+
+function frequencySummary(cfg: CadenceConfig): string {
+  if (cfg.frequencyCadence === 'monthly')   return 'every month'
+  if (cfg.frequencyCadence === 'quarterly') return 'every 3 months'
+  return `every ${cfg.frequencyIntervalMonths} months`
+}
+
+function buildSummary(cfg: CadenceConfig): string {
+  const freq = frequencySummary(cfg)
+  if (cfg.scheduleType === 'date') {
+    return `Due on the ${ordinal(cfg.dueDayOfMonth ?? 1)}, ${freq}.`
+  }
+  if (cfg.scheduleType === 'weekday') {
+    const weekLabel = WEEK_NUMBERS.find((w) => w.value === cfg.dueWeekNumber)?.label ?? '1st'
+    const dayLabel  = WEEKDAYS.find((d) => d.value === cfg.dueWeekday)?.label ?? 'Mon'
+    return `Due the ${weekLabel} ${dayLabel}, ${freq}.`
+  }
+  return ''
+}
+
 // ── Frequency sub-section ─────────────────────────────────────────────────────
 
 function FrequencySection({
@@ -63,7 +84,7 @@ function FrequencySection({
 
   return (
     <div className="space-y-2">
-      <Label>Frequency</Label>
+      <Label className="text-xs text-muted-foreground uppercase tracking-wide">Frequency</Label>
       <div className="flex gap-2 flex-wrap">
         {FREQUENCY_OPTIONS.map(({ value: v, label }) => (
           <button
@@ -106,6 +127,7 @@ export function CadenceSettings({ value, onChange, showWearWarning = false }: Ca
   const set = (patch: Partial<CadenceConfig>) => onChange({ ...value, ...patch })
 
   const showWarning = showWearWarning && value.scheduleType !== 'day_count'
+  const summary     = buildSummary(value)
 
   return (
     <div className="space-y-4">
@@ -127,7 +149,7 @@ export function CadenceSettings({ value, onChange, showWearWarning = false }: Ca
         </div>
       </div>
 
-      {/* Day Count — interval input */}
+      {/* Day Count — stays outside the box, simple interval input */}
       {value.scheduleType === 'day_count' && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Every</span>
@@ -143,70 +165,78 @@ export function CadenceSettings({ value, onChange, showWearWarning = false }: Ca
         </div>
       )}
 
-      {/* Date — day-of-month select + frequency */}
-      {value.scheduleType === 'date' && (
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Day of month</Label>
-            <select
-              value={value.dueDayOfMonth}
-              onChange={(e) => set({ dueDayOfMonth: parseInt(e.target.value, 10) })}
-              className="h-9 w-28 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {DAY_OPTIONS.map((d) => (
-                <option key={d} value={d}>{ordinal(d)}</option>
-              ))}
-            </select>
-          </div>
-          <FrequencySection value={value} onChange={onChange} />
-        </div>
-      )}
+      {/* Date / Weekday — grouped bordered box */}
+      {(value.scheduleType === 'date' || value.scheduleType === 'weekday') && (
+        <div className="space-y-3 rounded-lg border border-border p-3">
 
-      {/* Weekday — week number + weekday pills + frequency */}
-      {value.scheduleType === 'weekday' && (
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>Week</Label>
-            <div className="flex gap-1.5 flex-wrap">
-              {WEEK_NUMBERS.map(({ value: v, label }) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => set({ dueWeekNumber: v })}
-                  className={cn(PILL_BASE, value.dueWeekNumber === v ? PILL_ON : PILL_OFF)}
-                >
-                  {label}
-                </button>
-              ))}
+          {/* Date — single "On the [15th]" row */}
+          {value.scheduleType === 'date' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">On the</span>
+              <select
+                value={value.dueDayOfMonth}
+                onChange={(e) => set({ dueDayOfMonth: parseInt(e.target.value, 10) })}
+                className="h-9 w-28 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                {DAY_OPTIONS.map((d) => (
+                  <option key={d} value={d}>{ordinal(d)}</option>
+                ))}
+              </select>
+              <span className="text-sm text-muted-foreground">of the month</span>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Day</Label>
-            <div className="flex gap-1.5 flex-wrap">
-              {WEEKDAYS.map(({ value: v, label }) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => set({ dueWeekday: v })}
-                  className={cn(PILL_BASE, value.dueWeekday === v ? PILL_ON : PILL_OFF)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <FrequencySection value={value} onChange={onChange} />
-        </div>
-      )}
+          )}
 
-      {/* Wear warning — Filter Replacement only */}
-      {showWarning && (
-        <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
-          <span>
-            Period-based cadence tracks whether this was done at least once this period, not exact days since last replacement.{' '}
-            <strong className="font-semibold">Day Count is recommended for equipment wear.</strong>
-          </span>
+          {/* Weekday — single "On the [1st ▾] [Friday ▾]" combined row */}
+          {value.scheduleType === 'weekday' && (
+            <div className="space-y-2">
+              <span className="text-sm text-muted-foreground">On the</span>
+              <div className="flex items-start gap-2 flex-wrap">
+                {/* Week number pills */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {WEEK_NUMBERS.map(({ value: v, label }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => set({ dueWeekNumber: v })}
+                      className={cn(PILL_BASE, value.dueWeekNumber === v ? PILL_ON : PILL_OFF)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {/* Weekday pills */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {WEEKDAYS.map(({ value: v, label }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => set({ dueWeekday: v })}
+                      className={cn(PILL_BASE, value.dueWeekday === v ? PILL_ON : PILL_OFF)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Frequency — inside the box, below the day-rule control */}
+          <FrequencySection value={value} onChange={onChange} />
+
+          {/* Live summary sentence */}
+          <p className="text-sm font-medium text-primary">{summary}</p>
+
+          {/* Wear warning — Filter Replacement only, inside the box */}
+          {showWarning && (
+            <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
+              <span>
+                Period-based cadence tracks whether this was done at least once this period, not exact days since last replacement.{' '}
+                <strong className="font-semibold">Day Count is recommended for equipment wear.</strong>
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
