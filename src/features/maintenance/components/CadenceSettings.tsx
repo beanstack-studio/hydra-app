@@ -1,6 +1,13 @@
 import { AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { CadenceConfig, ScheduleType, FrequencyCadence } from '../lib/cadenceUtils'
 
@@ -186,38 +193,36 @@ export function CadenceSettings({ value, onChange, showWearWarning = false }: Ca
             </div>
           )}
 
-          {/* Weekday — single "On the [1st ▾] [Friday ▾]" combined row */}
+          {/* Weekday — "On the [1st ▾] [Monday ▾]" dropdowns */}
           {value.scheduleType === 'weekday' && (
-            <div className="space-y-2">
-              <span className="text-sm text-muted-foreground">On the</span>
-              <div className="flex items-start gap-2 flex-wrap">
-                {/* Week number pills */}
-                <div className="flex gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">On the</span>
+              <Select
+                value={String(value.dueWeekNumber ?? 1)}
+                onValueChange={(v) => set({ dueWeekNumber: parseInt(v, 10) })}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {WEEK_NUMBERS.map(({ value: v, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => set({ dueWeekNumber: v })}
-                      className={cn(PILL_BASE, value.dueWeekNumber === v ? PILL_ON : PILL_OFF)}
-                    >
-                      {label}
-                    </button>
+                    <SelectItem key={v} value={String(v)}>{label}</SelectItem>
                   ))}
-                </div>
-                {/* Weekday pills */}
-                <div className="flex gap-1.5 flex-wrap">
+                </SelectContent>
+              </Select>
+              <Select
+                value={String(value.dueWeekday ?? 1)}
+                onValueChange={(v) => set({ dueWeekday: parseInt(v, 10) })}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {WEEKDAYS.map(({ value: v, label }) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => set({ dueWeekday: v })}
-                      className={cn(PILL_BASE, value.dueWeekday === v ? PILL_ON : PILL_OFF)}
-                    >
-                      {label}
-                    </button>
+                    <SelectItem key={v} value={String(v)}>{label}</SelectItem>
                   ))}
-                </div>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
