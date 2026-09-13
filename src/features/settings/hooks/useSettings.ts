@@ -19,6 +19,7 @@ export interface UseSettingsReturn {
   addProduct: (input: ProductInput) => Promise<void>
   updateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
   deleteProduct: (id: string) => Promise<void>
+  reorderProducts: (updates: { id: string; sort_order: number }[]) => Promise<void>
   updateStationSettings: (input: Partial<StationSettingsInput>) => Promise<void>
   updateStationName: (name: string) => Promise<void>
   uploadStationPhoto: (file: File) => Promise<void>
@@ -60,7 +61,7 @@ export function useSettings(): UseSettingsReturn {
           .select('*')
           .eq('station_id', stationId)
           .order('type')
-          .order('name'),
+          .order('sort_order'),
         supabase
           .from('station_settings')
           .select('*')
@@ -149,6 +150,15 @@ export function useSettings(): UseSettingsReturn {
     await fetchData()
   }, [fetchData])
 
+  const reorderProducts = useCallback(async (updates: { id: string; sort_order: number }[]) => {
+    await Promise.all(
+      updates.map(({ id, sort_order }) =>
+        supabase.from('products').update({ sort_order, updated_at: new Date().toISOString() }).eq('id', id)
+      )
+    )
+    await fetchData()
+  }, [fetchData])
+
   const updateStationSettings = useCallback(async (input: Partial<StationSettingsInput>) => {
     if (!stationId) return
     const { error: e } = await supabase
@@ -198,7 +208,7 @@ export function useSettings(): UseSettingsReturn {
 
   return {
     data, isLoading, error,
-    addProduct, updateProduct, deleteProduct,
+    addProduct, updateProduct, deleteProduct, reorderProducts,
     updateStationSettings, updateStationName, uploadStationPhoto,
     addContact, updateContact, deleteContact,
   }

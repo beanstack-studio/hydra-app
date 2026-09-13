@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ArrowUpDown, GripHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ArrowUpDown, GripHorizontal, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +44,9 @@ interface DataTableProps<T> {
   // Forces table-fixed w-full mode so the table never exceeds the viewport.
   // Use alongside col.className width hints (e.g. "w-28") and truncation in renders.
   fitViewport?: boolean
+  // Enables row drag-to-reorder within the table (owner-gated by parent)
+  draggableRows?: boolean
+  onRowReorder?: (fromId: string, toId: string) => void
 }
 
 const MIN_COL_WIDTH = 80
@@ -66,6 +69,8 @@ export function DataTable<T>({
   externalColumnOrder,
   onColumnReorder,
   fitViewport = false,
+  draggableRows = false,
+  onRowReorder,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(0)
 
@@ -139,6 +144,49 @@ export function DataTable<T>({
     document.addEventListener('pointermove', onMove)
     document.addEventListener('pointerup', onUp)
   }, [tableId, saveColumnOrder])
+
+  // ── Row drag state ──────────────────────────────────────────────────────────
+  const [dragRowId, setDragRowId] = useState<string | null>(null)
+  const [dropRowId, setDropRowId] = useState<string | null>(null)
+  const dragRowRef = useRef<string | null>(null)
+  const dropRowRef = useRef<string | null>(null)
+
+  const startRowDrag = useCallback((id: string, e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggableRows || !onRowReorder) return
+    e.preventDefault()
+    e.stopPropagation()
+    dragRowRef.current = id
+    dropRowRef.current = null
+    setDragRowId(id)
+    setDropRowId(null)
+
+    const onMove = (ev: PointerEvent) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY)
+      const tr = el?.closest('[data-row-key]') as HTMLElement | null
+      const targetId = tr?.dataset.rowKey ?? null
+      if (targetId !== dropRowRef.current) {
+        dropRowRef.current = targetId
+        setDropRowId(targetId)
+      }
+    }
+
+    const onUp = () => {
+      const src = dragRowRef.current
+      const tgt = dropRowRef.current
+      if (src && tgt && src !== tgt) {
+        onRowReorder(src, tgt)
+      }
+      dragRowRef.current = null
+      dropRowRef.current = null
+      setDragRowId(null)
+      setDropRowId(null)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }, [draggableRows, onRowReorder])
 
   // ── Column resize (pointer events — works on touch + mouse) ──────────────
   const [dragWidths, setDragWidths] = useState<Record<string, number>>({})
@@ -242,6 +290,7 @@ export function DataTable<T>({
           )}
           <thead>
             <tr className="border-b border-border bg-muted/60">
+              {draggableRows && <th className="w-8 px-2 py-3" aria-label="Row order" />}
               {orderedVisibleCols.map((col) => (
                 <th
                   key={col.key}
@@ -306,13 +355,29 @@ export function DataTable<T>({
             {pageData.map((row) => (
               <tr
                 key={rowKey(row)}
+                data-row-key={rowKey(row)}
                 className={cn(
                   'group border-b border-border last:border-0 transition-colors duration-150',
                   onRowClick && 'cursor-pointer hover:bg-accent/70',
-                  rowClassName?.(row)
+                  rowClassName?.(row),
+                  draggableRows && dragRowId === rowKey(row) && 'opacity-40',
+                  draggableRows && dropRowId === rowKey(row) && dragRowId !== rowKey(row) && 'bg-primary/10',
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
+                {draggableRows && (
+                  <td className="w-8 px-2 py-3">
+                    <button
+                      type="button"
+                      aria-label="Drag to reorder row"
+                      className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors duration-150 touch-none"
+                      onPointerDown={(e) => startRowDrag(rowKey(row), e)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                  </td>
+                )}
                 {orderedVisibleCols.map((col) => (
                   <td key={col.key} className={cn('px-4 py-3 text-foreground', fitViewport && 'overflow-hidden', col.className)}>
                     {col.render(row)}

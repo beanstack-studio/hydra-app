@@ -96,7 +96,7 @@ export default function SettingsPage() {
 
   const {
     data, isLoading, error,
-    addProduct, updateProduct, deleteProduct,
+    addProduct, updateProduct, deleteProduct, reorderProducts,
     updateStationSettings, updateStationName, uploadStationPhoto,
     addContact, updateContact, deleteContact,
   } = useSettings()
@@ -154,6 +154,7 @@ export default function SettingsPage() {
             onAddProduct={addProduct}
             onUpdateProduct={updateProduct}
             onDeleteProduct={deleteProduct}
+            onReorderProducts={reorderProducts}
             onUpdateStationSettings={updateStationSettings}
             supplyProductMap={supplyProductMap}
           />

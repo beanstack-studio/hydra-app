@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -60,6 +60,7 @@ interface ProductsTabProps {
   onUpdateProduct: (id: string, input: Partial<ProductInput>) => Promise<void>
   onDeleteProduct: (id: string) => Promise<void>
   onUpdateStationSettings: (input: Partial<StationSettingsInput>) => Promise<void>
+  onReorderProducts: (updates: { id: string; sort_order: number }[]) => Promise<void>
   supplyProductMap: Record<string, string[]>
 }
 
@@ -313,6 +314,7 @@ export function ProductsTab({
   onUpdateProduct,
   onDeleteProduct,
   onUpdateStationSettings,
+  onReorderProducts,
   supplyProductMap,
 }: ProductsTabProps) {
   const { toast } = useToast()
@@ -326,7 +328,7 @@ export function ProductsTab({
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [isDeletingProduct, setIsDeletingProduct] = useState(false)
 
-  const [sortKey, setSortKey] = useState<'name' | 'price'>('name')
+  const [sortKey, setSortKey] = useState<'name' | 'price' | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const openAdd = (type: ItemType) => {
@@ -344,7 +346,12 @@ export function ProductsTab({
   const handleSort = (key: string) => {
     const k = key as 'name' | 'price'
     if (sortKey === k) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      if (sortDir === 'desc') {
+        setSortKey(null)
+        setSortDir('asc')
+      } else {
+        setSortDir('desc')
+      }
     } else {
       setSortKey(k)
       setSortDir('asc')
@@ -365,11 +372,32 @@ export function ProductsTab({
     }
   }
 
-  const sortProducts = (list: Product[]) =>
-    [...list].sort((a, b) => {
+  const handleReorder = useCallback((type: ItemType, fromId: string, toId: string) => {
+    const list = products
+      .filter((p) => p.type === type)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    const fromIdx = list.findIndex((p) => p.id === fromId)
+    const toIdx = list.findIndex((p) => p.id === toId)
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return
+    const newList = [...list]
+    const [moved] = newList.splice(fromIdx, 1)
+    newList.splice(toIdx, 0, moved)
+    const updates = newList
+      .map((p, i) => ({ id: p.id, sort_order: i + 1 }))
+      .filter(({ id, sort_order }) => {
+        const orig = list.find((p) => p.id === id)!
+        return orig.sort_order !== sort_order
+      })
+    if (updates.length > 0) void onReorderProducts(updates)
+  }, [products, onReorderProducts])
+
+  const sortProducts = (list: Product[]) => {
+    if (sortKey === null) return [...list].sort((a, b) => a.sort_order - b.sort_order)
+    return [...list].sort((a, b) => {
       const cmp = sortKey === 'price' ? a.price - b.price : a.name.localeCompare(b.name)
       return sortDir === 'asc' ? cmp : -cmp
     })
+  }
 
   const columns: Column<Product>[] = [
     {
@@ -466,10 +494,12 @@ export function ProductsTab({
             columns={columns}
             data={waterProducts}
             rowKey={(p) => p.id}
-            sortKey={sortKey}
+            sortKey={sortKey ?? undefined}
             sortDir={sortDir}
             onSort={handleSort}
             onRowClick={isOwner ? openEditProduct : undefined}
+            draggableRows={isOwner && sortKey === null}
+            onRowReorder={(fromId, toId) => handleReorder('water', fromId, toId)}
           />
         )}
       </div>
@@ -485,10 +515,12 @@ export function ProductsTab({
             columns={columns}
             data={iceProducts}
             rowKey={(p) => p.id}
-            sortKey={sortKey}
+            sortKey={sortKey ?? undefined}
             sortDir={sortDir}
             onSort={handleSort}
             onRowClick={isOwner ? openEditProduct : undefined}
+            draggableRows={isOwner && sortKey === null}
+            onRowReorder={(fromId, toId) => handleReorder('ice', fromId, toId)}
           />
         )}
       </div>
@@ -504,10 +536,12 @@ export function ProductsTab({
             columns={columns}
             data={addonProducts}
             rowKey={(p) => p.id}
-            sortKey={sortKey}
+            sortKey={sortKey ?? undefined}
             sortDir={sortDir}
             onSort={handleSort}
             onRowClick={isOwner ? openEditProduct : undefined}
+            draggableRows={isOwner && sortKey === null}
+            onRowReorder={(fromId, toId) => handleReorder('addon', fromId, toId)}
           />
         )}
       </div>
